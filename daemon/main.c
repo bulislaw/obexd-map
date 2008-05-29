@@ -34,9 +34,6 @@
 
 #include <glib.h>
 
-/* FIXME: */
-#define CONFIG_FILE	"~/.obexd/obexd.conf"
-	
 static GMainLoop *main_loop;
 
 static void sig_term(int sig)
@@ -51,35 +48,6 @@ static void sig_hup(int sig)
 static void sig_debug(int sig)
 {
 	        toggle_debug();
-}
-
-static int read_config_file(const gchar *filename)
-{
-	GKeyFile *keyfile;
-	GError *gerr = NULL;
-	int err;
-
-	keyfile = g_key_file_new();
-	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
-		error("Parsing %s failed: %s", filename, gerr->message);
-		g_error_free(gerr);
-		g_key_file_free(keyfile);
-		return -EIO;
-	}
-
-	/* FIXME: Parse obexd.conf */
-
-	err = obex_bt_init();
-	if (err < 0)
-		goto fail;
-
-	g_key_file_free(keyfile);
-
-	return 0;
-fail:
-
-	g_key_file_free(keyfile);
-	return err;
 }
 
 static void usage(void)
@@ -141,8 +109,7 @@ int main(int argc, char *argv[])
 	/* Create event loop */
 	main_loop = g_main_loop_new(NULL, FALSE);
 
-	/* FIXME: */
-	read_config_file(CONFIG_FILE);
+	obex_bt_init();
 
 	/* Start event processor */
 	g_main_loop_run(main_loop);

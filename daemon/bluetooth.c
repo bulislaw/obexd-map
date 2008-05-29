@@ -180,7 +180,7 @@ static int server_register(const char *name, uint16_t service,
 
 	laddr.rc_family = AF_BLUETOOTH;
 	bacpy(&laddr.rc_bdaddr, BDADDR_ANY);
-	laddr.rc_channel = channel; 
+	laddr.rc_channel = channel;
 
 	if (bind(sk, (struct sockaddr *)&laddr, sizeof(laddr)) < 0) {
 		err = errno;
@@ -230,7 +230,7 @@ int obex_bt_init(void)
 		goto failed;
 	}
 
-	/* FIXME: Pase the content */
+	/* FIXME: Parse the content */
 	err = server_register("OBEX FTP Server", 0x1106, 10, "/tmp/ftp", TRUE);
 	if (err < 0)
 		goto failed;
