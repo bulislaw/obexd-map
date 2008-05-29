@@ -1,0 +1,34 @@
+AC_PREREQ(2.50)
+AC_INIT()
+
+AM_INIT_AUTOMAKE(obexd, 0.01)
+AM_CONFIG_HEADER(config.h)
+
+AM_MAINTAINER_MODE
+
+AC_LANG_C
+
+AC_PROG_CC
+AC_PROG_INSTALL
+
+m4_define([_LT_AC_TAGCONFIG], [])
+m4_ifdef([AC_LIBTOOL_TAGS], [AC_LIBTOOL_TAGS([])])
+
+AC_DISABLE_STATIC
+AC_PROG_LIBTOOL
+
+AC_PATH_GLIB
+AC_PATH_DBUS
+AC_PATH_BLUEZ
+AC_PATH_OPENOBEX
+
+AC_ARG_OBEXD
+
+AC_OUTPUT([
+	Makefile
+	doc/Makefile
+	common/Makefile
+	gdbus/Makefile
+	daemon/Makefile
+	test/Makefile
+])
