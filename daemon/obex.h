@@ -26,3 +26,9 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+
+#define OBEX_OPUSH	0x00
+#define OBEX_FTP	0x01
+
+gint obex_server_start(gint fd, gint mtu, guint16 svc);
+gint obex_server_stop();

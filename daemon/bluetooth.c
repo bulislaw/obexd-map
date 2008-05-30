@@ -40,10 +40,13 @@
 #include <glib.h>
 #include <dbus/dbus.h>
 
+#include <openobex/obex.h>
+#include <openobex/obex_const.h>
+
 #include "obex.h"
 
 /* FIXME: */
-#define CONFIG_FILE	"~/.obexd/bluetooth.conf"
+#define CONFIG_FILE	"./bluetooth.conf"
 
 /* FIXME: */
 #define ftp_record "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
@@ -100,17 +103,16 @@
 "
 
 struct server {
-	uint8_t	 channel;
-	uint16_t service;
-	uint32_t record;	/* Service Record Handle */
-	gboolean auto_accept;
-	char	*folder;
-	char	*uuid;
+	guint8		channel;
+	guint16		service;
+	guint32		record;
+	gboolean	auto_accept;
+	gchar		*folder;
+	gchar		*uuid;
 };
 
 static GSList *servers = NULL;
 static DBusConnection *conn = NULL;
-
 static uint32_t register_service_record(const char *xml)
 {
 	return 0;
@@ -120,8 +122,9 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 {
 	struct sockaddr_rc raddr;
 	socklen_t alen;
-	char address[18];
-	int err, sk, nsk;
+	guint16 *svc = user_data;
+	gchar address[18];
+	gint err, sk, nsk;
 
 	sk = g_io_channel_unix_get_fd(io);
 	alen = sizeof(raddr);
@@ -140,7 +143,7 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 	ba2str(&raddr.rc_bdaddr, address);
 	info("New connection from: %s channel: %d", address, raddr.rc_channel);
 
-	if (obex_server_start(nsk, 0) < 0)
+	if (obex_server_start(nsk, 0, *svc) < 0)
 		close(nsk);
 
 	return TRUE;
@@ -148,15 +151,20 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 
 static void server_destroyed(gpointer user_data)
 {
+	guint16 *svc = user_data;
 	error("Server destroyed");
+
+	g_free(svc);
 }
 
-static int server_register(const char *name, uint16_t service,
-		uint8_t channel, const char *folder, gboolean auto_accept)
+static gint server_register(const gchar *name, guint16 service,
+		guint8 channel, const gchar *folder, gboolean auto_accept)
 {
 	struct sockaddr_rc laddr;
 	GIOChannel *io;
-	int err, sk, arg, lm = 0;
+	gint err, sk, arg, lm = 0;
+	guint16 *svc;
+	const gchar *bda_str = "00:12:5A:0F:D8:BB";
 
 	/* FIXME: Add the service record */
 
@@ -179,11 +187,12 @@ static int server_register(const char *name, uint16_t service,
 		goto failed;
 	}
 
+	memset(&laddr, 0, sizeof(laddr));
 	laddr.rc_family = AF_BLUETOOTH;
-	bacpy(&laddr.rc_bdaddr, BDADDR_ANY);
+	str2ba(bda_str, &laddr.rc_bdaddr);
 	laddr.rc_channel = channel;
 
-	if (bind(sk, (struct sockaddr *)&laddr, sizeof(laddr)) < 0) {
+	if (bind(sk, (struct sockaddr *) &laddr, sizeof(laddr)) < 0) {
 		err = errno;
 		goto failed;
 	}
@@ -194,10 +203,12 @@ static int server_register(const char *name, uint16_t service,
 	}
 
 	io = g_io_channel_unix_new(sk);
+	svc = g_malloc0(sizeof(guint16));
+	*svc = service;
 	g_io_channel_set_close_on_unref(io, TRUE);
 	g_io_add_watch_full(io, G_PRIORITY_DEFAULT,
 			G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
-			connect_event, NULL, server_destroyed);
+			connect_event, svc, server_destroyed);
 	g_io_channel_unref(io);
 
 	return 0;
@@ -209,19 +220,19 @@ failed:
 	return -err;
 }
 
-static int server_unregister(uint16_t service)
+static gint server_unregister(guint16 service)
 {
 	/* FIXME: Remove service record and disable it */
 
 	return 0;
 }
 
-int obex_bt_init(void)
+gint obex_bt_init(void)
 {
 	GKeyFile *keyfile;
 	GError *gerr = NULL;
 	DBusError derr;
-	int err;
+	gint err;
 
 	keyfile = g_key_file_new();
 

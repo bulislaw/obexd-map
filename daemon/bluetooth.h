@@ -27,5 +27,5 @@
 #include <config.h>
 #endif
 
-int obex_bt_init(void);
+gint obex_bt_init(void);
 void obex_bt_exit(void);
