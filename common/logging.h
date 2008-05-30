@@ -25,6 +25,7 @@
 void info(const char *format, ...);
 void error(const char *format, ...);
 void debug(const char *format, ...);
+void obex_debug(int evt, int cmd, int rsp);
 void toggle_debug(void);
 void enable_debug(void);
 void disable_debug(void);
