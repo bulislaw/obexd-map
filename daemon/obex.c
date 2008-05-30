@@ -49,36 +49,16 @@ struct obex_handlers {
 	void (*setpath) (obex_t *obex, obex_object_t *obj);
 };
 
-static void ftp_connect(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
-static void ftp_get(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
-static void ftp_put(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
-static void ftp_setpath(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
-static struct obex_handlers opp_handlers = {
+struct obex_handlers opp = {
 	.target		= NULL,
-	.connect	= NULL,
+	.connect	= opp_connect,
 	.disconnect	= NULL,
 	.get		= NULL,
-	.put		= NULL,
+	.put		= opp_put,
 	.setpath	= NULL,
 };
 
-static struct obex_handlers ftp_handlers = {
+struct obex_handlers ftp = {
 	.target		= { 0xF9, 0xEC, 0x7B, 0xC4, 0x95, 0x3C, 0x11, 0xD2, 0x98, 0x4E, 0x52, 0x54, 0x00, 0xDC, 0x9E, 0x09 },
 	.connect	= ftp_connect,
 	.disconnect	= NULL,
@@ -243,10 +223,10 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 
 	switch (svc) {
 	case OBEX_FTP:
-		hl = &ftp_handlers;
+		hl = &ftp;
 		break;
 	case OBEX_OPUSH:
-		hl = &opp_handlers;
+		hl = &opp;
 		break;
 	}
 

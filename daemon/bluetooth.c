@@ -113,6 +113,7 @@ struct server {
 
 static GSList *servers = NULL;
 static DBusConnection *conn = NULL;
+
 static uint32_t register_service_record(const char *xml)
 {
 	return 0;

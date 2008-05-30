@@ -1,6 +1,6 @@
 sbin_PROGRAMS = obexd
 
-obexd_SOURCES = obex.h obex.c bluetooth.h bluetooth.c main.c
+obexd_SOURCES = opp.c ftp.c obex.h obex.c bluetooth.h bluetooth.c main.c
 
 obexd_LDADD = $(top_builddir)/common/liblogging.a \
 		@BLUEZ_LIBS@ @DBUS_LIBS@ @GDBUS_LIBS@ @GLIB_LIBS@ @OPENOBEX_LIBS@

@@ -27,16 +27,15 @@
 #include <config.h>
 #endif
 
-#define OBEX_OPUSH	0x00
-#define OBEX_FTP	0x01
+#include <openobex/obex.h>
+#include <openobex/obex_const.h>
 
-gint obex_server_start(gint fd, gint mtu, guint16 svc);
-gint obex_server_stop();
+void opp_connect(obex_t *obex, obex_object_t *obj)
+{
 
-void opp_connect(obex_t *obex, obex_object_t *obj);
-void opp_put(obex_t *obex, obex_object_t *obj);
+}
 
-void ftp_connect(obex_t *obex, obex_object_t *obj);
-void ftp_get(obex_t *obex, obex_object_t *obj);
-void ftp_put(obex_t *obex, obex_object_t *obj);
-void ftp_setpath(obex_t *obex, obex_object_t *obj);
+void opp_put(obex_t *obex, obex_object_t *obj)
+{
+
+}
