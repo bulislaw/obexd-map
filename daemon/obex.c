@@ -3,6 +3,7 @@
  *  obexd - OBEX Daemon
  *
  *  Copyright (C) 2008  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2008  Nokia Corporation
  *  Copyright (C) 2008  INdT - Instituto Nokia de Tecnologia
  *
  *

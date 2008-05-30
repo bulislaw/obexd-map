@@ -1,6 +1,7 @@
 /*
  *
- *  BlueZ - Bluetooth protocol stack for Linux
+ *
+ *  obexd - OBEX Daemon
  *
  *  Copyright (C) 2004-2008  Marcel Holtmann <marcel@holtmann.org>
  *

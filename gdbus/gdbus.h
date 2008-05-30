@@ -1,6 +1,6 @@
 /*
  *
- *  BlueZ - Bluetooth protocol stack for Linux
+ *  obexd - OBEX Daemon
  *
  *  Copyright (C) 2004-2008  Marcel Holtmann <marcel@holtmann.org>
  *
@@ -31,13 +31,13 @@ extern "C" {
 #include <dbus/dbus.h>
 #include <glib.h>
 
-typedef void (* GDBusDisconnectFunction) (void *user_data);
+typedef void (* GDBusWatchFunction) (void *user_data);
 
 DBusConnection *g_dbus_setup_bus(DBusBusType type, const char *name,
 							DBusError *error);
 
 gboolean g_dbus_set_disconnect_function(DBusConnection *connection,
-				GDBusDisconnectFunction function,
+				GDBusWatchFunction function,
 				void *user_data, DBusFreeFunction destroy);
 
 #define DBUS_TYPE_STRING_ARRAY_AS_STRING (DBUS_TYPE_ARRAY_AS_STRING DBUS_TYPE_STRING_AS_STRING)
@@ -185,14 +185,12 @@ gboolean g_dbus_send_reply(DBusConnection *connection,
 gboolean g_dbus_send_reply_valist(DBusConnection *connection,
 				DBusMessage *message, int type, va_list args);
 
-typedef void (*name_cb_t)(const char *name, void *user_data);
-
-guint name_listener_add(DBusConnection *connection, const char *name,
-				name_cb_t func, void *user_data);
-int name_listener_remove(DBusConnection *connection, const char *name,
-				name_cb_t func, void *user_data);
-gboolean name_listener_id_remove(guint id);
-int name_listener_indicate_disconnect(DBusConnection *connection);
+guint g_dbus_add_disconnect_watch(DBusConnection *connection,
+				const char *name,
+				GDBusWatchFunction function,
+				void *user_data, GDBusDestroyFunction destroy);
+gboolean g_dbus_remove_watch(DBusConnection *connection, guint tag);
+void g_dbus_remove_all_watches(DBusConnection *connection);
 
 #ifdef __cplusplus
 }
