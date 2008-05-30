@@ -241,10 +241,6 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 		return ret;
 	}
 
-	io = g_io_channel_unix_new(fd);
-	g_io_add_watch_full(io, G_PRIORITY_DEFAULT,
-				G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
-				obex_handle_input, obex, obex_handle_destroy);
 	switch (svc) {
 	case OBEX_FTP:
 		hl = &ftp_handlers;
@@ -255,6 +251,11 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	}
 
 	OBEX_SetUserData(obex, hl);
+
+	io = g_io_channel_unix_new(fd);
+	g_io_add_watch_full(io, G_PRIORITY_DEFAULT,
+			G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+			obex_handle_input, obex, obex_handle_destroy);
 	g_io_channel_unref(io);
 
 	return 0;
