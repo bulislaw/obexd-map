@@ -30,22 +30,20 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
-void ftp_connect(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
-
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+			OBEX_RSP_NOT_IMPLEMENTED);
 }
 
 void ftp_put(obex_t *obex, obex_object_t *obj)
 {
-
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+			OBEX_RSP_NOT_IMPLEMENTED);
 }
 
 void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
-
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+			OBEX_RSP_NOT_IMPLEMENTED);
 }

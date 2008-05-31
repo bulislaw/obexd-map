@@ -153,6 +153,7 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 static void server_destroyed(gpointer user_data)
 {
 	guint16 *svc = user_data;
+
 	error("Server destroyed");
 
 	g_free(svc);
@@ -244,7 +245,7 @@ gint obex_bt_init(void)
 	}
 
 	/* FIXME: Parse the content */
-	err = server_register("OBEX FTP Server", 0x1106, 10, "/tmp/ftp", TRUE);
+	err = server_register("OBEX FTP Server", OBEX_FTP, 10, "/tmp/ftp", TRUE);
 	if (err < 0)
 		goto failed;
 

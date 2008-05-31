@@ -40,10 +40,20 @@
 
 #include "obex.h"
 
+#define TARGET_SIZE	16
+#define FTP_TARGET	"\xF9\xEC\x7B\xC4\x95\x3C\x11\xD2\x98\x4E\x52\x54\x00\xDC\x9E\x09"
+
+/* Connection ID */
+static guint32 cid = 0x0000;
+
+typedef struct {
+    guint8	version;
+    guint8	flags;
+    guint16	mtu;
+} __attribute__ ((packed)) obex_connect_hdr_t;
+
 struct obex_handlers {
-	guint8 target[16];
-	void (*connect) (obex_t *obex, obex_object_t *obj);
-	void (*disconnect) (obex_t *obex, obex_object_t *obj);
+	guint8 *target;
 	void (*get) (obex_t *obex, obex_object_t *obj);
 	void (*put) (obex_t *obex, obex_object_t *obj);
 	void (*setpath) (obex_t *obex, obex_object_t *obj);
@@ -51,21 +61,74 @@ struct obex_handlers {
 
 struct obex_handlers opp = {
 	.target		= NULL,
-	.connect	= opp_connect,
-	.disconnect	= NULL,
 	.get		= NULL,
 	.put		= opp_put,
 	.setpath	= NULL,
 };
 
 struct obex_handlers ftp = {
-	.target		= { 0xF9, 0xEC, 0x7B, 0xC4, 0x95, 0x3C, 0x11, 0xD2, 0x98, 0x4E, 0x52, 0x54, 0x00, 0xDC, 0x9E, 0x09 },
-	.connect	= ftp_connect,
-	.disconnect	= NULL,
+	.target		= FTP_TARGET,
 	.get		= ftp_get,
 	.put		= ftp_put,
 	.setpath	= ftp_setpath,
 };
+
+static void cmd_connect(obex_t *obex, obex_object_t *obj, guint8 *target)
+{
+	obex_connect_hdr_t *nonhdr;
+	obex_headerdata_t hd;
+	const guint8 *t;
+	guint ts, hlen, newsize;
+	guint16 mtu;
+	guint8 hi;
+
+	/* FIXME: Reject if NonHdrData is invalid? */
+	if (OBEX_ObjectGetNonHdrData(obj, (guint8 **) &nonhdr) != sizeof(*nonhdr)) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		debug("Invalid OBEX CONNECT packet");
+		return;
+	}
+
+	mtu = g_ntohs(nonhdr->mtu);
+	debug("Version: 0x%02x. Flags: 0x%02x  OBEX packet length: %d",
+			nonhdr->version, nonhdr->flags, mtu);
+	/* Leave space for headers */
+	newsize = mtu - 200;
+	debug("Resizing stream chunks to %d", newsize);
+	/* FIXME: Use the new size */
+
+	if (!target) {
+		/* OPP doesn't contains target */
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+		return;
+	}
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		if (hi == OBEX_HDR_TARGET) {
+			t = hd.bs;
+			ts = hlen;
+		}
+	}
+
+	if ((ts != TARGET_SIZE) || memcmp(target, t, TARGET_SIZE) != 0) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
+	}
+
+	/* FIXME: Add non header values */
+
+	hd.bs = target;
+	OBEX_ObjectAddHeader(obex, obj,
+			OBEX_HDR_WHO, hd, TARGET_SIZE,
+			OBEX_FL_FIT_ONE_PACKET);
+	hd.bs = NULL;
+	hd.bq4 = ++cid;
+	OBEX_ObjectAddHeader(obex, obj,
+			OBEX_HDR_CONNECTION, hd, 4,
+			OBEX_FL_FIT_ONE_PACKET);
+
+	OBEX_ObjectSetRsp (obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+}
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 					gint evt, gint cmd, gint rsp)
@@ -98,7 +161,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		case OBEX_CMD_GET:
 		case OBEX_CMD_CONNECT:
 		case OBEX_CMD_DISCONNECT:
-			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+					OBEX_RSP_SUCCESS);
 			break;
 		default:
 			OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
@@ -127,12 +191,9 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		/* FIXME: call handles */
 		switch (cmd) {
 		case OBEX_CMD_DISCONNECT:
-			if (hl->disconnect)
-				hl->disconnect(obex, obj);
 			break;
 		case OBEX_CMD_CONNECT:
-			if (hl->connect)
-				hl->connect(obex, obj);
+			cmd_connect(obex, obj, hl->target);
 			break;
 		case OBEX_CMD_SETPATH:
 			if (hl->setpath)
@@ -181,7 +242,6 @@ static void obex_handle_destroy(gpointer user_data)
 {
 	obex_t *obex = user_data;
 
-
 	OBEX_Cleanup(obex);
 }
 
@@ -211,16 +271,6 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	obex_t *obex;
 	gint ret;
 
-	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
-	if (!obex)
-		return -EIO;
-
-	ret = FdOBEX_TransportSetup(obex, fd, fd, mtu);
-	if (ret < 0) {
-		OBEX_Cleanup(obex);
-		return ret;
-	}
-
 	switch (svc) {
 	case OBEX_FTP:
 		hl = &ftp;
@@ -228,9 +278,22 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	case OBEX_OPUSH:
 		hl = &opp;
 		break;
+	default:
+		debug("Invalid OBEX server");
+		return -EINVAL;
 	}
 
+	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
+	if (!obex)
+		return -EIO;
+
 	OBEX_SetUserData(obex, hl);
+
+	ret = FdOBEX_TransportSetup(obex, fd, fd, mtu);
+	if (ret < 0) {
+		OBEX_Cleanup(obex);
+		return ret;
+	}
 
 	io = g_io_channel_unix_new(fd);
 	g_io_add_watch_full(io, G_PRIORITY_DEFAULT,
