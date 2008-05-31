@@ -180,6 +180,14 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		break;
 	case OBEX_EV_REQ:
 		hl = OBEX_GetUserData(obex);
+		switch (cmd) {
+		case OBEX_CMD_SETPATH:
+		case OBEX_CMD_GET:
+		case OBEX_CMD_PUT:
+			/* FIXME: Check target */
+			break;
+		}
+
 		/* FIXME: call handles */
 		switch (cmd) {
 		case OBEX_CMD_DISCONNECT:
