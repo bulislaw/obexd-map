@@ -103,14 +103,14 @@ static void cmd_connect(obex_t *obex, obex_object_t *obj, guint8 *target)
 		return;
 	}
 
+	hi = ts = 0;
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
-		if (hi == OBEX_HDR_TARGET) {
-			t = hd.bs;
-			ts = hlen;
-		}
+		t = hd.bs;
+		ts = hlen;
 	}
 
-	if ((ts != TARGET_SIZE) || memcmp(target, t, TARGET_SIZE) != 0) {
+	if (hi != OBEX_HDR_TARGET || ts != TARGET_SIZE
+			|| memcmp(target, t, TARGET_SIZE) != 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
