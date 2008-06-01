@@ -140,14 +140,41 @@ static void cmd_connect(struct obex_session *os,
 	os->cid = cid;
 }
 
+static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
+{
+	obex_headerdata_t hd;
+	guint hlen;
+	guint8 hi;
+	gboolean ret = FALSE;
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		if (hi == OBEX_HDR_CONNECTION && hlen == 4) {
+			ret = (hd.bq4 == cid ? TRUE : FALSE);
+			break;
+		}
+	}
+
+	if (ret == FALSE)
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_SERVICE_UNAVAILABLE,
+				OBEX_RSP_SERVICE_UNAVAILABLE);
+	else
+		OBEX_ObjectReParseHeaders(obex, obj);
+
+	return ret;
+}
+
 static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
+	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
 }
 
 static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
+	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
 }
@@ -155,6 +182,8 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 static void cmd_setpath(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
+	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
 }
