@@ -165,7 +165,7 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 
 static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
-	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
@@ -173,7 +173,7 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
-	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
@@ -182,7 +182,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 static void cmd_setpath(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
-	g_return_if_fail(chk_cid(obex, obj, os->cid) != TRUE);
+	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
