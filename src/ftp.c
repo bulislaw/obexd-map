@@ -77,6 +77,55 @@ void ftp_put(obex_t *obex, obex_object_t *obj)
 
 void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
-	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-			OBEX_RSP_NOT_IMPLEMENTED);
+	obex_headerdata_t hdr;
+	guint32 hlen;
+	guint8 hi;
+	guint8 *nohdr_data;
+	char *name = NULL;
+
+	OBEX_ObjectGetNonHdrData(obj, &nohdr_data);
+	if (!nohdr_data) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+				OBEX_RSP_PRECONDITION_FAILED);
+		error("Set path failed: flag not found!");
+		return;
+	}
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hdr, &hlen)) {
+		if (hi == OBEX_HDR_NAME) {
+			name = (char *) g_malloc0(hlen/2 + 1);
+			OBEX_UnicodeToChar((uint8_t *)name, hdr.bs, hlen/2);
+			debug("Set path name: %s", name);
+			break;
+		}
+	}
+
+	if ((nohdr_data[0] & 0x01) == 0x01) {
+		debug("Set to parent path");
+		//TODO: Set to patent path
+
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+		goto done;
+	}
+
+	if (!name) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
+		error("Set path failed: name missing!");
+		goto done;
+	}
+
+	if (strlen(name) == 0) {
+		debug("Set to root");
+		//TODO: Set to root
+
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+		goto done;
+	}
+
+	//TODO: Check and set to name path
+
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+
+done:
+	free(name);
 }
