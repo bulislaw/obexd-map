@@ -215,5 +215,3 @@ void obex_debug(int evt, int cmd, int rsp)
 
 	debug("%s(0x%x), %s(0x%x), %s(0x%x)", evtstr, evt, cmdstr, cmd, rspstr, rsp);
 }
-
-

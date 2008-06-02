@@ -27,7 +27,6 @@ AC_ARG_OBEXD
 AC_OUTPUT([
 	Makefile
 	doc/Makefile
-	common/Makefile
 	gdbus/Makefile
 	src/Makefile
 	test/Makefile
