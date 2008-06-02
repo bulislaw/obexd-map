@@ -82,6 +82,8 @@ struct obex_commands ftp = {
 struct obex_session {
 	guint32		cid;
 	guint16		mtu;
+	gchar		*name;
+	gchar		*type;
 	const guint8	*target;
 	struct obex_commands *cmds;
 };
@@ -173,7 +175,43 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 
 static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
+	obex_headerdata_t hd;
+	guint hlen, len;
+	guint8 hi;
+	const gchar *type, *name;
+
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
+
+	if (os->type) {
+		g_free(os->type);
+		os->type = NULL;
+	}
+
+	if (os->name) {
+		g_free(os->name);
+		os->name = NULL;
+	}
+
+	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		switch (hi) {
+		case OBEX_HDR_NAME:
+			if (hlen == 0)
+				continue;
+
+			len = (hlen / 2) + 1;
+			os->name = g_malloc0(len);
+			OBEX_UnicodeToChar(os->name, hd.bs, len);
+			debug("OBEX_HDR_NAME: %s", os->name);
+			break;
+		case OBEX_HDR_TYPE:
+			if (hlen == 0)
+				continue;
+
+			os->type = g_strndup(hd.bs, hlen);
+			debug("OBEX_HDR_TYPE: %s", os->type);
+			break;
+		}
+	}
 
 	os->cmds->get(obex, obj);
 }

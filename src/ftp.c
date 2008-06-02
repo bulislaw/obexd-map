@@ -27,6 +27,8 @@
 #include <config.h>
 #endif
 
+#include <glib.h>
+
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
