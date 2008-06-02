@@ -88,6 +88,15 @@ struct obex_session {
 	struct obex_commands *cmds;
 };
 
+static void obex_session_free(struct obex_session *os)
+{
+	if (os->name)
+		g_free(os->name);
+	if (os->type)
+		g_free(os->type);
+	g_free(os);
+}
+
 static void cmd_connect(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
@@ -323,7 +332,7 @@ static void obex_handle_destroy(gpointer user_data)
 	obex_t *obex = user_data;
 
 	os = OBEX_GetUserData(obex);
-	g_free(os);
+	obex_session_free(os);
 
 	OBEX_Cleanup(obex);
 }
@@ -378,7 +387,7 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 
 	ret = FdOBEX_TransportSetup(obex, fd, fd, mtu);
 	if (ret < 0) {
-		g_free(os);
+		obex_session_free(os);
 		OBEX_Cleanup(obex);
 		return ret;
 	}
