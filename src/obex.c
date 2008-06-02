@@ -62,12 +62,6 @@ static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 			OBEX_RSP_NOT_IMPLEMENTED);
 }
 
-struct obex_commands {
-	void (*get) (obex_t *obex, obex_object_t *obj);
-	void (*put) (obex_t *obex, obex_object_t *obj);
-	void (*setpath) (obex_t *obex, obex_object_t *obj);
-};
-
 struct obex_commands opp = {
 	.get		= cmd_not_implemented,
 	.put		= opp_put,
@@ -78,15 +72,6 @@ struct obex_commands ftp = {
 	.get		= ftp_get,
 	.put		= ftp_put,
 	.setpath	= ftp_setpath,
-};
-
-struct obex_session {
-	guint32		cid;
-	guint16		mtu;
-	gchar		*name;
-	gchar		*type;
-	const guint8	*target;
-	struct obex_commands *cmds;
 };
 
 static void obex_session_free(struct obex_session *os)

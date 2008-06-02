@@ -27,8 +27,25 @@
 #include <config.h>
 #endif
 
+#include <glib.h>
+
 #define OBEX_OPUSH	0x00
 #define OBEX_FTP	0x01
+
+struct obex_commands {
+	void (*get) (obex_t *obex, obex_object_t *obj);
+	void (*put) (obex_t *obex, obex_object_t *obj);
+	void (*setpath) (obex_t *obex, obex_object_t *obj);
+};
+
+struct obex_session {
+	guint32		cid;
+	guint16		mtu;
+	gchar		*name;
+	gchar		*type;
+	const guint8	*target;
+	struct obex_commands *cmds;
+};
 
 gint obex_server_start(gint fd, gint mtu, guint16 svc);
 gint obex_server_stop();

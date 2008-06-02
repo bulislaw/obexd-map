@@ -32,6 +32,8 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "obex.h"
+
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,

@@ -30,6 +30,8 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "obex.h"
+
 void opp_connect(obex_t *obex, obex_object_t *obj)
 {
 
