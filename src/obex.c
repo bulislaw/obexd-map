@@ -89,19 +89,17 @@ static void cmd_connect(struct obex_session *os,
 	obex_connect_hdr_t *nonhdr;
 	obex_headerdata_t hd;
 	const guint8 *target;
-	uint8_t *buffer;
 	guint targetsize, hlen, newsize;
 	guint16 mtu;
 	guint8 hi;
 
 	/* FIXME: Reject if NonHdrData is invalid? */
-	if (OBEX_ObjectGetNonHdrData(obj, &buffer) != sizeof(*nonhdr)) {
+	if (OBEX_ObjectGetNonHdrData(obj, (guint8 **) &nonhdr) != sizeof(*nonhdr)) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		debug("Invalid OBEX CONNECT packet");
 		return;
 	}
 
-	nonhdr = (obex_connect_hdr_t *) buffer;
 	mtu = g_ntohs(nonhdr->mtu);
 	debug("Version: 0x%02x. Flags: 0x%02x  OBEX packet length: %d",
 			nonhdr->version, nonhdr->flags, mtu);
