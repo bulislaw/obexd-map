@@ -46,7 +46,7 @@
 #include "obex.h"
 
 /* FIXME: */
-#define CONFIG_FILE	"./bluetooth.conf"
+#define CONFIG_FILE	"./obex.conf"
 
 /* FIXME: */
 #define ftp_record "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
