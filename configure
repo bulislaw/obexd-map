@@ -10497,7 +10497,7 @@ fi
 
 
 
-ac_config_files="$ac_config_files Makefile doc/Makefile common/Makefile gdbus/Makefile daemon/Makefile test/Makefile"
+ac_config_files="$ac_config_files Makefile doc/Makefile common/Makefile gdbus/Makefile src/Makefile test/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11089,7 +11089,7 @@ do
     "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
     "common/Makefile") CONFIG_FILES="$CONFIG_FILES common/Makefile" ;;
     "gdbus/Makefile") CONFIG_FILES="$CONFIG_FILES gdbus/Makefile" ;;
-    "daemon/Makefile") CONFIG_FILES="$CONFIG_FILES daemon/Makefile" ;;
+    "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "test/Makefile") CONFIG_FILES="$CONFIG_FILES test/Makefile" ;;
 
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5

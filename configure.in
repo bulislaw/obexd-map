@@ -29,6 +29,6 @@ AC_OUTPUT([
 	doc/Makefile
 	common/Makefile
 	gdbus/Makefile
-	daemon/Makefile
+	src/Makefile
 	test/Makefile
 ])
