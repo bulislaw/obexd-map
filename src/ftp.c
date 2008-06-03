@@ -28,6 +28,11 @@
 #endif
 
 #include <fcntl.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #include <glib.h>
 
@@ -36,6 +41,7 @@
 
 #include "logging.h"
 #include "obex.h"
+#include "logging.h"
 
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
@@ -83,6 +89,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	guint8 hi;
 	guint8 *nohdr;
 	char *name = NULL;
+	char *fullname = NULL;
 
 	os = OBEX_GetUserData(obex);
 
@@ -103,11 +110,18 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		}
 	}
 
+	//Check flag "Backup"
 	if ((nohdr[0] & 0x01) == 0x01) {
 		debug("Set to parent path");
-		//TODO: Set to parent path
 
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+		if (strcmp(ROOT_PATH, os->current_path) == 0) {
+			OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+			goto done;
+		}
+
+		os->current_path = g_path_get_dirname(os->current_path);
+		debug("Set to parent path: %s", os->current_path);
+		OBEX_ObjectSetRsp (obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		goto done;
 	}
 
@@ -119,16 +133,39 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 	if (strlen(name) == 0) {
 		debug("Set to root");
-		//TODO: Set to root
+		os->current_path = g_strdup(ROOT_PATH);
 
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		goto done;
 	}
 
-	//TODO: Check and set to name path
+	//Check and set to name path
+	if (strstr(name, "/../")) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		error("Set path failed: name incorrect!");
+		goto done;
+	}
 
-	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+	fullname = g_build_filename(os->current_path, name, NULL);
+	debug("Fullname: %s", fullname);
 
+	if (g_file_test(fullname, G_FILE_TEST_IS_DIR)) {
+		os->current_path = g_strdup(fullname);
+
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
+		goto done;
+	}
+
+	if (!g_file_test(fullname, G_FILE_TEST_EXISTS) && nohdr[0] == 0 &&
+					mkdir(fullname, 0775) >=  0) {
+		os->current_path = g_strdup(fullname);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
+		goto done;
+
+	}
+
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 done:
-	free(name);
+	g_free(name);
+	g_free(fullname);
 }

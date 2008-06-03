@@ -41,6 +41,7 @@
 
 #include "logging.h"
 #include "obex.h"
+#include "logging.h"
 
 #define TARGET_SIZE	16
 static const guint8 FTP_TARGET[TARGET_SIZE] = { 0xF9, 0xEC, 0x7B, 0xC4,
@@ -396,7 +397,7 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
-		os->current_path = FTP_ROOT;
+		os->current_path = g_strdup(ROOT_PATH);
 		break;
 	default:
 		g_free(os);

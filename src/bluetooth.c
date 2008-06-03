@@ -169,7 +169,7 @@ static gint server_register(const gchar *name, guint16 service,
 	GIOChannel *io;
 	gint err, sk, arg;
 	guint16 *svc;
-	const gchar *bda_str = "00:19:DB:99:77:12";
+	const gchar *bda_str = "00:04:61:85:CA:73";
 
 	/* FIXME: Add the service record */
 

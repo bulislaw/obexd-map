@@ -32,6 +32,8 @@
 #define OBEX_OPUSH	0x00
 #define OBEX_FTP	0x01
 
+#define ROOT_PATH "/tmp"
+
 struct obex_commands {
 	void (*get) (obex_t *obex, obex_object_t *obj);
 	void (*put) (obex_t *obex, obex_object_t *obj);
