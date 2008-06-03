@@ -27,5 +27,5 @@
 #include <config.h>
 #endif
 
-gint obex_bt_init(void);
+gint obex_bt_init(const GKeyFile *keyfile);
 void obex_bt_exit(void);

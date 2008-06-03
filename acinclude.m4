@@ -1,3 +1,24 @@
+AC_DEFUN([AC_INIT_OBEXD], [
+	if (test "${CFLAGS}" = ""); then
+		CFLAGS="-Wall -O2"
+	fi
+
+	if (test "${prefix}" = "NONE"); then
+		dnl no prefix and no sysconfdir, so default to /etc
+		if (test "$sysconfdir" = '${prefix}/etc'); then
+			AC_SUBST([sysconfdir], ['/etc'])
+		fi
+	fi
+
+	if (test "$sysconfdir" = '${prefix}/etc'); then
+		configdir="${prefix}/etc/obex"
+	else
+		configdir="${sysconfdir}/obex"
+	fi
+
+	AC_DEFINE_UNQUOTED(CONFIGDIR, "${configdir}", [Directory for the configuration files])
+])
+
 AC_DEFUN([AC_PATH_GLIB], [
 	PKG_CHECK_MODULES(GLIB, glib-2.0, glib_found=yes, glib_found=no)
 	AC_SUBST(GLIB_CFLAGS)

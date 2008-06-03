@@ -32,10 +32,44 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <glib.h>
 
+#include "logging.h"
+#include "bluetooth.h"
+
+#define CONFIG_FILE	"obex.conf"
+
 static GMainLoop *main_loop;
+static gchar *config_file;
+
+static int start_server(void)
+{
+	GKeyFile *keyfile;
+	GError *gerr = NULL;
+	const char *filename = (config_file ? : CONFIGDIR "/" CONFIG_FILE);
+
+	debug("Configuration file: %s", filename);
+
+	keyfile = g_key_file_new();
+
+	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
+		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
+		g_error_free(gerr);
+		return -EINVAL;
+	}
+
+	/* FIXME: Read [General] section */
+
+	obex_bt_init(keyfile);
+
+	g_key_file_free(keyfile);
+
+	return 0;
+}
 
 static void sig_term(int sig)
 {
@@ -55,7 +89,7 @@ static void usage(void)
 {
 	printf("obexd - OBEX daemon ver %s\n", VERSION);
 	printf("Usage: \n");
-	printf("\thcid [-n] [-d]\n");
+	printf("\thcid [-n] [-d] [-f config file]\n");
 }
 
 int main(int argc, char *argv[])
@@ -63,7 +97,7 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int opt, daemonize = 1, debug = 0;
 
-	while ((opt = getopt(argc, argv, "nd")) != EOF) {
+	while ((opt = getopt(argc, argv, "ndf:")) != EOF) {
 		switch (opt) {
 		case 'n':
 			daemonize = 0;
@@ -72,7 +106,9 @@ int main(int argc, char *argv[])
 		case 'd':
 			debug = 1;
 			break;
-
+		case 'f':
+			config_file = g_strdup(optarg);
+			break;
 		default:
 			usage();
 			exit(1);
@@ -110,12 +146,14 @@ int main(int argc, char *argv[])
 	/* Create event loop */
 	main_loop = g_main_loop_new(NULL, FALSE);
 
-	obex_bt_init();
+	start_server();
 
 	/* Start event processor */
 	g_main_loop_run(main_loop);
 
 	g_main_loop_unref(main_loop);
+
+	g_free(config_file);
 
 	stop_logging();
 

@@ -40,9 +40,12 @@
 #include <glib.h>
 #include <dbus/dbus.h>
 
+#include <gdbus.h>
+
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "logging.h"
 #include "obex.h"
 
 /* FIXME: */
@@ -164,7 +167,7 @@ static gint server_register(const gchar *name, guint16 service,
 {
 	struct sockaddr_rc laddr;
 	GIOChannel *io;
-	gint err, sk, arg, lm = 0;
+	gint err, sk, arg;
 	guint16 *svc;
 	const gchar *bda_str = "00:12:5A:0F:D8:BB";
 
@@ -229,20 +232,10 @@ static gint server_unregister(guint16 service)
 	return 0;
 }
 
-gint obex_bt_init(void)
+gint obex_bt_init(const GKeyFile *keyfile)
 {
-	GKeyFile *keyfile;
-	GError *gerr = NULL;
 	DBusError derr;
 	gint err;
-
-	keyfile = g_key_file_new();
-
-	if (!g_key_file_load_from_file(keyfile, CONFIG_FILE, 0, &gerr)) {
-		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
-		g_error_free(gerr);
-		goto failed;
-	}
 
 	/* FIXME: Parse the content */
 	err = server_register("OBEX FTP Server", OBEX_FTP, 10, "/tmp/ftp", TRUE);
@@ -257,13 +250,9 @@ gint obex_bt_init(void)
 		return -EIO;
 	}
 
-	g_key_file_free(keyfile);
-
 	return 0;
 
 failed:
-	g_key_file_free(keyfile);
-
 	return -1;
 }
 
