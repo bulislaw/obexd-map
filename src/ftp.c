@@ -77,32 +77,35 @@ void ftp_put(obex_t *obex, obex_object_t *obj)
 
 void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
-	obex_headerdata_t hdr;
+	struct obex_session *os;
+	obex_headerdata_t hd;
 	guint32 hlen;
 	guint8 hi;
-	guint8 *nohdr_data;
+	guint8 *nohdr;
 	char *name = NULL;
 
-	OBEX_ObjectGetNonHdrData(obj, &nohdr_data);
-	if (!nohdr_data) {
+	os = OBEX_GetUserData(obex);
+
+	OBEX_ObjectGetNonHdrData(obj, &nohdr);
+	if (!nohdr) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 				OBEX_RSP_PRECONDITION_FAILED);
 		error("Set path failed: flag not found!");
 		return;
 	}
 
-	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hdr, &hlen)) {
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_NAME) {
 			name = (char *) g_malloc0(hlen/2 + 1);
-			OBEX_UnicodeToChar((uint8_t *)name, hdr.bs, hlen/2);
+			OBEX_UnicodeToChar((uint8_t *)name, hd.bs, hlen/2);
 			debug("Set path name: %s", name);
 			break;
 		}
 	}
 
-	if ((nohdr_data[0] & 0x01) == 0x01) {
+	if ((nohdr[0] & 0x01) == 0x01) {
 		debug("Set to parent path");
-		//TODO: Set to patent path
+		//TODO: Set to parent path
 
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 		goto done;
@@ -124,7 +127,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 	//TODO: Check and set to name path
 
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 
 done:
 	free(name);
