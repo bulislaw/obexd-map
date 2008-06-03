@@ -27,17 +27,46 @@
 #include <config.h>
 #endif
 
+#include <fcntl.h>
+
 #include <glib.h>
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "logging.h"
 #include "obex.h"
 
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
-	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-			OBEX_RSP_NOT_IMPLEMENTED);
+	struct obex_session *os;
+	gchar *path = NULL;
+	int fd;
+
+	os = OBEX_GetUserData(obex);
+	if (os == NULL)
+		return;
+
+	debug("%s - name: %s type: %s path: %s", __func__, os->name, os->type,
+						os->current_path);
+
+	if (os->current_path == NULL)
+		return;
+
+	if (os->name)
+		path = g_build_filename(os->current_path, os->name, NULL);
+
+	if (path == NULL)
+		return;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return;
+
+	os->stream_fd = fd;
+
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+			OBEX_RSP_SUCCESS);
 }
 
 void ftp_put(obex_t *obex, obex_object_t *obj)

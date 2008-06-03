@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <glib.h>
 
@@ -55,6 +56,8 @@ typedef struct {
     guint8	flags;
     guint16	mtu;
 } __attribute__ ((packed)) obex_connect_hdr_t;
+
+#define FTP_ROOT "/tmp/obexd"
 
 static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 {
@@ -105,6 +108,9 @@ static void cmd_connect(struct obex_session *os,
 			nonhdr->version, nonhdr->flags, mtu);
 	/* Leave space for headers */
 	newsize = mtu - 200;
+
+	os->mtu = newsize;
+
 	debug("Resizing stream chunks to %d", newsize);
 	/* FIXME: Use the new size */
 
@@ -171,7 +177,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	obex_headerdata_t hd;
 	guint hlen, len;
 	guint8 hi;
-	const gchar *type, *name;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
@@ -222,6 +227,37 @@ static void cmd_setpath(struct obex_session *os,
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	os->cmds->setpath(obex, obj);
+}
+
+static gint obex_write(struct obex_session *os, obex_t *obex,
+			obex_object_t *obj)
+{
+	obex_headerdata_t hv;
+	gchar buf[os->mtu];
+	gint len;
+
+	debug("name: %s type: %s mtu: %d stream_fd: %d", os->name,
+					os->type, os->mtu, os->mtu);
+
+	if (os->stream_fd < 0)
+		return -1;
+
+	memset(&buf, 0, os->mtu);
+
+	len = read(os->stream_fd, buf, os->mtu);
+	if (len < 0)
+		return -errno;
+
+	if (len == 0) {
+		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
+					OBEX_FL_STREAM_DATAEND);
+		return len;
+	}
+
+	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, len,
+				OBEX_FL_STREAM_DATA);
+
+	return len;
 }
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
@@ -297,6 +333,10 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		break;
 	case OBEX_EV_STREAMAVAIL:
 		break;
+	case OBEX_EV_STREAMEMPTY:
+		os = OBEX_GetUserData(obex);
+		obex_write(os, obex, obj);
+		break;
 	case OBEX_EV_LINKERR:
 		break;
 	case OBEX_EV_PARSEERR:
@@ -356,6 +396,7 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
+		os->current_path = FTP_ROOT;
 		break;
 	default:
 		g_free(os);

@@ -43,6 +43,8 @@ struct obex_session {
 	guint16		mtu;
 	gchar		*name;
 	gchar		*type;
+	gchar		*current_path;
+	gint		stream_fd;
 	const guint8	*target;
 	struct obex_commands *cmds;
 };
