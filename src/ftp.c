@@ -146,7 +146,10 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 			goto done;
 		}
 
-		os->current_path = g_path_get_dirname(os->current_path);
+		fullname = g_path_get_dirname(os->current_path);
+		g_free(os->current_path);
+		os->current_path = g_strdup(fullname);
+
 		debug("Set to parent path: %s", os->current_path);
 		OBEX_ObjectSetRsp (obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		goto done;
@@ -160,6 +163,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 	if (strlen(name) == 0) {
 		debug("Set to root");
+		g_free(os->current_path);
 		os->current_path = g_strdup(ROOT_PATH);
 
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
@@ -177,6 +181,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	debug("Fullname: %s", fullname);
 
 	if (g_file_test(fullname, G_FILE_TEST_IS_DIR)) {
+		g_free(os->current_path);
 		os->current_path = g_strdup(fullname);
 
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
