@@ -578,3 +578,56 @@ gboolean g_dbus_send_reply(DBusConnection *connection,
 
 	return result;
 }
+
+gboolean g_dbus_emit_signal_valist(DBusConnection *connection,
+				const char *path, const char *interface,
+				const char *name, int type, va_list args)
+{
+	DBusMessage *signal;
+	const char *signature, *sigargs;
+	gboolean result = FALSE;
+
+	if (!check_signal(connection, path, interface, name, &sigargs))
+		return FALSE;
+
+	signal = dbus_message_new_signal(path, interface, name);
+	if (!signal) {
+		error("Unable to allocate new %s.%s signal", interface, name);
+		return FALSE;
+	}
+
+	result = dbus_message_append_args_valist(signal, type, args);
+	if (result == FALSE)
+		goto done;
+
+	signature = dbus_message_get_signature(signal);
+	if (strcmp(sigargs, signature) != 0) {
+		error("%s.%s: expected signature'%s' but got '%s'",
+					interface, name, args, signature);
+		goto done;
+	}
+
+	result = dbus_connection_send(connection, signal, NULL);
+
+done:
+	dbus_message_unref(signal);
+
+	return result;
+}
+
+gboolean g_dbus_emit_signal(DBusConnection *connection,
+				const char *path, const char *interface,
+				const char *name, int type, ...)
+{
+	va_list args;
+	gboolean result;
+
+	va_start(args, type);
+
+	result = g_dbus_emit_signal_valist(connection, path, interface,
+							name, type, args);
+
+	va_end(args);
+
+	return result;
+}
