@@ -70,6 +70,7 @@ static struct option options[] = {
 int main(int argc, char *argv[])
 {
 	DBusConnection *conn;
+	DBusError err;
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
 	int opt, detach = 1, debug = 0;
@@ -105,9 +106,15 @@ int main(int argc, char *argv[])
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 
-	conn = g_dbus_setup_bus(DBUS_BUS_SESSION, OPENOBEX_SERVICE, NULL);
+	dbus_error_init(&err);
+
+	conn = g_dbus_setup_bus(DBUS_BUS_SESSION, OPENOBEX_SERVICE, &err);
 	if (conn == NULL) {
-		fprintf(stderr, "Can't register with session bus\n");
+		if (dbus_error_is_set(&err) == TRUE) {
+			fprintf(stderr, "%s\n", err.message);
+			dbus_error_free(&err);
+		} else
+			fprintf(stderr, "Can't register with session bus\n");
 		exit(1);
 	}
 
