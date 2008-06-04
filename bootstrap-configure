@@ -9,13 +9,4 @@ fi
 		--enable-debug \
 		--prefix=/usr \
 		--mandir=/usr/share/man \
-		--sysconfdir=/etc \
-		--localstatedir=/var \
-		--libexecdir=/lib \
-		--enable-all \
-		--enable-glib \
-		--disable-manpages \
-		--disable-configfiles \
-		--disable-initscripts \
-		--disable-pcmciarules \
-		--disable-cups $*
+		--sysconfdir=/etc

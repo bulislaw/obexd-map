@@ -1,7 +1,7 @@
 
-noinst_LTLIBRARIES = libgdbus.la
+noinst_LIBRARIES = libgdbus.a
 
-libgdbus_la_SOURCES = gdbus.h mainloop.c object.c watch.c
+libgdbus_a_SOURCES = gdbus.h mainloop.c object.c watch.c
 
 AM_CFLAGS = @DBUS_CFLAGS@ @GLIB_CFLAGS@
 
