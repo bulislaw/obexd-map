@@ -38,6 +38,7 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "logging.h"
 #include "obex.h"
 
 #define TARGET_SIZE	16
