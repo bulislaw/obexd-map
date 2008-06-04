@@ -21,9 +21,6 @@
  *
  */
 
-#ifndef __LOGGING_H
-#define __LOGGING_H
-
 void info(const char *format, ...);
 void error(const char *format, ...);
 void debug(const char *format, ...);
@@ -33,5 +30,3 @@ void enable_debug(void);
 void disable_debug(void);
 void start_logging(const char *ident, const char *message, ...);
 void stop_logging(void);
-
-#endif /* __LOGGING_H */
