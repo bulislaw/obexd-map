@@ -46,6 +46,7 @@ struct obex_session {
 	gchar		*name;
 	gchar		*type;
 	gchar		*current_path;
+	guint8		*buf;
 	gint		stream_fd;
 	const guint8	*target;
 	struct obex_commands *cmds;
@@ -56,6 +57,7 @@ gint obex_server_stop();
 
 void opp_connect(obex_t *obex, obex_object_t *obj);
 void opp_put(obex_t *obex, obex_object_t *obj);
+void opp_get(obex_t *obex, obex_object_t *obj);
 
 void ftp_connect(obex_t *obex, obex_object_t *obj);
 void ftp_get(obex_t *obex, obex_object_t *obj);

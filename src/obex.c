@@ -112,7 +112,7 @@ static void cmd_connect(struct obex_session *os,
 	/* Leave space for headers */
 	newsize = mtu - 200;
 
-	os->mtu = newsize;
+	os->mtu = mtu;
 
 	debug("Resizing stream chunks to %d", newsize);
 	/* FIXME: Use the new size */
@@ -193,6 +193,11 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os->name = NULL;
 	}
 
+	if (os->buf) {
+		g_free(os->buf);
+		os->buf = NULL;
+	}
+
 	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
@@ -214,6 +219,7 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		}
 	}
 
+	os->buf = g_new0(guint8, os->mtu);
 	os->cmds->get(obex, obj);
 }
 
@@ -236,27 +242,29 @@ static gint obex_write(struct obex_session *os, obex_t *obex,
 			obex_object_t *obj)
 {
 	obex_headerdata_t hv;
-	gchar buf[os->mtu];
 	gint len;
 
-	debug("name: %s type: %s mtu: %d stream_fd: %d", os->name,
-					os->type, os->mtu, os->mtu);
+	debug("name: %s type: %s mtu: %d stream_fd: %d",
+			os->name, os->type, os->mtu, os->stream_fd);
 
 	if (os->stream_fd < 0)
 		return -1;
 
-	memset(&buf, 0, os->mtu);
+	len = read(os->stream_fd, os->buf, os->mtu);
 
-	len = read(os->stream_fd, buf, os->mtu);
-	if (len < 0)
+	if (len < 0) {
+		g_free(os->buf);
 		return -errno;
+	}
 
 	if (len == 0) {
 		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
 					OBEX_FL_STREAM_DATAEND);
+		g_free(os->buf);
 		return len;
 	}
 
+	hv.bs = os->buf;
 	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, len,
 				OBEX_FL_STREAM_DATA);
 
@@ -373,7 +381,6 @@ static gboolean obex_handle_input(GIOChannel *io, GIOCondition cond, gpointer us
 
 	if (cond & (G_IO_HUP | G_IO_ERR))
 		return FALSE;
-
 
 	if (OBEX_HandleInput(obex, 1) < 0) {
 		error("Handle input error");

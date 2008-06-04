@@ -66,12 +66,10 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 
 	if (os->name) {
 		path = g_build_filename(os->current_path, os->name, NULL);
+		if (path == NULL) {
+			goto fail;
+		}
 	}
-
-	if (path == NULL) {
-		goto fail;
-	}
-
 
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
@@ -93,11 +91,17 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 			hv, 0, OBEX_FL_STREAM_START);
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 			OBEX_RSP_SUCCESS);
+
+	g_free(path);
+
 	return;
 
 fail:
 	g_free(path);
-	close(fd);
+	if (fd >= 0)
+		close(fd);
+
+	/* FIXME: answer with something more informative */
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 	return;
 }
