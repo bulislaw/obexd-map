@@ -35,6 +35,7 @@ typedef void (* GDBusWatchFunction) (void *user_data);
 
 DBusConnection *g_dbus_setup_bus(DBusBusType type, const char *name,
 							DBusError *error);
+void g_dbus_cleanup_connection(DBusConnection *connection);
 
 gboolean g_dbus_set_disconnect_function(DBusConnection *connection,
 				GDBusWatchFunction function,

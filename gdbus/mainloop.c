@@ -279,6 +279,11 @@ DBusConnection *g_dbus_setup_bus(DBusBusType type, const char *name,
 	return conn;
 }
 
+void g_dbus_cleanup_connection(DBusConnection *connection)
+{
+	dbus_connection_unref(connection);
+}
+
 gboolean g_dbus_set_disconnect_function(DBusConnection *connection,
 				GDBusWatchFunction function,
 				void *user_data, DBusFreeFunction destroy)
