@@ -30,6 +30,8 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include <glib.h>
+
 #include "obex.h"
 
 void opp_connect(obex_t *obex, obex_object_t *obj)
@@ -41,3 +43,24 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 {
 
 }
+
+void opp_get(obex_t *obex, obex_object_t *obj)
+{
+	struct obex_session *os = NULL;
+
+	os = OBEX_GetUserData(obex);
+	if (os == NULL)
+		return;
+
+	if (os->name)
+		goto fail;
+
+	if (os->type == NULL)
+		goto fail;
+
+fail:
+	/* FIXME: answer with something more informative */
+	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	return;
+}
+
