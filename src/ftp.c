@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <glib.h>
 
@@ -45,9 +47,12 @@
 
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
+	obex_headerdata_t hv;
 	struct obex_session *os;
 	gchar *path = NULL;
-	int fd;
+	gint fd = -1;
+	struct stat stats;
+	guint32 size;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
@@ -57,22 +62,44 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 						os->current_path);
 
 	if (os->current_path == NULL)
-		return;
+		goto fail;
 
-	if (os->name)
+	if (os->name) {
 		path = g_build_filename(os->current_path, os->name, NULL);
+	}
 
-	if (path == NULL)
-		return;
+	if (path == NULL) {
+		goto fail;
+	}
+
 
 	fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return;
+	if (fd < 0) {
+		goto fail;
+	}
 
+	if (fstat(fd, &stats)) {
+		goto fail;
+	}
+
+	size = stats.st_size;
+	hv.bq4 = size;
+	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_LENGTH, hv, 4, 0);
 	os->stream_fd = fd;
 
+	/* Add body header */
+	hv.bs = NULL;
+	OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+			hv, 0, OBEX_FL_STREAM_START);
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 			OBEX_RSP_SUCCESS);
+	return;
+
+fail:
+	g_free(path);
+	close(fd);
+	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	return;
 }
 
 void ftp_put(obex_t *obex, obex_object_t *obj)
