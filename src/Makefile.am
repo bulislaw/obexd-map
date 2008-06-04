@@ -1,4 +1,8 @@
 
+servicedir = $(datarootdir)/dbus-1/sevices
+
+service_DATA = org.openobex.service
+
 sbin_PROGRAMS = obexd
 
 obexd_SOURCES = main.c obexd.h manager.c \
