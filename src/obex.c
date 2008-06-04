@@ -1,10 +1,10 @@
 /*
  *
- *  obexd - OBEX Daemon
+ *  OBEX Server
  *
- *  Copyright (C) 2008  Marcel Holtmann <marcel@holtmann.org>
- *  Copyright (C) 2008  Nokia Corporation
- *  Copyright (C) 2008  INdT - Instituto Nokia de Tecnologia
+ *  Copyright (C) 2007-2008  Nokia Corporation
+ *  Copyright (C) 2007-2008  Instituto Nokia de Tecnologia (INdT)
+ *  Copyright (C) 2007-2008  Marcel Holtmann <marcel@holtmann.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
