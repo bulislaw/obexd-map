@@ -2,8 +2,6 @@
  *
  *  OBEX Server
  *
- *  Copyright (C) 2007-2008  Nokia Corporation
- *  Copyright (C) 2007-2008  Instituto Nokia de Tecnologia (INdT)
  *  Copyright (C) 2007-2008  Marcel Holtmann <marcel@holtmann.org>
  *
  *
@@ -29,133 +27,106 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+#include <getopt.h>
+#include <syslog.h>
 
-#include <glib.h>
+#include <gdbus.h>
 
-#include "logging.h"
-#include "bluetooth.h"
+#include "obexd.h"
 
-#define CONFIG_FILE	"obex.conf"
-
-static GMainLoop *main_loop;
-static gchar *config_file;
-
-static int start_server(void)
-{
-	GKeyFile *keyfile;
-	GError *gerr = NULL;
-	const char *filename = (config_file ? : CONFIGDIR "/" CONFIG_FILE);
-
-	debug("Configuration file: %s", filename);
-
-	keyfile = g_key_file_new();
-
-	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
-		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
-		g_error_free(gerr);
-		return -EINVAL;
-	}
-
-	/* FIXME: Read [General] section */
-
-	obex_bt_init(keyfile);
-
-	g_key_file_free(keyfile);
-
-	return 0;
-}
+static GMainLoop *main_loop = NULL;
 
 static void sig_term(int sig)
 {
 	g_main_loop_quit(main_loop);
 }
 
-static void sig_hup(int sig)
-{
-}
-
-static void sig_debug(int sig)
-{
-	        toggle_debug();
-}
-
 static void usage(void)
 {
-	printf("obexd - OBEX daemon ver %s\n", VERSION);
-	printf("Usage: \n");
-	printf("\thcid [-n] [-d] [-f config file]\n");
+	printf("OBEX Server version %s\n\n", VERSION);
+
+	printf("Usage:\n"
+		"\tobexd [options]\n"
+		"\n");
+
+	printf("Options:\n"
+		"\t-n, --nodaemon       Don't fork daemon to background\n"
+		"\t-d, --debug          Enable output of debug information\n"
+		"\t-h, --help           Display help\n"
+		"\n");
 }
+
+static struct option options[] = {
+	{ "nodaemon", 0, 0, 'n' },
+	{ "debug",    0, 0, 'd' },
+	{ "help",     0, 0, 'h' },
+	{ }
+};
 
 int main(int argc, char *argv[])
 {
+	DBusConnection *conn;
 	struct sigaction sa;
-	int opt, daemonize = 1, debug = 0;
+	int log_option = LOG_NDELAY | LOG_PID;
+	int opt, detach = 1, debug = 0;
 
-	while ((opt = getopt(argc, argv, "ndf:")) != EOF) {
-		switch (opt) {
+	while ((opt = getopt_long(argc, argv, "+ndh", options, NULL)) != EOF) {
+		switch(opt) {
 		case 'n':
-			daemonize = 0;
+			detach = 0;
 			break;
-
 		case 'd':
 			debug = 1;
 			break;
-		case 'f':
-			config_file = g_strdup(optarg);
-			break;
+		case 'h':
 		default:
 			usage();
-			exit(1);
+			exit(0);
 		}
 	}
 
-	if (daemonize && daemon(0, 0)) {
-		error("Can't daemonize: %s (%d)", strerror(errno), errno);
+	argc -= optind;
+	argv += optind;
+	optind = 0;
+
+	if (detach) {
+		if (daemon(0, 0)) {
+			perror("Can't start daemon");
+			exit(1);
+		}
+	} else
+		log_option |= LOG_PERROR;
+
+	openlog("obexd", log_option, LOG_DAEMON);
+
+	main_loop = g_main_loop_new(NULL, FALSE);
+
+	conn = g_dbus_setup_bus(DBUS_BUS_SESSION, OPENOBEX_SERVICE, NULL);
+	if (conn == NULL) {
+		fprintf(stderr, "Can't register with session bus\n");
 		exit(1);
 	}
 
-	umask(0077);
-
-	start_logging("obexd", "OBEX daemon");
-	if (debug) {
-		info("Enabling debug information");
-		enable_debug();
-	}
+	manager_init(conn);
 
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_flags = SA_NOCLDSTOP;
 	sa.sa_handler = sig_term;
+	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
-	sigaction(SIGINT,  &sa, NULL);
-	sa.sa_handler = sig_hup;
-	sigaction(SIGHUP, &sa, NULL);
 
-	sa.sa_handler = sig_debug;
-	sigaction(SIGUSR2, &sa, NULL);
-
-	sa.sa_handler = SIG_IGN;
-	sigaction(SIGPIPE, &sa, NULL);
-
-	
-	/* Create event loop */
-	main_loop = g_main_loop_new(NULL, FALSE);
-
-	start_server();
-
-	/* Start event processor */
 	g_main_loop_run(main_loop);
+
+	manager_cleanup();
+
+	g_dbus_cleanup_connection(conn);
 
 	g_main_loop_unref(main_loop);
 
-	g_free(config_file);
-
-	stop_logging();
+	closelog();
 
 	return 0;
 }
