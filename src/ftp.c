@@ -35,6 +35,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdio.h>
 
 #include <glib.h>
 
@@ -45,46 +47,56 @@
 #include "obex.h"
 #include "logging.h"
 
+#define LST_TYPE "x-obex/folder-listing"
+#define CAP_TYPE "x-obex/capability"
+
+#define CAP_FILE CONFIGDIR "/capability.xml"
+
+static gint get_by_type(struct obex_session *os, gchar *type)
+{
+	gint size = 0;
+
+	if (!strcmp(type, CAP_TYPE)) {
+		size = os_setup_by_name(os, CAP_FILE);
+		if (!size)
+			goto fail;
+	} else
+		goto fail;
+
+	return size;
+
+fail:
+	return 0;
+}
+
 void ftp_get(obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hv;
 	struct obex_session *os;
 	gchar *path = NULL;
-	gint fd = -1;
-	struct stat stats;
-	guint32 size;
+	guint32 size = -1;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
 		return;
-
-	debug("%s - name: %s type: %s path: %s", __func__, os->name, os->type,
-						os->current_path);
 
 	if (os->current_path == NULL)
 		goto fail;
 
 	if (os->name) {
 		path = g_build_filename(os->current_path, os->name, NULL);
-	}
-
-	if (path == NULL) {
+		size = os_setup_by_name(os, path);
+		if (!size)
+			goto fail;
+	} else if (os->type) {
+		size = get_by_type(os, os->type);
+		if (!size)
+			goto fail;
+	} else
 		goto fail;
-	}
 
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		goto fail;
-	}
-
-	if (fstat(fd, &stats)) {
-		goto fail;
-	}
-
-	size = stats.st_size;
 	hv.bq4 = size;
 	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_LENGTH, hv, 4, 0);
-	os->stream_fd = fd;
 
 	/* Add body header */
 	hv.bs = NULL;
@@ -99,10 +111,7 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 
 fail:
 	g_free(path);
-	if (fd >= 0)
-		close(fd);
 
-	/* FIXME: answer with something more informative */
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 	return;
 }

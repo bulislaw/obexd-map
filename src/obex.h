@@ -47,6 +47,8 @@ struct obex_session {
 	gchar		*type;
 	gchar		*current_path;
 	guint8		*buf;
+	gint		buf_start;
+	gint		buf_size;
 	gint		stream_fd;
 	const guint8	*target;
 	struct obex_commands *cmds;
@@ -63,3 +65,5 @@ void ftp_connect(obex_t *obex, obex_object_t *obj);
 void ftp_get(obex_t *obex, obex_object_t *obj);
 void ftp_put(obex_t *obex, obex_object_t *obj);
 void ftp_setpath(obex_t *obex, obex_object_t *obj);
+
+gint os_setup_by_name(struct obex_session *os, gchar *file);

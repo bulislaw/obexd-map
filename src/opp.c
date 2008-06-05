@@ -34,6 +34,10 @@
 
 #include "obex.h"
 
+#define VCARD_TYPE "text/x-vcard"
+
+#define VCARD_FILE CONFIGDIR "/vcard.vcf"
+
 void opp_connect(obex_t *obex, obex_object_t *obj)
 {
 
@@ -47,6 +51,8 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 void opp_get(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os = NULL;
+	obex_headerdata_t hv;
+	gint size = 0;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
@@ -58,8 +64,27 @@ void opp_get(obex_t *obex, obex_object_t *obj)
 	if (os->type == NULL)
 		goto fail;
 
+	if (!strcmp(os->type, VCARD_TYPE)) {
+		size = os_setup_by_name(os, VCARD_FILE);
+		if (!size)
+			goto fail;
+	} else
+		goto fail;
+
+
+	hv.bq4 = size;
+	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_LENGTH, hv, 4, 0);
+
+	/* Add body header */
+	hv.bs = NULL;
+	OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+			hv, 0, OBEX_FL_STREAM_START);
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+			OBEX_RSP_SUCCESS);
+
+	return;
+
 fail:
-	/* FIXME: answer with something more informative */
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 	return;
 }

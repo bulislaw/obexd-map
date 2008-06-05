@@ -33,6 +33,9 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <glib.h>
 
@@ -67,7 +70,7 @@ static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 }
 
 struct obex_commands opp = {
-	.get		= cmd_not_implemented,
+	.get		= opp_get,
 	.put		= opp_put,
 	.setpath	= cmd_not_implemented,
 };
@@ -236,6 +239,32 @@ static void cmd_setpath(struct obex_session *os,
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	os->cmds->setpath(obex, obj);
+}
+
+gint os_setup_by_name(struct obex_session *os, gchar *file)
+{
+	gint fd;
+	struct stat stats;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		goto fail;
+
+	if (fstat(fd, &stats))
+		goto fail;
+
+	os->stream_fd = fd;
+	os->buf = g_new0(guint8, os->mtu);
+	os->buf_start = 0;
+	os->buf_size = os->mtu;
+
+	return stats.st_size;
+
+fail:
+	if (fd >= 0)
+		close(fd);
+
+	return 0;
 }
 
 static gint obex_write(struct obex_session *os, obex_t *obex,
