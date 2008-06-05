@@ -66,9 +66,10 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 
 	if (os->name) {
 		path = g_build_filename(os->current_path, os->name, NULL);
-		if (path == NULL) {
-			goto fail;
-		}
+	}
+
+	if (path == NULL) {
+		goto fail;
 	}
 
 	fd = open(path, O_RDONLY);
