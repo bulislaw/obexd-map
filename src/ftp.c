@@ -193,14 +193,15 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	}
 
 	if (!g_file_test(fullname, G_FILE_TEST_EXISTS) && nohdr[0] == 0 &&
-					mkdir(fullname, 0775) >=  0) {
+				mkdir(fullname, 0775) >=  0) {
+		g_free(os->current_path);
 		os->current_path = g_strdup(fullname);
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		goto done;
 
 	}
 
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 done:
 	g_free(name);
 	g_free(fullname);
