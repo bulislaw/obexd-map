@@ -125,11 +125,7 @@ void ftp_put(obex_t *obex, obex_object_t *obj)
 void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
-	obex_headerdata_t hd;
-	guint32 hlen;
-	guint8 hi;
 	guint8 *nohdr;
-	char *name = NULL;
 	char *fullname = NULL;
 
 	os = OBEX_GetUserData(obex);
@@ -141,26 +137,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		error("Set path failed: flag not found!");
 		return;
 	}
-
-	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
-		if (hi == OBEX_HDR_NAME) {
-			/*
-			 * This is because OBEX_UnicodeToChar() accesses
-			 * the string even if its size is zero
-			 */
-			if (hlen == 0) {
-				name = g_strdup("");
-				break;
-			}
-
-			name = (char *) g_malloc0(hlen/2 + 1);
-			OBEX_UnicodeToChar((uint8_t *)name, hd.bs, hlen/2);
-			debug("Set path name: %s", name);
-			break;
-		}
-	}
-
-	//Check flag "Backup"
+	/* Check flag "Backup" */
 	if ((nohdr[0] & 0x01) == 0x01) {
 		debug("Set to parent path");
 
@@ -178,13 +155,13 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		goto done;
 	}
 
-	if (!name) {
+	if (!os->name) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
-		error("Set path failed: name missing!");
+		debug("Set path failed: name missing!");
 		goto done;
 	}
 
-	if (strlen(name) == 0) {
+	if (strlen(os->name) == 0) {
 		debug("Set to root");
 		g_free(os->current_path);
 		os->current_path = g_strdup(ROOT_PATH);
@@ -193,14 +170,14 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		goto done;
 	}
 
-	//Check and set to name path
-	if (strstr(name, "/../")) {
+	/* Check and set to name path */
+	if (strstr(os->name, "/../")) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		error("Set path failed: name incorrect!");
 		goto done;
 	}
 
-	fullname = g_build_filename(os->current_path, name, NULL);
+	fullname = g_build_filename(os->current_path, os->name, NULL);
 	debug("Fullname: %s", fullname);
 
 	if (g_file_test(fullname, G_FILE_TEST_IS_DIR)) {
@@ -222,6 +199,5 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 done:
-	g_free(name);
 	g_free(fullname);
 }

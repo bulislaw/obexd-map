@@ -235,7 +235,34 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 static void cmd_setpath(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
+	obex_headerdata_t hd;
+	guint32 hlen;
+	guint8 hi;
+
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
+
+	if (os->name) {
+		g_free(os->name);
+		os->name = NULL;
+	}
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		if (hi == OBEX_HDR_NAME) {
+			/*
+			 * This is because OBEX_UnicodeToChar() accesses
+			 * the string even if its size is zero
+			 */
+			if (hlen == 0) {
+				os->name = g_strdup("");
+				break;
+			}
+
+			os->name = (char *) g_malloc0(hlen/2 + 1);
+			OBEX_UnicodeToChar((uint8_t *)os->name, hd.bs, hlen/2);
+			debug("Set path name: %s", os->name);
+			break;
+		}
+	}
 
 	os->cmds->setpath(obex, obj);
 }
