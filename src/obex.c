@@ -222,7 +222,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		}
 	}
 
-	os->buf = g_new0(guint8, os->mtu);
 	os->cmds->get(obex, obj);
 }
 
@@ -290,6 +289,7 @@ static gint obex_write(struct obex_session *os, obex_t *obex,
 		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
 					OBEX_FL_STREAM_DATAEND);
 		g_free(os->buf);
+		os->buf = NULL;
 		return len;
 	}
 

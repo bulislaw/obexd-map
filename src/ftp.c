@@ -144,6 +144,15 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_NAME) {
+			/*
+			 * This is because OBEX_UnicodeToChar() accesses
+			 * the string even if its size is zero
+			 */
+			if (hlen == 0) {
+				name = g_strdup("");
+				break;
+			}
+
 			name = (char *) g_malloc0(hlen/2 + 1);
 			OBEX_UnicodeToChar((uint8_t *)name, hd.bs, hlen/2);
 			debug("Set path name: %s", name);
