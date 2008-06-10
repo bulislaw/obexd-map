@@ -169,7 +169,6 @@ static gint server_register(const gchar *name, guint16 service,
 	GIOChannel *io;
 	gint err, sk, arg;
 	guint16 *svc;
-	const gchar *bda_str = "00:12:5A:0F:D8:BB";
 
 	/* FIXME: Add the service record */
 
@@ -194,7 +193,7 @@ static gint server_register(const gchar *name, guint16 service,
 
 	memset(&laddr, 0, sizeof(laddr));
 	laddr.rc_family = AF_BLUETOOTH;
-	str2ba(bda_str, &laddr.rc_bdaddr);
+	bacpy(&laddr.rc_bdaddr, BDADDR_ANY);
 	laddr.rc_channel = channel;
 
 	if (bind(sk, (struct sockaddr *) &laddr, sizeof(laddr)) < 0) {
