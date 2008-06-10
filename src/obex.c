@@ -89,6 +89,8 @@ static void obex_session_free(struct obex_session *os)
 		g_free(os->type);
 	if (os->current_path)
 		g_free(os->current_path);
+	if (os->buf)
+		g_free(os->buf);
 	g_free(os);
 }
 
