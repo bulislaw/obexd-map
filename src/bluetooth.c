@@ -38,72 +38,12 @@
 #include <bluetooth/rfcomm.h>
 
 #include <glib.h>
-#include <dbus/dbus.h>
-
-#include <gdbus.h>
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
 #include "logging.h"
 #include "obex.h"
-
-/* FIXME: */
-#define CONFIG_FILE	"./obex.conf"
-
-/* FIXME: */
-#define ftp_record "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
-<record> \
-	<attribute id=\"0x0000\"> \
-		<uint32 value=\"0x0001000c\"/> \
-	</attribute> \
-	<attribute id=\"0x0001\"> \
-		<sequence> \
-			<uuid value=\"0x1106\"/> \
-		</sequence> \
-	</attribute> \
-	<attribute id=\"0x0002\"> \
-		<uint32 value="0x00000006"/> \
-	</attribute> \
-	<attribute id=\"0x0004\"> \
-		<sequence> \
-			<sequence> \
-				<uuid value=\"0x0100\"/> \
-			</sequence> \
-			<sequence> \
-				<uuid value=\"0x0003\"/> \
-				<uint8 value=\"0x0b\"/> \
-			</sequence> \
-			<sequence> \
-				<uuid value=\"0x0008\"/> \
-			</sequence> \
-		</sequence> \
-	</attribute> \
-	<attribute id=\"0x0005\"> \
-		<sequence> \
-			<uuid value=\"0x1002\"/> \
-		</sequence> \
-	</attribute> \
-	<attribute id=\"0x0006\"> \
-		<sequence> \
-			<uint16 value=\"0x454e\"/> \
-			<uint16 value="0x006a" /> \
-			<uint16 value="0x0100" /> \
-		</sequence> \
-	</attribute> \
-	<attribute id=\"0x0009\"> \
-		<sequence> \
-			<sequence> \
-				<uuid value=\"0x1106\"/> \
-				<uint16 value=\"0x0100\"/> \
-			</sequence> \
-		</sequence> \
-	</attribute> \
-	<attribute id=\"0x0100\"> \
-		<text value=\"OBEX File Transfer\"/> \
-	</attribute> \
-</record>\
-"
 
 struct server {
 	guint8		channel;
@@ -115,7 +55,6 @@ struct server {
 };
 
 static GSList *servers = NULL;
-static DBusConnection *conn = NULL;
 
 static uint32_t register_service_record(const char *xml)
 {
@@ -231,9 +170,8 @@ static gint server_unregister(guint16 service)
 	return 0;
 }
 
-gint obex_bt_init(const GKeyFile *keyfile)
+gint bluetooth_init(const GKeyFile *keyfile)
 {
-	DBusError derr;
 	gint err;
 
 	/* FIXME: Parse the content */
@@ -241,22 +179,13 @@ gint obex_bt_init(const GKeyFile *keyfile)
 	if (err < 0)
 		goto failed;
 
-	dbus_error_init(&derr);
-	conn = g_dbus_setup_bus(DBUS_BUS_SYSTEM, NULL, &derr);
-	if (!conn) {
-		error("Can't connect to system bus: %s", derr.message);
-		dbus_error_free(&derr);
-		return -EIO;
-	}
-
 	return 0;
 
 failed:
 	return -1;
 }
 
-void obex_bt_exit(void)
+void bluetooth_exit(void)
 {
-	if (conn)
-		dbus_connection_unref(conn);
+	/* FIXME: Free all servers and remove records */
 }

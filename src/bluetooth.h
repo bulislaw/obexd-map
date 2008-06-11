@@ -27,5 +27,5 @@
 #include <config.h>
 #endif
 
-gint obex_bt_init(const GKeyFile *keyfile);
-void obex_bt_exit(void);
+gint bluetooth_init(const GKeyFile *keyfile);
+void bluetooth_exit(void);
