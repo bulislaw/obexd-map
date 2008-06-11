@@ -27,7 +27,13 @@
 #include <config.h>
 #endif
 
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
@@ -47,7 +53,35 @@ void opp_connect(obex_t *obex, obex_object_t *obj)
 
 void opp_put(obex_t *obex, obex_object_t *obj)
 {
+	struct obex_session *os;
+	gchar *path = NULL;
 
+	os = OBEX_GetUserData(obex);
+	if (os == NULL)
+		return;
+
+	if (os->current_path == NULL) {
+		goto fail;
+	}
+
+	if (os->name == NULL) {
+		goto fail;
+	}
+
+	path = g_build_filename(os->current_path, os->name, NULL);
+
+	close(os->fd);
+	rename(os->temp, path);
+
+	OBEX_ObjectSetRsp (obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+
+	g_free(path);
+
+	return;
+
+fail:
+	g_free(path);
+	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 }
 
 void opp_get(obex_t *obex, obex_object_t *obj)
