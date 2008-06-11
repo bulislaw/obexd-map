@@ -37,9 +37,38 @@
 #include <gdbus.h>
 
 #include "logging.h"
+#include "bluetooth.h"
 #include "obexd.h"
 
+#define CONFIG_FILE	"obex.conf"
+
 static GMainLoop *main_loop = NULL;
+
+static int server_start(void)
+{
+	GKeyFile *keyfile;
+	GError *gerr = NULL;
+
+	const char *filename = CONFIGDIR "/" CONFIG_FILE;
+
+	debug("Configuration file: %s", filename);
+
+	keyfile = g_key_file_new();
+	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
+		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
+		g_error_free(gerr);
+		return -EINVAL;
+	}
+
+	/* FIXME: Read [General] section */
+
+	/* Initialize enabled transports */
+	bluetooth_init(keyfile);
+
+	g_key_file_free(keyfile);
+
+	return 0;
+}
 
 static void sig_term(int sig)
 {
@@ -123,6 +152,9 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Can't register with session bus\n");
 		exit(1);
 	}
+
+	if (server_start() < 0)
+		goto fail;
 
 	if (!manager_init(conn))
 		goto fail;
