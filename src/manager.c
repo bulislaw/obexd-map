@@ -39,19 +39,18 @@ static GDBusSignalTable manager_signals[] = {
 
 static DBusConnection *connection = NULL;
 
-int manager_init(DBusConnection *conn)
+gboolean manager_init(DBusConnection *conn)
 {
 	DBG("conn %p", conn);
 
 	connection = dbus_connection_ref(conn);
 	if (connection == NULL)
-		return -1;
-	g_dbus_register_interface(connection, OPENOBEX_MANAGER_PATH,
+		return FALSE;
+
+	return g_dbus_register_interface(connection, OPENOBEX_MANAGER_PATH,
 					OPENOBEX_MANAGER_INTERFACE,
 					manager_methods, manager_signals, NULL,
-								NULL, NULL);
-
-	return 0;
+					NULL, NULL);
 }
 
 void manager_cleanup(void)

@@ -124,7 +124,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	manager_init(conn);
+	if (!manager_init(conn))
+		goto fail;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sig_term;
@@ -135,6 +136,7 @@ int main(int argc, char *argv[])
 
 	manager_cleanup();
 
+fail:
 	g_dbus_cleanup_connection(conn);
 
 	g_main_loop_unref(main_loop);

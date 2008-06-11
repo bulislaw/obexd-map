@@ -33,5 +33,5 @@
 #define OPENOBEX_MANAGER_PATH       "/"
 #define OPENOBEX_MANAGER_INTERFACE  OPENOBEX_SERVICE ".Manager"
 
-int manager_init(DBusConnection *conn);
+gboolean manager_init(DBusConnection *conn);
 void manager_cleanup(void);
