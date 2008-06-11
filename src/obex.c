@@ -408,7 +408,7 @@ static gint obex_read(struct obex_session *os, obex_t *obex,
 	while (len < size) {
 		gint w;
 
-		w = write(os->fd, buffer, size - len);
+		w = write(os->fd, buffer + len, size - len);
 		if (w < 0 && errno == EINTR)
 			continue;
 
@@ -428,7 +428,7 @@ static void prepare_put(obex_t *obex, obex_object_t *obj)
 
 	os = OBEX_GetUserData(obex);
 
-	temp_file = g_strdup("/tmp/obexd_XXXXXX");
+	temp_file = g_build_filename(os->current_path, "tmp_XXXXXX", NULL);
 
 	os->fd = mkstemp(temp_file);
 	os->temp = temp_file;
