@@ -36,6 +36,7 @@
 
 #include <gdbus.h>
 
+#include "logging.h"
 #include "obexd.h"
 
 static GMainLoop *main_loop = NULL;
@@ -103,6 +104,11 @@ int main(int argc, char *argv[])
 		log_option |= LOG_PERROR;
 
 	openlog("obexd", log_option, LOG_DAEMON);
+
+	if (debug) {
+		info("Enabling debug information");
+		enable_debug();
+	}
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 
