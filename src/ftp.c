@@ -73,8 +73,8 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hv;
 	struct obex_session *os;
-	gchar *path = NULL;
-	guint32 size = -1;
+	gchar *path;
+	guint32 size;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
@@ -126,7 +126,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
 	guint8 *nohdr;
-	char *fullname = NULL;
+	gchar *fullname;
 
 	os = OBEX_GetUserData(obex);
 
