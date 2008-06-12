@@ -172,7 +172,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	}
 
 	/* Check and set to name path */
-	if (strstr(os->name, "/../")) {
+	if (strstr(os->name, "/") || strcmp(os->name, "..") == 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		error("Set path failed: name incorrect!");
 		goto done;
