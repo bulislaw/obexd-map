@@ -124,13 +124,14 @@ static void cmd_connect(struct obex_session *os,
 	/* Leave space for headers */
 	newsize = mtu - 200;
 
-	os->mtu = mtu;
+	os->mtu = newsize;
 
 	debug("Resizing stream chunks to %d", newsize);
 	/* FIXME: Use the new size */
 
 	if (os->target == NULL) {
-		/* OPP doesn't contains target */
+		/* OPP doesn't contains target or connection id. */
+		os->cid = 0;
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 		return;
 	}
@@ -167,6 +168,10 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 	guint hlen;
 	guint8 hi;
 	gboolean ret = FALSE;
+
+	/* OPUSH doesn't provide a connection id. This is an invalid cid. */
+	if (cid == 0)
+		return TRUE;
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_CONNECTION && hlen == 4) {
@@ -242,7 +247,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	guint hlen, len;
 	guint8 hi;
 
-	/* g_return_if_fail(chk_cid(obex, obj, os->cid)); */
+	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	if (os->type) {
 		g_free(os->type);
@@ -556,7 +561,7 @@ static gboolean obex_handle_input(GIOChannel *io, GIOCondition cond, gpointer us
 	return TRUE;
 }
 
-gint obex_server_start(gint fd, gint mtu, guint16 svc)
+gint obex_server_start(gint fd, gint mtu, struct server *server)
 {
 	struct obex_session *os;
 	GIOChannel *io;
@@ -564,16 +569,16 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	gint ret;
 
 	os = g_new0(struct obex_session, 1);
-	switch (svc) {
+	switch (server->service) {
 	case OBEX_OPUSH:
 		os->target = NULL;
 		os->cmds = &opp;
-		os->current_path = g_strdup(ROOT_PATH);
+		os->current_path = g_strdup(server->folder);
 		break;
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
-		os->current_path = g_strdup(ROOT_PATH);
+		os->current_path = g_strdup(server->folder);
 		break;
 	default:
 		g_free(os);

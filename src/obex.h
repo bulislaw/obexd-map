@@ -40,6 +40,12 @@ struct obex_commands {
 	void (*setpath) (obex_t *obex, obex_object_t *obj);
 };
 
+struct server {
+	guint16		service;
+	gboolean	auto_accept;
+	gchar		*folder;
+};
+
 struct obex_session {
 	guint32		cid;
 	guint16		mtu;
@@ -55,7 +61,7 @@ struct obex_session {
 	struct obex_commands *cmds;
 };
 
-gint obex_server_start(gint fd, gint mtu, guint16 svc);
+gint obex_server_start(gint fd, gint mtu, struct server *server);
 gint obex_server_stop();
 
 void opp_connect(obex_t *obex, obex_object_t *obj);

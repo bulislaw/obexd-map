@@ -45,15 +45,6 @@
 #include "logging.h"
 #include "obex.h"
 
-struct server {
-	guint8		channel;
-	guint16		service;
-	guint32		record;
-	gboolean	auto_accept;
-	gchar		*folder;
-	gchar		*uuid;
-};
-
 static GSList *servers = NULL;
 
 static uint32_t register_service_record(const char *xml)
@@ -65,7 +56,7 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 {
 	struct sockaddr_rc raddr;
 	socklen_t alen;
-	guint16 *svc = user_data;
+	struct server *server = user_data;
 	gchar address[18];
 	gint err, sk, nsk;
 
@@ -86,7 +77,7 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 	ba2str(&raddr.rc_bdaddr, address);
 	info("New connection from: %s channel: %d", address, raddr.rc_channel);
 
-	if (obex_server_start(nsk, 0, *svc) < 0)
+	if (obex_server_start(nsk, 0, server) < 0)
 		close(nsk);
 
 	return TRUE;
@@ -107,7 +98,7 @@ static gint server_register(const gchar *name, guint16 service,
 	struct sockaddr_rc laddr;
 	GIOChannel *io;
 	gint err, sk, arg;
-	guint16 *svc;
+	struct server *server;
 
 	/* FIXME: Add the service record */
 
@@ -145,13 +136,16 @@ static gint server_register(const gchar *name, guint16 service,
 		goto failed;
 	}
 
+	server = g_malloc0(sizeof(struct server));
+	server->service = service;
+	server->folder = g_strdup(folder);
+	server->auto_accept = auto_accept;
+
 	io = g_io_channel_unix_new(sk);
-	svc = g_malloc0(sizeof(guint16));
-	*svc = service;
 	g_io_channel_set_close_on_unref(io, TRUE);
 	g_io_add_watch_full(io, G_PRIORITY_DEFAULT,
 			G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
-			connect_event, svc, server_destroyed);
+			connect_event, server, server_destroyed);
 	g_io_channel_unref(io);
 
 	return 0;
@@ -175,7 +169,7 @@ gint bluetooth_init(const GKeyFile *keyfile)
 	gint err;
 
 	/* FIXME: Parse the content */
-	err = server_register("OBEX FTP Server", OBEX_FTP, 10, "/tmp/ftp", TRUE);
+	err = server_register("OBEX FTP Server", OBEX_OPUSH, 10, "/tmp/obexd", TRUE);
 	if (err < 0)
 		goto failed;
 
