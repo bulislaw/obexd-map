@@ -44,18 +44,17 @@
 
 static GMainLoop *main_loop = NULL;
 
-static int server_start(void)
+static int server_start(const gchar *config_file)
 {
 	GKeyFile *keyfile;
 	GError *gerr = NULL;
-
-	const char *filename = CONFIGDIR "/" CONFIG_FILE;
+	const gchar *filename = (config_file ? : CONFIGDIR "/" CONFIG_FILE);
 
 	debug("Configuration file: %s", filename);
 
 	keyfile = g_key_file_new();
 	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
-		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
+		error("Parsing %s failed: %s", filename, gerr->message);
 		g_error_free(gerr);
 		return -EINVAL;
 	}
@@ -92,6 +91,7 @@ static void usage(void)
 	printf("Options:\n"
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
+		"\t-f, --config         Set configuration file\n"
 		"\t-h, --help           Display help\n"
 		"\n");
 }
@@ -99,6 +99,7 @@ static void usage(void)
 static struct option options[] = {
 	{ "nodaemon", 0, 0, 'n' },
 	{ "debug",    0, 0, 'd' },
+	{ "config",    0, 0, 'f' },
 	{ "help",     0, 0, 'h' },
 	{ }
 };
@@ -110,8 +111,9 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
 	int opt, detach = 1, debug = 0;
+	gchar *config_file = NULL;
 
-	while ((opt = getopt_long(argc, argv, "+ndh", options, NULL)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "+ndhf:", options, NULL)) != EOF) {
 		switch(opt) {
 		case 'n':
 			detach = 0;
@@ -120,6 +122,9 @@ int main(int argc, char *argv[])
 			debug = 1;
 			break;
 		case 'h':
+		case 'f':
+			config_file = g_strdup(optarg);
+			break;
 		default:
 			usage();
 			exit(0);
@@ -159,7 +164,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (server_start() < 0)
+	if (server_start(config_file) < 0)
 		goto fail;
 
 	if (!manager_init(conn))
@@ -177,6 +182,9 @@ int main(int argc, char *argv[])
 	server_stop();
 
 fail:
+	if (config_file)
+		g_free(config_file);
+
 	g_dbus_cleanup_connection(conn);
 
 	g_main_loop_unref(main_loop);

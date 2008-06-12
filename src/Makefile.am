@@ -1,6 +1,10 @@
 
 servicedir = $(datarootdir)/dbus-1/sevices
 
+confdir = $(sysconfdir)/obex
+
+conf_DATA = obex.conf
+
 service_DATA = org.openobex.service
 
 sbin_PROGRAMS = obexd
@@ -16,3 +20,5 @@ AM_CFLAGS = @GDBUS_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
 				@BLUEZ_CFLAGS@ @OPENOBEX_CFLAGS@
 
 MAINTAINERCLEANFILES = Makefile.in
+
+EXTRA_DIST = obex.conf
