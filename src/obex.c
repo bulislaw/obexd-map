@@ -220,14 +220,14 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 			len = (hlen / 2) + 1;
 			os->name = g_malloc0(len);
-			OBEX_UnicodeToChar(os->name, hd.bs, len);
+			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
 			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 		case OBEX_HDR_TYPE:
 			if (hlen == 0)
 				continue;
 
-			os->type = g_strndup(hd.bs, hlen);
+			os->type = g_strndup((const gchar *) hd.bs, hlen);
 			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 		}
@@ -267,7 +267,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 			len = (hlen / 2) + 1;
 			os->name = g_malloc0(len);
-			OBEX_UnicodeToChar(os->name, hd.bs, len);
+			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
 			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 
@@ -275,7 +275,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 			if (hlen == 0)
 				continue;
 
-			os->type = g_strndup(hd.bs, hlen);
+			os->type = g_strndup((const gchar *) hd.bs, hlen);
 			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 
@@ -392,7 +392,7 @@ static gint obex_read(struct obex_session *os, obex_t *obex,
 {
 	gint size;
 	gint len = 0;
-	guint8 *buffer;
+	const guint8 *buffer;
 
 	if (os->fd < 0)
 		return -1;
