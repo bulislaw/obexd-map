@@ -91,7 +91,7 @@ static void obex_session_free(struct obex_session *os)
 		g_free(os->current_path);
 	if (os->buf)
 		g_free(os->buf);
-	if (os->fd)
+	if (os->fd > 0)
 		close(os->fd);
 	if (os->temp) {
 		unlink(os->temp);

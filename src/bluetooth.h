@@ -27,5 +27,5 @@
 #include <config.h>
 #endif
 
-gint bluetooth_init(const GKeyFile *keyfile);
+gint bluetooth_init(GKeyFile *keyfile);
 void bluetooth_exit(void);

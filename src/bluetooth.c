@@ -47,7 +47,6 @@
 #include "logging.h"
 #include "obex.h"
 
-static GSList *servers = NULL;
 static GSList *handles = NULL;
 static sdp_session_t *session = NULL;
 
@@ -200,6 +199,8 @@ static gint server_register(const gchar *name, guint16 service,
 	struct server *server;
 	uint32_t *handle;
 
+	debug("Registering %s on folder %s", name, folder);
+
 	handle = malloc(sizeof(uint32_t));
 	*handle = register_record(name, service, channel);
 	if (*handle == 0) {
@@ -266,16 +267,40 @@ failed:
 	return -err;
 }
 
-gint bluetooth_init(const GKeyFile *keyfile)
+static gint setup_server(GKeyFile *keyfile, const gchar *group,
+				gint16 service)
+{
+	gchar *name, *folder;
+	gboolean auto_accept;
+	gint8 channel;
+
+	name = g_key_file_get_string(keyfile, group, "name", NULL);
+	channel = g_key_file_get_integer(keyfile, group, "channel", NULL);
+	folder = g_key_file_get_string(keyfile, group, "folder", NULL);
+	auto_accept = g_key_file_get_boolean(keyfile, group,
+			"auto_accept", NULL);
+
+	return server_register(name, service, channel, folder, auto_accept);
+}
+
+gint bluetooth_init(GKeyFile *keyfile)
 {
 	gint err;
+	gchar **list;
+	gint i;
 
 	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
 	if (!session)
 		return -EIO;
 
-	/* FIXME: Parse the content */
-	err = server_register("OBEX FTP Server", OBEX_OPUSH, 10, "/tmp/obexd", TRUE);
+	err = 0;
+	list = g_key_file_get_string_list(keyfile, "Bluetooth", "Enable", NULL, NULL);
+	for (i = 0; list && list[i]; i++) {
+		if (g_str_equal(list[i], "OPUSH"))
+			err = setup_server(keyfile, "OPUSH", OBEX_OPUSH);
+		if (g_str_equal(list[i], "FTP"))
+			err = setup_server(keyfile, "FTP", OBEX_FTP);
+	}
 	if (err < 0)
 		goto failed;
 
