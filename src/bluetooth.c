@@ -36,6 +36,8 @@
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/rfcomm.h>
+#include <bluetooth/sdp.h>
+#include <bluetooth/sdp_lib.h>
 
 #include <glib.h>
 
@@ -46,10 +48,107 @@
 #include "obex.h"
 
 static GSList *servers = NULL;
+static GSList *handles = NULL;
+static sdp_session_t *session = NULL;
 
-static uint32_t register_service_record(const char *xml)
+static void add_lang_attr(sdp_record_t *r)
 {
-	return 0;
+	sdp_lang_attr_t base_lang;
+	sdp_list_t *langs = 0;
+
+	/* UTF-8 MIBenum (http://www.iana.org/assignments/character-sets) */
+	base_lang.code_ISO639 = (0x65 << 8) | 0x6e;
+	base_lang.encoding = 106;
+	base_lang.base_offset = SDP_PRIMARY_LANG_BASE;
+	langs = sdp_list_append(0, &base_lang);
+	sdp_set_lang_attr(r, langs);
+	sdp_list_free(langs, 0);
+}
+
+static uint32_t register_record(const gchar *name,
+				guint16 service, guint8 channel)
+{
+	uuid_t root_uuid, uuid, l2cap_uuid, rfcomm_uuid, obex_uuid;
+	sdp_list_t *root, *svclass_id, *apseq, *profiles, *aproto, *proto[3];
+	sdp_data_t *sdp_data;
+	sdp_profile_desc_t profile;
+	sdp_record_t record;
+	uint8_t formats = 0xFF;
+	int ret;
+
+	switch (service) {
+	case OBEX_OPUSH:
+		sdp_uuid16_create(&uuid, OBEX_OBJPUSH_SVCLASS_ID);
+		sdp_uuid16_create(&profile.uuid, OBEX_OBJPUSH_PROFILE_ID);
+		break;
+	case OBEX_FTP:
+		sdp_uuid16_create(&uuid, OBEX_FILETRANS_SVCLASS_ID);
+		sdp_uuid16_create(&profile.uuid, OBEX_FILETRANS_PROFILE_ID);
+		break;
+	default:
+		return 0;
+	}
+
+	/* Browse Groups */
+	memset(&record, 0, sizeof(sdp_record_t));
+	record.handle = 0xffffffff;
+	sdp_uuid16_create(&root_uuid, PUBLIC_BROWSE_GROUP);
+	root = sdp_list_append(NULL, &root_uuid);
+	sdp_set_browse_groups(&record, root);
+	sdp_list_free(root, NULL);
+
+	/* Service Class */
+	svclass_id = sdp_list_append(NULL, &uuid);
+	sdp_set_service_classes(&record, svclass_id);
+	sdp_list_free(svclass_id, NULL);
+
+	/* Profile Descriptor */
+	profile.version = 0x0100;
+	profiles = sdp_list_append(NULL, &profile);
+	sdp_set_profile_descs(&record, profiles);
+	sdp_list_free(profiles, NULL);
+
+	/* Protocol Descriptor */
+	sdp_uuid16_create(&l2cap_uuid, L2CAP_UUID);
+	proto[0] = sdp_list_append(NULL, &l2cap_uuid);
+	apseq = sdp_list_append(NULL, proto[0]);
+
+	sdp_uuid16_create(&rfcomm_uuid, RFCOMM_UUID);
+	proto[1] = sdp_list_append(NULL, &rfcomm_uuid);
+	sdp_data = sdp_data_alloc(SDP_UINT8, &channel);
+	proto[1] = sdp_list_append(proto[1], sdp_data);
+	apseq = sdp_list_append(apseq, proto[1]);
+
+	sdp_uuid16_create(&obex_uuid, OBEX_UUID);
+	proto[2] = sdp_list_append(NULL, &obex_uuid);
+	apseq = sdp_list_append(apseq, proto[2]);
+
+	aproto = sdp_list_append(NULL, apseq);
+	sdp_set_access_protos(&record, aproto);
+
+	sdp_data_free(sdp_data);
+	sdp_list_free(proto[0], NULL);
+	sdp_list_free(proto[1], NULL);
+	sdp_list_free(proto[2], NULL);
+	sdp_list_free(apseq, NULL);
+	sdp_list_free(aproto, NULL);
+
+	/* Suported Repositories */
+	if (service == OBEX_OPUSH)
+		sdp_attr_add_new(&record, SDP_ATTR_SUPPORTED_FORMATS_LIST,
+				SDP_UINT8, &formats);
+
+	/* Service Name */
+	sdp_set_info_attr(&record, name, NULL, NULL);
+
+	add_lang_attr(&record);
+
+	ret = sdp_record_register(session, &record, SDP_RECORD_PERSIST);
+
+	sdp_list_free(record.attrlist, (sdp_free_func_t) sdp_data_free);
+	sdp_list_free(record.pattern, free);
+
+	return (ret < 0 ? 0 : record.handle);
 }
 
 static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_data)
@@ -99,8 +198,19 @@ static gint server_register(const gchar *name, guint16 service,
 	GIOChannel *io;
 	gint err, sk, arg;
 	struct server *server;
+	guint16 *svc;
+	uint32_t *handle;
 
-	/* FIXME: Add the service record */
+	handle = malloc(sizeof(uint32_t));
+	*handle = register_record(name, service, channel);
+	if (*handle == 0) {
+		error("Service record registration failed!");
+		g_free(handle);
+		return -EIO;
+	}
+
+	debug("%s assigned record handle: 0x%X", name, *handle);
+	handles = g_slist_prepend(handles, handle);
 
 	sk = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 	if (sk < 0) {
@@ -157,16 +267,13 @@ failed:
 	return -err;
 }
 
-static gint server_unregister(guint16 service)
-{
-	/* FIXME: Remove service record and disable it */
-
-	return 0;
-}
-
 gint bluetooth_init(const GKeyFile *keyfile)
 {
 	gint err;
+
+	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
+	if (!session)
+		return -EIO;
 
 	/* FIXME: Parse the content */
 	err = server_register("OBEX FTP Server", OBEX_OPUSH, 10, "/tmp/obexd", TRUE);
@@ -176,10 +283,23 @@ gint bluetooth_init(const GKeyFile *keyfile)
 	return 0;
 
 failed:
+	sdp_close(session);
+
 	return -1;
+}
+
+static void unregister_record(gpointer rec_handle, gpointer user_data)
+{
+	uint32_t *handle = rec_handle;
+
+	sdp_device_record_unregister_binary(session, BDADDR_ANY, *handle);
+	g_free(handle);
 }
 
 void bluetooth_exit(void)
 {
-	/* FIXME: Free all servers and remove records */
+	g_slist_foreach(handles, unregister_record, NULL);
+	g_slist_free(handles);
+
+	sdp_close(session);
 }
