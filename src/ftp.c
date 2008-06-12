@@ -124,20 +124,21 @@ void ftp_put(obex_t *obex, obex_object_t *obj)
 void ftp_setpath(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
-	guint8 *nohdr;
+	guint8 *nonhdr;
 	gchar *fullname;
 
 	os = OBEX_GetUserData(obex);
 
-	OBEX_ObjectGetNonHdrData(obj, &nohdr);
-	if (!nohdr) {
+	if (OBEX_ObjectGetNonHdrData(obj, &nonhdr) != 2) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 				OBEX_RSP_PRECONDITION_FAILED);
-		error("Set path failed: flag not found!");
+		error("Set path failed: flag and constants not found!");
 		return;
 	}
+
 	/* Check flag "Backup" */
-	if ((nohdr[0] & 0x01) == 0x01) {
+	if ((nonhdr[0] & 0x01) == 0x01) {
+
 		debug("Set to parent path");
 
 		if (strcmp(ROOT_PATH, os->current_path) == 0) {
@@ -150,6 +151,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		os->current_path = g_strdup(fullname);
 
 		debug("Set to parent path: %s", os->current_path);
+
 		OBEX_ObjectSetRsp (obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		goto done;
 	}
@@ -177,6 +179,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	}
 
 	fullname = g_build_filename(os->current_path, os->name, NULL);
+
 	debug("Fullname: %s", fullname);
 
 	if (g_file_test(fullname, G_FILE_TEST_IS_DIR)) {
@@ -187,7 +190,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		goto done;
 	}
 
-	if (!g_file_test(fullname, G_FILE_TEST_EXISTS) && nohdr[0] == 0 &&
+	if (!g_file_test(fullname, G_FILE_TEST_EXISTS) && nonhdr[0] == 0 &&
 				mkdir(fullname, 0775) >=  0) {
 		g_free(os->current_path);
 		os->current_path = g_strdup(fullname);
