@@ -198,7 +198,6 @@ static gint server_register(const gchar *name, guint16 service,
 	GIOChannel *io;
 	gint err, sk, arg;
 	struct server *server;
-	guint16 *svc;
 	uint32_t *handle;
 
 	handle = malloc(sizeof(uint32_t));
