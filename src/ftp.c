@@ -73,7 +73,6 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hv;
 	struct obex_session *os;
-	gchar *path;
 	guint32 size;
 
 	os = OBEX_GetUserData(obex);
@@ -84,8 +83,11 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 		goto fail;
 
 	if (os->name) {
-		path = g_build_filename(os->current_path, os->name, NULL);
+		gchar *path = g_build_filename(os->current_path,
+						os->name, NULL);
 		size = os_setup_by_name(os, path);
+		g_free(path);
+
 		if (!size)
 			goto fail;
 	} else if (os->type) {
@@ -105,14 +107,11 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 			OBEX_RSP_SUCCESS);
 
-	g_free(path);
-
 	return;
 
 fail:
-	g_free(path);
-
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+
 	return;
 }
 
