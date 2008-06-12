@@ -49,6 +49,9 @@ static int server_start(const gchar *config_file)
 	GKeyFile *keyfile;
 	GError *gerr = NULL;
 	const gchar *filename = (config_file ? : CONFIGDIR "/" CONFIG_FILE);
+	gchar **key;
+	gsize len;
+	int i;
 
 	debug("Configuration file: %s", filename);
 
@@ -59,12 +62,33 @@ static int server_start(const gchar *config_file)
 		return -EINVAL;
 	}
 
-	/* FIXME: Read [General] section */
+	key = g_key_file_get_string_list(keyfile, 
+				"General", "EnabledTransports",
+				&len, &gerr);
+	if (gerr) {
+		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
+		g_error_free(gerr);
+		return -EINVAL;
+	}
 
-	/* Initialize enabled transports */
-	bluetooth_init(keyfile);
+	if (key == NULL || len == 0) {
+		error("EnabledTransports not defined");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < len; i++){
+
+		if (!g_strcasecmp(key[i], "Bluetooth")) {
+			bluetooth_init(keyfile);
+		} else if (!g_strcasecmp(key[i], "USB")) {
+			debug("Not implemented (USB)");
+		} else if (!g_strcasecmp(key[i], "IrDA")) {
+			debug("Not implemented (IrDA)");
+		}
+	}
 
 	g_key_file_free(keyfile);
+	g_strfreev(key);
 
 	return 0;
 }
