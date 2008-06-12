@@ -27,16 +27,44 @@
 #include <config.h>
 #endif
 
+#include <glib.h>
+
 #define OBEX_OPUSH	0x00
 #define OBEX_FTP	0x01
+
+#define ROOT_PATH "/tmp"
+
+struct obex_commands {
+	void (*get) (obex_t *obex, obex_object_t *obj);
+	void (*put) (obex_t *obex, obex_object_t *obj);
+	void (*setpath) (obex_t *obex, obex_object_t *obj);
+};
+
+struct obex_session {
+	guint32		cid;
+	guint16		mtu;
+	gchar		*name;
+	gchar		*type;
+	gchar		*current_path;
+	guint8		*buf;
+	gchar		*temp;
+	gint		start;
+	gint		size;
+	gint		fd;
+	const guint8	*target;
+	struct obex_commands *cmds;
+};
 
 gint obex_server_start(gint fd, gint mtu, guint16 svc);
 gint obex_server_stop();
 
 void opp_connect(obex_t *obex, obex_object_t *obj);
 void opp_put(obex_t *obex, obex_object_t *obj);
+void opp_get(obex_t *obex, obex_object_t *obj);
 
 void ftp_connect(obex_t *obex, obex_object_t *obj);
 void ftp_get(obex_t *obex, obex_object_t *obj);
 void ftp_put(obex_t *obex, obex_object_t *obj);
 void ftp_setpath(obex_t *obex, obex_object_t *obj);
+
+gint os_setup_by_name(struct obex_session *os, gchar *file);

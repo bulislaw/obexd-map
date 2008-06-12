@@ -32,6 +32,10 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <glib.h>
 
@@ -40,6 +44,7 @@
 
 #include "logging.h"
 #include "obex.h"
+#include "logging.h"
 
 #define TARGET_SIZE	16
 static const guint8 FTP_TARGET[TARGET_SIZE] = { 0xF9, 0xEC, 0x7B, 0xC4,
@@ -56,20 +61,16 @@ typedef struct {
     guint16	mtu;
 } __attribute__ ((packed)) obex_connect_hdr_t;
 
+#define FTP_ROOT "/tmp/obexd"
+
 static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 {
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 			OBEX_RSP_NOT_IMPLEMENTED);
 }
 
-struct obex_commands {
-	void (*get) (obex_t *obex, obex_object_t *obj);
-	void (*put) (obex_t *obex, obex_object_t *obj);
-	void (*setpath) (obex_t *obex, obex_object_t *obj);
-};
-
 struct obex_commands opp = {
-	.get		= cmd_not_implemented,
+	.get		= opp_get,
 	.put		= opp_put,
 	.setpath	= cmd_not_implemented,
 };
@@ -80,21 +81,22 @@ struct obex_commands ftp = {
 	.setpath	= ftp_setpath,
 };
 
-struct obex_session {
-	guint32		cid;
-	guint16		mtu;
-	gchar		*name;
-	gchar		*type;
-	const guint8	*target;
-	struct obex_commands *cmds;
-};
-
 static void obex_session_free(struct obex_session *os)
 {
 	if (os->name)
 		g_free(os->name);
 	if (os->type)
 		g_free(os->type);
+	if (os->current_path)
+		g_free(os->current_path);
+	if (os->buf)
+		g_free(os->buf);
+	if (os->fd)
+		close(os->fd);
+	if (os->temp) {
+		unlink(os->temp);
+		g_free(os->temp);
+	}
 	g_free(os);
 }
 
@@ -121,6 +123,9 @@ static void cmd_connect(struct obex_session *os,
 			nonhdr->version, nonhdr->flags, mtu);
 	/* Leave space for headers */
 	newsize = mtu - 200;
+
+	os->mtu = mtu;
+
 	debug("Resizing stream chunks to %d", newsize);
 	/* FIXME: Use the new size */
 
@@ -184,7 +189,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	obex_headerdata_t hd;
 	guint hlen, len;
 	guint8 hi;
-	const gchar *type, *name;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
@@ -196,6 +200,16 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (os->name) {
 		g_free(os->name);
 		os->name = NULL;
+	}
+
+	if (os->buf) {
+		g_free(os->buf);
+		os->buf = NULL;
+	}
+
+	if (os->temp) {
+		g_free(os->temp);
+		os->temp = NULL;
 	}
 
 	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
@@ -224,7 +238,56 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
-	g_return_if_fail(chk_cid(obex, obj, os->cid));
+	obex_headerdata_t hd;
+	guint hlen, len;
+	guint8 hi;
+
+	/* g_return_if_fail(chk_cid(obex, obj, os->cid)); */
+
+	if (os->type) {
+		g_free(os->type);
+		os->type = NULL;
+	}
+
+	if (os->name) {
+		g_free(os->name);
+		os->name = NULL;
+	}
+
+	if (os->buf) {
+		g_free(os->buf);
+		os->buf = NULL;
+	}
+
+	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		switch (hi) {
+		case OBEX_HDR_NAME:
+			if (hlen == 0)
+				continue;
+
+			len = (hlen / 2) + 1;
+			os->name = g_malloc0(len);
+			OBEX_UnicodeToChar(os->name, hd.bs, len);
+			debug("OBEX_HDR_NAME: %s", os->name);
+			break;
+
+		case OBEX_HDR_TYPE:
+			if (hlen == 0)
+				continue;
+
+			os->type = g_strndup(hd.bs, hlen);
+			debug("OBEX_HDR_TYPE: %s", os->type);
+			break;
+
+		case OBEX_HDR_BODY:
+			os->size = -1;
+			break;
+
+		case OBEX_HDR_LENGTH:
+			os->size = hd.bq4;
+			break;
+		}
+	}
 
 	os->cmds->put(obex, obj);
 }
@@ -232,9 +295,143 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 static void cmd_setpath(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
+	obex_headerdata_t hd;
+	guint32 hlen;
+	guint8 hi;
+
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
+	if (os->name) {
+		g_free(os->name);
+		os->name = NULL;
+	}
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		if (hi == OBEX_HDR_NAME) {
+			/*
+			 * This is because OBEX_UnicodeToChar() accesses
+			 * the string even if its size is zero
+			 */
+			if (hlen == 0) {
+				os->name = g_strdup("");
+				break;
+			}
+
+			os->name = (char *) g_malloc0(hlen/2 + 1);
+			OBEX_UnicodeToChar((uint8_t *)os->name, hd.bs, hlen/2);
+			debug("Set path name: %s", os->name);
+			break;
+		}
+	}
+
 	os->cmds->setpath(obex, obj);
+}
+
+gint os_setup_by_name(struct obex_session *os, gchar *file)
+{
+	gint fd;
+	struct stat stats;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		goto fail;
+
+	if (fstat(fd, &stats))
+		goto fail;
+
+	os->fd = fd;
+	os->buf = g_new0(guint8, os->mtu);
+	os->start = 0;
+	os->size = os->mtu;
+
+	return stats.st_size;
+
+fail:
+	if (fd >= 0)
+		close(fd);
+
+	return 0;
+}
+
+static gint obex_write(struct obex_session *os, obex_t *obex,
+			obex_object_t *obj)
+{
+	obex_headerdata_t hv;
+	gint len;
+
+	debug("name: %s type: %s mtu: %d fd: %d",
+			os->name, os->type, os->mtu, os->fd);
+
+	if (os->fd < 0)
+		return -1;
+
+	len = read(os->fd, os->buf, os->mtu);
+
+	if (len < 0) {
+		g_free(os->buf);
+		return -errno;
+	}
+
+	if (len == 0) {
+		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
+					OBEX_FL_STREAM_DATAEND);
+		g_free(os->buf);
+		os->buf = NULL;
+		return len;
+	}
+
+	hv.bs = os->buf;
+	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, len,
+				OBEX_FL_STREAM_DATA);
+
+	return len;
+}
+
+static gint obex_read(struct obex_session *os, obex_t *obex,
+		obex_object_t *obj)
+{
+	gint size;
+	gint len = 0;
+	guint8 *buffer;
+
+	if (os->fd < 0)
+		return -1;
+
+	size = OBEX_ObjectReadStream(obex, obj, &buffer);
+	if (size <= 0) {
+		close(os->fd);
+		return 0;
+	}
+
+	while (len < size) {
+		gint w;
+
+		w = write(os->fd, buffer + len, size - len);
+		if (w < 0 && errno == EINTR)
+			continue;
+
+		if (w < 0)
+			return -errno;
+
+		len += w;
+	}
+
+	return 0;
+}
+
+static void prepare_put(obex_t *obex, obex_object_t *obj)
+{
+	struct obex_session *os;
+	gchar *temp_file;
+
+	os = OBEX_GetUserData(obex);
+
+	temp_file = g_build_filename(os->current_path, "tmp_XXXXXX", NULL);
+
+	os->fd = mkstemp(temp_file);
+	os->temp = temp_file;
+
+	OBEX_ObjectReadStream(obex, obj, NULL);
 }
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
@@ -264,6 +461,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQHINT:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
+			prepare_put(obex, obj);
 		case OBEX_CMD_GET:
 		case OBEX_CMD_CONNECT:
 		case OBEX_CMD_DISCONNECT:
@@ -309,6 +507,12 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		}
 		break;
 	case OBEX_EV_STREAMAVAIL:
+		os = OBEX_GetUserData(obex);
+		obex_read(os, obex, obj);
+		break;
+	case OBEX_EV_STREAMEMPTY:
+		os = OBEX_GetUserData(obex);
+		obex_write(os, obex, obj);
 		break;
 	case OBEX_EV_LINKERR:
 		break;
@@ -344,7 +548,6 @@ static gboolean obex_handle_input(GIOChannel *io, GIOCondition cond, gpointer us
 	if (cond & (G_IO_HUP | G_IO_ERR))
 		return FALSE;
 
-
 	if (OBEX_HandleInput(obex, 1) < 0) {
 		error("Handle input error");
 		return FALSE;
@@ -365,10 +568,12 @@ gint obex_server_start(gint fd, gint mtu, guint16 svc)
 	case OBEX_OPUSH:
 		os->target = NULL;
 		os->cmds = &opp;
+		os->current_path = g_strdup(ROOT_PATH);
 		break;
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
+		os->current_path = g_strdup(ROOT_PATH);
 		break;
 	default:
 		g_free(os);
