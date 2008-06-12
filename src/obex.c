@@ -103,9 +103,8 @@ static void cmd_connect(struct obex_session *os,
 {
 	obex_connect_hdr_t *nonhdr;
 	obex_headerdata_t hd;
-	const guint8 *target;
 	uint8_t *buffer;
-	guint targetsize, hlen, newsize;
+	guint hlen, newsize;
 	guint16 mtu;
 	guint8 hi;
 
@@ -131,21 +130,18 @@ static void cmd_connect(struct obex_session *os,
 		return;
 	}
 
-	hi = targetsize = 0;
-	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
-		target = hd.bs;
-		targetsize = hlen;
-	}
+	hi = hlen = 0;
+	OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen);
 
-	if (hi != OBEX_HDR_TARGET || targetsize != TARGET_SIZE
-			|| memcmp(os->target, target, TARGET_SIZE) != 0) {
+	if (hi != OBEX_HDR_TARGET || hlen != TARGET_SIZE
+			|| memcmp(os->target, hd.bs, TARGET_SIZE) != 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
 
 	/* FIXME: Add non header values */
 
-	hd.bs = target;
+	/* Append received UUID in WHO header */
 	OBEX_ObjectAddHeader(obex, obj,
 			OBEX_HDR_WHO, hd, TARGET_SIZE,
 			OBEX_FL_FIT_ONE_PACKET);
