@@ -70,6 +70,12 @@ static int server_start(void)
 	return 0;
 }
 
+static void server_stop()
+{
+	/* FIXME: If Bluetooth enabled */
+	bluetooth_exit();
+}
+
 static void sig_term(int sig)
 {
 	g_main_loop_quit(main_loop);
@@ -167,6 +173,8 @@ int main(int argc, char *argv[])
 	g_main_loop_run(main_loop);
 
 	manager_cleanup();
+
+	server_stop();
 
 fail:
 	g_dbus_cleanup_connection(conn);

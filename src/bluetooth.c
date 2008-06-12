@@ -57,6 +57,8 @@ struct server {
 };
 
 static GSList *servers = NULL;
+static GSList *handles = NULL;
+static sdp_session_t *session = NULL;
 
 static void add_lang_attr(sdp_record_t *r)
 {
@@ -72,13 +74,12 @@ static void add_lang_attr(sdp_record_t *r)
 	sdp_list_free(langs, 0);
 }
 
-static uint32_t register_service_record(const gchar *name,
-					guint16 service, guint8 channel)
+static uint32_t register_record(const gchar *name,
+				guint16 service, guint8 channel)
 {
 	uuid_t root_uuid, uuid, l2cap_uuid, rfcomm_uuid, obex_uuid;
 	sdp_list_t *root, *svclass_id, *apseq, *profiles, *aproto, *proto[3];
 	sdp_data_t *sdp_data;
-	sdp_session_t *session;
 	sdp_profile_desc_t profile;
 	sdp_record_t record;
 	uint8_t formats = 0xFF;
@@ -96,10 +97,6 @@ static uint32_t register_service_record(const gchar *name,
 	default:
 		return 0;
 	}
-
-	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
-	if (!session)
-		return 0;
 
 	/* Browse Groups */
 	memset(&record, 0, sizeof(sdp_record_t));
@@ -160,8 +157,6 @@ static uint32_t register_service_record(const gchar *name,
 	sdp_list_free(record.attrlist, (sdp_free_func_t) sdp_data_free);
 	sdp_list_free(record.pattern, free);
 
-	sdp_close(session);
-
 	return (ret < 0 ? 0 : record.handle);
 }
 
@@ -212,9 +207,19 @@ static gint server_register(const gchar *name, guint16 service,
 	GIOChannel *io;
 	gint err, sk, arg;
 	guint16 *svc;
+	uint32_t *handle;
 
-	/* FIXME: Add the service record */
-	register_service_record(name, service, channel);
+	handle = malloc(sizeof(uint32_t));
+	*handle = register_record(name, service, channel);
+	if (*handle == 0) {
+		error("Service record registration failed!");
+		g_free(handle);
+		return -EIO;
+	}
+
+	debug("%s assigned record handle: 0x%X", name, *handle);
+
+	handles = g_slist_prepend(handles, handle);
 
 	sk = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 	if (sk < 0) {
@@ -268,16 +273,13 @@ failed:
 	return -err;
 }
 
-static gint server_unregister(guint16 service)
-{
-	/* FIXME: Remove service record and disable it */
-
-	return 0;
-}
-
 gint bluetooth_init(const GKeyFile *keyfile)
 {
 	gint err;
+
+	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
+	if (!session)
+		return -EIO;
 
 	/* FIXME: Parse the content */
 	err = server_register("OBEX FTP Server", OBEX_FTP, 10, "/tmp/ftp", TRUE);
@@ -287,10 +289,23 @@ gint bluetooth_init(const GKeyFile *keyfile)
 	return 0;
 
 failed:
+	sdp_close(session);
+
 	return -1;
+}
+
+static void unregister_record(gpointer rec_handle, gpointer user_data)
+{
+	uint32_t *handle = rec_handle;
+
+	sdp_device_record_unregister_binary(session, BDADDR_ANY, *handle);
+	g_free(handle);
 }
 
 void bluetooth_exit(void)
 {
-	/* FIXME: Free all servers and remove records */
+	g_slist_foreach(handles, unregister_record, NULL);
+	g_slist_free(handles);
+
+	sdp_close(session);
 }
