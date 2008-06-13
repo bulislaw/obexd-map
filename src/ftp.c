@@ -143,23 +143,24 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 		if (strcmp(ROOT_PATH, os->current_path) == 0) {
 			OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
-			goto done;
+			return;
 		}
 
 		fullname = g_path_get_dirname(os->current_path);
 		g_free(os->current_path);
 		os->current_path = g_strdup(fullname);
+		g_free(fullname);
 
 		debug("Set to parent path: %s", os->current_path);
 
 		OBEX_ObjectSetRsp (obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
-		goto done;
+		return;
 	}
 
 	if (!os->name) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		debug("Set path failed: name missing!");
-		goto done;
+		return;
 	}
 
 	if (strlen(os->name) == 0) {
@@ -168,14 +169,14 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 		os->current_path = g_strdup(ROOT_PATH);
 
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
-		goto done;
+		return;
 	}
 
 	/* Check and set to name path */
 	if (strstr(os->name, "/") || strcmp(os->name, "..") == 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		error("Set path failed: name incorrect!");
-		goto done;
+		return;
 	}
 
 	fullname = g_build_filename(os->current_path, os->name, NULL);
