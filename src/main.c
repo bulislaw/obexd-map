@@ -59,21 +59,21 @@ static int server_start(const gchar *config_file)
 	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
 		error("Parsing %s failed: %s", filename, gerr->message);
 		g_error_free(gerr);
-		return -EINVAL;
+		goto fail;
 	}
 
-	key = g_key_file_get_string_list(keyfile, 
+	key = g_key_file_get_string_list(keyfile,
 				"General", "EnabledTransports",
 				&len, &gerr);
 	if (gerr) {
 		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
 		g_error_free(gerr);
-		return -EINVAL;
+		goto fail;
 	}
 
 	if (key == NULL || len == 0) {
 		error("EnabledTransports not defined");
-		return -EINVAL;
+		goto fail;
 	}
 
 	for (i = 0; i < len; i++){
@@ -91,6 +91,11 @@ static int server_start(const gchar *config_file)
 	g_strfreev(key);
 
 	return 0;
+
+fail:
+	g_key_file_free(keyfile);
+
+	return -EINVAL;
 }
 
 static void server_stop()

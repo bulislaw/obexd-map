@@ -273,6 +273,7 @@ static gint setup_server(GKeyFile *keyfile, const gchar *group,
 	gchar *name, *folder;
 	gboolean auto_accept;
 	gint8 channel;
+	gint ret;
 
 	name = g_key_file_get_string(keyfile, group, "name", NULL);
 	channel = g_key_file_get_integer(keyfile, group, "channel", NULL);
@@ -280,7 +281,12 @@ static gint setup_server(GKeyFile *keyfile, const gchar *group,
 	auto_accept = g_key_file_get_boolean(keyfile, group,
 			"auto_accept", NULL);
 
-	return server_register(name, service, channel, folder, auto_accept);
+	ret = server_register(name, service, channel, folder, auto_accept);
+
+	g_free(name);
+	g_free(folder);
+
+	return ret;
 }
 
 gint bluetooth_init(GKeyFile *keyfile)
@@ -295,12 +301,18 @@ gint bluetooth_init(GKeyFile *keyfile)
 
 	err = 0;
 	list = g_key_file_get_string_list(keyfile, "Bluetooth", "Enable", NULL, NULL);
-	for (i = 0; list && list[i]; i++) {
+	if (list == NULL)
+		goto failed;
+
+	for (i = 0; list[i]; i++) {
 		if (g_str_equal(list[i], "OPUSH"))
 			err = setup_server(keyfile, "OPUSH", OBEX_OPUSH);
 		if (g_str_equal(list[i], "FTP"))
 			err = setup_server(keyfile, "FTP", OBEX_FTP);
 	}
+
+	g_strfreev(list);
+
 	if (err < 0)
 		goto failed;
 
