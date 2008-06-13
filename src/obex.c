@@ -264,7 +264,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os->buf = NULL;
 	}
 
-	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
 			if (hlen == 0)
@@ -358,8 +358,8 @@ fail:
 	return 0;
 }
 
-static gint obex_write(struct obex_session *os, obex_t *obex,
-			obex_object_t *obj)
+static gint obex_write(struct obex_session *os,
+			obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hv;
 	gint len;
@@ -371,10 +371,10 @@ static gint obex_write(struct obex_session *os, obex_t *obex,
 		return -1;
 
 	len = read(os->fd, os->buf, os->mtu);
-
 	if (len < 0) {
+		gint err = errno;
 		g_free(os->buf);
-		return -errno;
+		return -err;
 	}
 
 	if (len == 0) {
@@ -392,15 +392,15 @@ static gint obex_write(struct obex_session *os, obex_t *obex,
 	return len;
 }
 
-static gint obex_read(struct obex_session *os, obex_t *obex,
-		obex_object_t *obj)
+static gint obex_read(struct obex_session *os,
+			obex_t *obex, obex_object_t *obj)
 {
 	gint size;
 	gint len = 0;
 	const guint8 *buffer;
 
 	if (os->fd < 0)
-		return -1;
+		return -EIO;
 
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
 	if (size <= 0) {
@@ -412,11 +412,13 @@ static gint obex_read(struct obex_session *os, obex_t *obex,
 		gint w;
 
 		w = write(os->fd, buffer + len, size - len);
-		if (w < 0 && errno == EINTR)
-			continue;
-
-		if (w < 0)
-			return -errno;
+		if (w < 0) {
+			gint err = errno;
+			if (err == EINTR)
+				continue;
+			else
+				return -err;
+		}
 
 		len += w;
 	}
