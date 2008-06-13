@@ -368,7 +368,7 @@ static gint obex_write(struct obex_session *os,
 			os->name, os->type, os->mtu, os->fd);
 
 	if (os->fd < 0)
-		return -1;
+		return -EIO;
 
 	len = read(os->fd, os->buf, os->mtu);
 	if (len < 0) {

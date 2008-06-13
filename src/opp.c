@@ -45,11 +45,6 @@
 #define VCARD_TYPE "text/x-vcard"
 #define VCARD_FILE CONFIGDIR "/vcard.vcf"
 
-void opp_connect(obex_t *obex, obex_object_t *obj)
-{
-
-}
-
 void opp_put(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
@@ -117,6 +112,6 @@ void opp_get(obex_t *obex, obex_object_t *obj)
 
 fail:
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+
 	return;
 }
-
