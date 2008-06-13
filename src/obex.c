@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <fcntl.h>
 
 #include <glib.h>
@@ -290,6 +291,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 		case OBEX_HDR_LENGTH:
 			os->size = hd.bq4;
+			debug("OBEX_HDR_LENGTH: %d", os->size);
 			break;
 		}
 	}
@@ -395,8 +397,7 @@ static gint obex_write(struct obex_session *os,
 static gint obex_read(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
-	gint size;
-	gint len = 0;
+	gint size, len = 0;
 	const guint8 *buffer;
 
 	if (os->fd < 0)
@@ -424,6 +425,40 @@ static gint obex_read(struct obex_session *os,
 	}
 
 	return 0;
+}
+
+static void check_put(obex_t *obex, obex_object_t *obj)
+{
+	struct obex_session *os;
+	struct statvfs buf;
+	obex_headerdata_t hd;
+	guint hlen, len = 0;
+	guint8 hi;
+	guint64 free;
+
+	os = OBEX_GetUserData(obex);
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen))
+		if (hi == OBEX_HDR_LENGTH) {
+			debug("OBEX_HDR_LENGTH %d", hd.bq4);
+			len = hd.bq4;
+			break;
+		}
+
+	if (!len)
+		return;
+	OBEX_ObjectReParseHeaders(obex, obj);
+
+	if (fstatvfs(os->fd, &buf) < 0) {
+		error("fstatvfs() fail");
+	}
+
+	free = buf.f_bsize * buf.f_bavail;
+	debug ("Free space in disk: %d", free);
+	if (len > free) {
+		debug("Free disk space not available");
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	}
 }
 
 static void prepare_put(obex_t *obex, obex_object_t *obj)
@@ -484,6 +519,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQCHECK:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
+			check_put(obex, obj);
 			break;
 		default:
 			break;
