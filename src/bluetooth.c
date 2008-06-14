@@ -47,6 +47,9 @@
 #include "logging.h"
 #include "obex.h"
 
+#define OPUSH_CHANNEL	9
+#define FTP_CHANNEL	10
+
 static GSList *handles = NULL;
 static sdp_session_t *session = NULL;
 
@@ -199,19 +202,6 @@ static gint server_register(const gchar *name, guint16 service,
 	struct server *server;
 	uint32_t *handle;
 
-	debug("Registering %s on folder %s", name, folder);
-
-	handle = malloc(sizeof(uint32_t));
-	*handle = register_record(name, service, channel);
-	if (*handle == 0) {
-		error("Service record registration failed!");
-		g_free(handle);
-		return -EIO;
-	}
-
-	debug("%s assigned record handle: 0x%X", name, *handle);
-	handles = g_slist_prepend(handles, handle);
-
 	sk = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 	if (sk < 0) {
 		err = errno;
@@ -246,6 +236,16 @@ static gint server_register(const gchar *name, guint16 service,
 		goto failed;
 	}
 
+	handle = malloc(sizeof(uint32_t));
+	*handle = register_record(name, service, channel);
+	if (*handle == 0) {
+		g_free(handle);
+		err = EIO;
+		goto failed;
+	}
+
+	handles = g_slist_prepend(handles, handle);
+
 	server = g_malloc0(sizeof(struct server));
 	server->service = service;
 	server->folder = g_strdup(folder);
@@ -258,6 +258,8 @@ static gint server_register(const gchar *name, guint16 service,
 			connect_event, server, server_destroyed);
 	g_io_channel_unref(io);
 
+	debug("Registered: %s, record handle: 0x%x, folder: %s", name, *handle, folder);
+
 	return 0;
 
 failed:
@@ -267,24 +269,38 @@ failed:
 	return -err;
 }
 
-static gint setup_server(GKeyFile *keyfile, const gchar *group,
-				gint16 service)
+static gint setup_server(GKeyFile *keyfile,
+			const gchar *group, gint16 service)
 {
-	gchar *name, *folder;
+	const gchar *name, *folder;
+	gchar *key_name, *key_folder;
 	gboolean auto_accept;
 	gint8 channel;
 	gint ret;
 
-	name = g_key_file_get_string(keyfile, group, "name", NULL);
+	key_name = g_key_file_get_string(keyfile, group, "name", NULL);
 	channel = g_key_file_get_integer(keyfile, group, "channel", NULL);
-	folder = g_key_file_get_string(keyfile, group, "folder", NULL);
+	key_folder = g_key_file_get_string(keyfile, group, "folder", NULL);
 	auto_accept = g_key_file_get_boolean(keyfile, group,
-			"auto_accept", NULL);
+						"auto_accept", NULL);
+
+	switch (service) {
+	case OBEX_OPUSH:
+		name = (key_name ? : "OBEX OPUSH server");
+		folder = (key_folder ? : ROOT_PATH);
+		channel = (channel ? : OPUSH_CHANNEL);
+		break;
+	case OBEX_FTP:
+		name = (key_name ? : "OBEX FTP server");
+		folder = (key_folder ? : ROOT_PATH);
+		channel = (channel ? : FTP_CHANNEL);
+		break;
+	}
 
 	ret = server_register(name, service, channel, folder, auto_accept);
 
-	g_free(name);
-	g_free(folder);
+	g_free(key_name);
+	g_free(key_folder);
 
 	return ret;
 }
