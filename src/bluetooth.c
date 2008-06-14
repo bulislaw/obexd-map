@@ -312,8 +312,11 @@ gint bluetooth_init(GKeyFile *keyfile)
 	gint i;
 
 	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
-	if (!session)
-		return -EIO;
+	if (!session) {
+		gint err = errno;
+		error("sdp_connect(): %s(%d)", strerror(err), err);
+		return -err;
+	}
 
 	err = 0;
 	list = g_key_file_get_string_list(keyfile, "Bluetooth", "Enable", NULL, NULL);
