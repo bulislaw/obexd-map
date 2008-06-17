@@ -46,6 +46,7 @@
 #include "logging.h"
 #include "obex.h"
 #include "logging.h"
+#include "dbus.h"
 
 #define TARGET_SIZE	16
 static const guint8 FTP_TARGET[TARGET_SIZE] = { 0xF9, 0xEC, 0x7B, 0xC4,
