@@ -442,7 +442,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		if (hi == OBEX_HDR_LENGTH) {
 			debug("OBEX_HDR_LENGTH %d", hd.bq4);
 			len = hd.bq4;
-			break;
 		}
 
 	if (!len)
@@ -451,6 +450,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		error("fstatvfs() fail");
+		return;
 	}
 
 	free = buf.f_bsize * buf.f_bavail;
@@ -551,7 +551,10 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		break;
 	case OBEX_EV_STREAMAVAIL:
 		os = OBEX_GetUserData(obex);
-		obex_read(os, obex, obj);
+		if (obex_read(os, obex, obj) < 0) {
+			debug("error obex_read()");
+			OBEX_CancelRequest(obj, 1);
+		}
 		break;
 	case OBEX_EV_STREAMEMPTY:
 		os = OBEX_GetUserData(obex);
@@ -611,18 +614,19 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	case OBEX_OPUSH:
 		os->target = NULL;
 		os->cmds = &opp;
-		os->current_path = g_strdup(server->folder);
 		break;
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
-		os->current_path = g_strdup(server->folder);
 		break;
 	default:
 		g_free(os);
 		debug("Invalid OBEX server");
 		return -EINVAL;
 	}
+
+	os->server = server;
+	os->current_path = g_strdup(server->folder);
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
 	if (!obex)
