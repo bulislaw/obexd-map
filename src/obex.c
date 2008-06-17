@@ -553,7 +553,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		os = OBEX_GetUserData(obex);
 		if (obex_read(os, obex, obj) < 0) {
 			debug("error obex_read()");
-			OBEX_CancelRequest(obj, 1);
+			OBEX_CancelRequest(obex, 1);
 		}
 		break;
 	case OBEX_EV_STREAMEMPTY:
