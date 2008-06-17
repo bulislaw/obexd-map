@@ -141,7 +141,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 		debug("Set to parent path");
 
-		if (strcmp(ROOT_PATH, os->current_path) == 0) {
+		if (strcmp(os->server->folder, os->current_path) == 0) {
 			OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 			return;
 		}
@@ -166,7 +166,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 	if (strlen(os->name) == 0) {
 		debug("Set to root");
 		g_free(os->current_path);
-		os->current_path = g_strdup(ROOT_PATH);
+		os->current_path = g_strdup(os->server->folder);
 
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		return;

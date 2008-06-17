@@ -32,8 +32,6 @@
 #define OBEX_OPUSH	0x00
 #define OBEX_FTP	0x01
 
-#define ROOT_PATH "/tmp"
-
 struct obex_commands {
 	void (*get) (obex_t *obex, obex_object_t *obj);
 	void (*put) (obex_t *obex, obex_object_t *obj);
@@ -59,6 +57,7 @@ struct obex_session {
 	gint		fd;
 	const guint8	*target;
 	struct obex_commands *cmds;
+	struct server *server;
 };
 
 gint obex_server_start(gint fd, gint mtu, struct server *server);
