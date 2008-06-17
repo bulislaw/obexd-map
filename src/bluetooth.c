@@ -50,6 +50,8 @@
 #define OPUSH_CHANNEL	9
 #define FTP_CHANNEL	10
 
+#define ROOT_PATH "/tmp"
+
 static GSList *handles = NULL;
 static sdp_session_t *session = NULL;
 
