@@ -188,11 +188,12 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 
 static void server_destroyed(gpointer user_data)
 {
-	guint16 *svc = user_data;
+	struct server *server = user_data;
 
 	error("Server destroyed");
 
-	g_free(svc);
+	g_free(server->folder);
+	g_free(server);
 }
 
 static gint server_register(const gchar *name, guint16 service,
