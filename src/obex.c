@@ -62,8 +62,6 @@ typedef struct {
     guint16	mtu;
 } __attribute__ ((packed)) obex_connect_hdr_t;
 
-#define FTP_ROOT "/tmp/obexd"
-
 static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 {
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
@@ -444,9 +442,10 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			len = hd.bq4;
 		}
 
+	OBEX_ObjectReParseHeaders(obex, obj);
+
 	if (!len)
 		return;
-	OBEX_ObjectReParseHeaders(obex, obj);
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		error("fstatvfs() fail");
