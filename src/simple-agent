@@ -1,0 +1,41 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+
+class Agent(dbus.service.Object):
+
+	@dbus.service.method("org.openobex.Agent",
+					in_signature="osssii", out_signature="s")
+	def Authorize(self, path, device, filename, type, length, time):
+		print "Authorize (%s, %s, %s)" % (path, device, filename)
+		return "/tmp"
+
+	@dbus.service.method("org.openobex.Agent",
+					in_signature="", out_signature="")
+	def Cancel(self):
+		print "Cancel"
+
+if __name__ == '__main__':
+	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+	bus = dbus.SessionBus()
+	manager = dbus.Interface(bus.get_object("org.openobex", "/"),
+							"org.openobex.Manager")
+
+	path = "/test/agent"
+	agent = Agent(bus, path)
+
+	mainloop = gobject.MainLoop()
+
+	manager.RegisterAgent(path)
+	print "Agent registered"
+
+	mainloop.run()
+
+	# manager.UnregisterAgent(path)
+	# print "Agent unregistered"
