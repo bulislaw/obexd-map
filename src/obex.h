@@ -52,8 +52,8 @@ struct obex_session {
 	gchar		*current_path;
 	guint8		*buf;
 	gchar		*temp;
-	gint		offset;
-	gint		size;
+	gint32		offset;
+	gint32		size;
 	gint		fd;
 	const guint8	*target;
 	struct obex_commands *cmds;
