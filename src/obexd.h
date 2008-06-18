@@ -32,6 +32,7 @@
 
 #define OPENOBEX_MANAGER_PATH       "/"
 #define OPENOBEX_MANAGER_INTERFACE  OPENOBEX_SERVICE ".Manager"
+#define ERROR_INTERFACE		OPENOBEX_SERVICE ".Error"
 
 gboolean manager_init(DBusConnection *conn);
 void manager_cleanup(void);

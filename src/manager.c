@@ -29,7 +29,55 @@
 
 #include "obexd.h"
 
+struct agent {
+	gchar	*bus_name;
+	gchar	*path;
+};
+
+static struct agent *agent = NULL;
+
+static inline DBusMessage *invalid_args(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg, ERROR_INTERFACE ".InvalidArguments",
+			"Invalid arguments in method call");
+}
+
+static inline DBusMessage *agent_already_exists(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			ERROR_INTERFACE ".AlreadyExists",
+			"Agent already exists");
+}
+
+static DBusMessage *register_agent(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	const gchar *path;
+
+	if (agent)
+		return agent_already_exists(msg);
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID))
+		return invalid_args(msg);
+
+	agent = g_new0(struct agent, 1);
+	agent->bus_name = g_strdup(dbus_message_get_sender(msg));
+	agent->path = g_strdup(path);
+
+	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *unregister_agent(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	return NULL;
+}
+
 static GDBusMethodTable manager_methods[] = {
+	{ "RegisterAgent",	"o",	"",	register_agent		},
+	{ "UnregisterAgent",	"o",	"",	unregister_agent	},
 	{ }
 };
 
@@ -59,6 +107,12 @@ void manager_cleanup(void)
 
 	g_dbus_unregister_interface(connection, OPENOBEX_MANAGER_PATH,
 						OPENOBEX_MANAGER_INTERFACE);
+
+	if (agent) {
+		g_free(agent->bus_name);
+		g_free(agent->path);
+		g_free(agent);
+	}
 
 	dbus_connection_unref(connection);
 }
