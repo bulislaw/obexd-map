@@ -25,6 +25,8 @@
 #include <config.h>
 #endif
 
+#include <string.h>
+
 #include <gdbus.h>
 
 #include "obexd.h"
@@ -38,7 +40,8 @@ static struct agent *agent = NULL;
 
 static inline DBusMessage *invalid_args(DBusMessage *msg)
 {
-	return g_dbus_create_error(msg, ERROR_INTERFACE ".InvalidArguments",
+	return g_dbus_create_error(msg,
+			ERROR_INTERFACE ".InvalidArguments",
 			"Invalid arguments in method call");
 }
 
@@ -47,6 +50,20 @@ static inline DBusMessage *agent_already_exists(DBusMessage *msg)
 	return g_dbus_create_error(msg,
 			ERROR_INTERFACE ".AlreadyExists",
 			"Agent already exists");
+}
+
+static inline DBusMessage *agent_does_not_exist(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			ERROR_INTERFACE ".DoesNotExist",
+			"Agent does not exist");
+}
+
+static inline DBusMessage *not_authorized(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			ERROR_INTERFACE ".NotAuthorized",
+			"Not authorized");
 }
 
 static DBusMessage *register_agent(DBusConnection *conn,
@@ -72,7 +89,29 @@ static DBusMessage *register_agent(DBusConnection *conn,
 static DBusMessage *unregister_agent(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
-	return NULL;
+	const gchar *path, *sender;
+
+	if (!agent)
+		return agent_does_not_exist(msg);
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID))
+		return invalid_args(msg);
+
+	if (strcmp(agent->path, path) != 0)
+		return agent_does_not_exist(msg);
+
+	sender = dbus_message_get_sender(msg);
+	if (strcmp(agent->bus_name, sender) != 0)
+		return not_authorized(msg);
+
+	g_free(agent->bus_name);
+	g_free(agent->path);
+	g_free(agent);
+	agent = NULL;
+
+	return dbus_message_new_method_return(msg);
 }
 
 static GDBusMethodTable manager_methods[] = {
@@ -107,6 +146,8 @@ void manager_cleanup(void)
 
 	g_dbus_unregister_interface(connection, OPENOBEX_MANAGER_PATH,
 						OPENOBEX_MANAGER_INTERFACE);
+
+	/* FIXME: Release agent? */
 
 	if (agent) {
 		g_free(agent->bus_name);
