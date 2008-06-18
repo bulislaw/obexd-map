@@ -35,7 +35,6 @@ typedef void (* GDBusWatchFunction) (void *user_data);
 
 DBusConnection *g_dbus_setup_bus(DBusBusType type, const char *name,
 							DBusError *error);
-void g_dbus_cleanup_connection(DBusConnection *connection);
 
 gboolean g_dbus_set_disconnect_function(DBusConnection *connection,
 				GDBusWatchFunction function,
@@ -89,6 +88,8 @@ gboolean g_dbus_register_interface(DBusConnection *connection,
 					GDBusDestroyFunction destroy);
 gboolean g_dbus_unregister_interface(DBusConnection *connection,
 					const char *path, const char *name);
+gboolean g_dbus_unregister_all_interfaces(DBusConnection *connection,
+							const char *path);
 
 DBusMessage *g_dbus_create_error(DBusMessage *message, const char *name,
 						const char *format, ...);
@@ -98,18 +99,18 @@ DBusMessage *g_dbus_create_reply(DBusMessage *message, int type, ...);
 DBusMessage *g_dbus_create_reply_valist(DBusMessage *message,
 						int type, va_list args);
 
+gboolean g_dbus_send_message(DBusConnection *connection, DBusMessage *message);
+gboolean g_dbus_send_reply(DBusConnection *connection,
+				DBusMessage *message, int type, ...);
+gboolean g_dbus_send_reply_valist(DBusConnection *connection,
+				DBusMessage *message, int type, va_list args);
+
 gboolean g_dbus_emit_signal(DBusConnection *connection,
 				const char *path, const char *interface,
 				const char *name, int type, ...);
 gboolean g_dbus_emit_signal_valist(DBusConnection *connection,
 				const char *path, const char *interface,
 				const char *name, int type, va_list args);
-
-gboolean g_dbus_send_message(DBusConnection *connection, DBusMessage *message);
-gboolean g_dbus_send_reply(DBusConnection *connection,
-				DBusMessage *message, int type, ...);
-gboolean g_dbus_send_reply_valist(DBusConnection *connection,
-				DBusMessage *message, int type, va_list args);
 
 guint g_dbus_add_disconnect_watch(DBusConnection *connection,
 				const char *name,

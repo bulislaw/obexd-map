@@ -38,11 +38,9 @@
 #define debug(fmt...)
 
 struct generic_data {
-	void *user_data;
-	DBusObjectPathUnregisterFunction unregister_function;
+	unsigned int refcount;
 	GSList *interfaces;
 	char *introspect;
-	unsigned int refcount;
 };
 
 struct interface_data {
@@ -54,7 +52,8 @@ struct interface_data {
 	GDBusDestroyFunction destroy;
 };
 
-static void print_arguments(GString *gstr, const char *sig, const char *direction)
+static void print_arguments(GString *gstr, const char *sig,
+						const char *direction)
 {
 	int i;
 
@@ -214,9 +213,6 @@ static DBusHandlerResult introspect(DBusConnection *connection,
 static void generic_unregister(DBusConnection *connection, void *user_data)
 {
 	struct generic_data *data = user_data;
-
-	if (data->unregister_function)
-		data->unregister_function(connection, data->user_data);
 
 	g_free(data->introspect);
 	g_free(data);
@@ -416,6 +412,46 @@ static gboolean check_signal(DBusConnection *conn, const char *path,
 	return TRUE;
 }
 
+static dbus_bool_t emit_signal_valist(DBusConnection *conn,
+						const char *path,
+						const char *interface,
+						const char *name,
+						int first,
+						va_list var_args)
+{
+	DBusMessage *signal;
+	dbus_bool_t ret;
+	const char *signature, *args;
+
+	if (!check_signal(conn, path, interface, name, &args))
+		return FALSE;
+
+	signal = dbus_message_new_signal(path, interface, name);
+	if (!signal) {
+		error("Unable to allocate new %s.%s signal", interface,  name);
+		return FALSE;
+	}
+
+	ret = dbus_message_append_args_valist(signal, first, var_args);
+	if (!ret)
+		goto fail;
+
+	signature = dbus_message_get_signature(signal);
+	if (strcmp(args, signature) != 0) {
+		error("%s.%s: expected signature'%s' but got '%s'",
+				interface, name, args, signature);
+		ret = FALSE;
+		goto fail;
+	}
+
+	ret = dbus_connection_send(conn, signal, NULL);
+
+fail:
+	dbus_message_unref(signal);
+
+	return ret;
+}
+
 gboolean g_dbus_register_interface(DBusConnection *connection,
 					const char *path, const char *name,
 					GDBusMethodTable *methods,
@@ -480,6 +516,25 @@ gboolean g_dbus_unregister_interface(DBusConnection *connection,
 	data->introspect = NULL;
 
 	object_path_unref(connection, path);
+
+	return TRUE;
+}
+
+gboolean g_dbus_unregister_all_interfaces(DBusConnection *connection,
+							const char *path)
+{
+	struct generic_data *data = NULL;
+
+	if (dbus_connection_get_object_path_data(connection, path,
+						(void *) &data) == FALSE)
+		return FALSE;
+
+	if (data == NULL)
+		return FALSE;
+
+	invalidate_parent_data(connection, path);
+
+	dbus_connection_unregister_object_path(connection, path);
 
 	return TRUE;
 }
@@ -579,55 +634,27 @@ gboolean g_dbus_send_reply(DBusConnection *connection,
 	return result;
 }
 
-gboolean g_dbus_emit_signal_valist(DBusConnection *connection,
-				const char *path, const char *interface,
-				const char *name, int type, va_list args)
-{
-	DBusMessage *signal;
-	const char *signature, *sigargs;
-	gboolean result = FALSE;
-
-	if (!check_signal(connection, path, interface, name, &sigargs))
-		return FALSE;
-
-	signal = dbus_message_new_signal(path, interface, name);
-	if (!signal) {
-		error("Unable to allocate new %s.%s signal", interface, name);
-		return FALSE;
-	}
-
-	result = dbus_message_append_args_valist(signal, type, args);
-	if (result == FALSE)
-		goto done;
-
-	signature = dbus_message_get_signature(signal);
-	if (strcmp(sigargs, signature) != 0) {
-		error("%s.%s: expected signature'%s' but got '%s'",
-					interface, name, args, signature);
-		goto done;
-	}
-
-	result = dbus_connection_send(connection, signal, NULL);
-
-done:
-	dbus_message_unref(signal);
-
-	return result;
-}
-
 gboolean g_dbus_emit_signal(DBusConnection *connection,
 				const char *path, const char *interface,
 				const char *name, int type, ...)
 {
-	va_list args;
+        va_list args;
 	gboolean result;
 
-	va_start(args, type);
+        va_start(args, type);
 
-	result = g_dbus_emit_signal_valist(connection, path, interface,
+	result = emit_signal_valist(connection, path, interface,
 							name, type, args);
 
-	va_end(args);
+        va_end(args);
 
-	return result;
+        return result;
+}
+
+gboolean g_dbus_emit_signal_valist(DBusConnection *connection,
+				const char *path, const char *interface,
+				const char *name, int type, va_list args)
+{
+	return emit_signal_valist(connection, path, interface,
+							name, type, args);
 }

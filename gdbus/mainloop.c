@@ -34,10 +34,6 @@
 #define dbus_watch_get_unix_fd dbus_watch_get_fd
 #endif
 
-#ifdef HAVE_DBUS_GLIB
-#include <dbus/dbus-glib-lowlevel.h>
-#endif
-
 #include "gdbus.h"
 
 #define DISPATCH_TIMEOUT  0
@@ -277,11 +273,6 @@ DBusConnection *g_dbus_setup_bus(DBusBusType type, const char *name,
 	setup_dbus_with_main_loop(conn);
 
 	return conn;
-}
-
-void g_dbus_cleanup_connection(DBusConnection *connection)
-{
-	dbus_connection_unref(connection);
 }
 
 gboolean g_dbus_set_disconnect_function(DBusConnection *connection,

@@ -297,6 +297,9 @@ gboolean g_dbus_remove_watch(DBusConnection *connection, guint id)
 	struct name_callback *cb;
 	GSList *ldata, *lcb;
 
+	if (id == 0)
+		return FALSE;
+
 	for (ldata = name_listeners; ldata; ldata = ldata->next) {
 		data = ldata->data;
 		for (lcb = data->callbacks; lcb; lcb = lcb->next) {

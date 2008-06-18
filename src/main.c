@@ -214,7 +214,7 @@ fail:
 	if (config_file)
 		g_free(config_file);
 
-	g_dbus_cleanup_connection(conn);
+	dbus_connection_unref(conn);
 
 	g_main_loop_unref(main_loop);
 
