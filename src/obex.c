@@ -439,7 +439,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	struct statvfs buf;
 	obex_headerdata_t hd;
 	guint hlen;
-	guint32 len = 0;
+	gint32 len = 0;
 	guint8 hi;
 	guint64 free;
 
