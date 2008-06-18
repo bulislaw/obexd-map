@@ -173,29 +173,23 @@ void manager_cleanup(void)
 	dbus_connection_unref(connection);
 }
 
-/* FIXME: Change the name  */
 void emit_transfer_started(guint32 id)
 {
 	gchar *path = g_strdup_printf("/transfer%u", id);
-	gboolean ret;
 
-	ret = g_dbus_register_interface(connection, path,
+	if (!g_dbus_register_interface(connection, path,
 				TRANSFER_INTERFACE,
-				transfer_methods, transfer_signals, NULL,
-				NULL, NULL);
-	if (ret == FALSE) {
+				transfer_methods, transfer_signals,
+				NULL, NULL, NULL)) {
 		error("Cannot register Transfer interface.");
+		g_free(path);
 		return;
 	}
 
-	ret = g_dbus_emit_signal(connection, OPENOBEX_MANAGER_PATH,
+	g_dbus_emit_signal(connection, OPENOBEX_MANAGER_PATH,
 			OPENOBEX_MANAGER_INTERFACE, "TransferStarted",
 			DBUS_TYPE_OBJECT_PATH, &path,
 			DBUS_TYPE_INVALID);
-	if (ret == FALSE) {
-		error("Cannot send Transfer started signal");
-		return;
-	}
 
 	g_free(path);
 }
