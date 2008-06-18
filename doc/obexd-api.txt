@@ -16,9 +16,9 @@ Object path	/
 Methods
 		void RegisterAgent(object agent)
 
-			Register an agent to authorize accept connection
-			or objects. Object push service needs to authorize
-			each received object.
+			Register an agent to request authorization of 
+			the user to accept/reject objects. Object push
+			service needs to authorize each received object.
 
 			Possible errors: org.openobex.Error.AlreadyExists
 
@@ -42,7 +42,7 @@ Signals		SessionCreated(object session)
 
 		TransferStarted(object transfer)
 
-			Signal sent when the
+			Signal sent when an object push operation starts.
 			(OPP only)
 
 		TransferCompleted(object transfer, boolean success)
