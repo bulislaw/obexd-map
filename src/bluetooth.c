@@ -298,10 +298,14 @@ static gint setup_server(GKeyFile *keyfile,
 		folder = (key_folder ? : ROOT_PATH);
 		channel = (channel ? : FTP_CHANNEL);
 		break;
+	default:
+		ret = -EINVAL;
+		goto failed;
 	}
 
 	ret = server_register(name, service, channel, folder, auto_accept);
 
+failed:
 	g_free(key_name);
 	g_free(key_folder);
 
