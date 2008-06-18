@@ -21,9 +21,8 @@
  *
  */
 
-void manager_emit_tranfer_started(const guint32 id);
+void emit_transfer_started(guint32 id);
 
-void manager_emit_transfer_comleted(const guint32 id, const gboolean success);
+void emit_transfer_completed(guint32 id, gboolean success);
 
-void manager_emit_transfer_progress(const guint32 id, const guint32 total,
-		const guint32 transfered);
+void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered);

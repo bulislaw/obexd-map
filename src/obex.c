@@ -127,11 +127,12 @@ static void cmd_connect(struct obex_session *os,
 	os->mtu = newsize;
 
 	debug("Resizing stream chunks to %d", newsize);
-	/* FIXME: Use the new size */
+
+	/* connection id will be used to track the sessions, even for OPP */
+	os->cid = ++cid;
 
 	if (os->target == NULL) {
 		/* OPP doesn't contains target or connection id. */
-		os->cid = 0;
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 		return;
 	}
@@ -152,25 +153,26 @@ static void cmd_connect(struct obex_session *os,
 			OBEX_HDR_WHO, hd, TARGET_SIZE,
 			OBEX_FL_FIT_ONE_PACKET);
 	hd.bs = NULL;
-	hd.bq4 = ++cid;
+	hd.bq4 = cid;
 	OBEX_ObjectAddHeader(obex, obj,
 			OBEX_HDR_CONNECTION, hd, 4,
 			OBEX_FL_FIT_ONE_PACKET);
 
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
-
-	os->cid = cid;
 }
 
 static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 {
+	struct obex_session *os;
 	obex_headerdata_t hd;
 	guint hlen;
 	guint8 hi;
 	gboolean ret = FALSE;
 
-	/* OPUSH doesn't provide a connection id. This is an invalid cid. */
-	if (cid == 0)
+	os = OBEX_GetUserData(obex);
+
+	/* OPUSH doesn't provide a connection id. */
+	if (os->target == NULL)
 		return TRUE;
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
@@ -347,7 +349,7 @@ gint os_setup_by_name(struct obex_session *os, gchar *file)
 
 	os->fd = fd;
 	os->buf = g_new0(guint8, os->mtu);
-	os->start = 0;
+	os->offset = 0;
 	os->size = os->mtu;
 
 	return stats.st_size;
@@ -377,6 +379,8 @@ static gint obex_write(struct obex_session *os,
 		g_free(os->buf);
 		return -err;
 	}
+
+	os->offset += len;
 
 	if (len == 0) {
 		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
@@ -422,6 +426,8 @@ static gint obex_read(struct obex_session *os,
 
 		len += w;
 	}
+
+	os->offset += len;
 
 	return 0;
 }
@@ -473,6 +479,8 @@ static void prepare_put(obex_t *obex, obex_object_t *obj)
 	os->fd = mkstemp(temp_file);
 	os->temp = temp_file;
 
+	emit_transfer_started(os->cid);
+
 	OBEX_ObjectReadStream(obex, obj, NULL);
 }
 
@@ -484,6 +492,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 
 	switch (evt) {
 	case OBEX_EV_PROGRESS:
+		os = OBEX_GetUserData(obex);
+		emit_transfer_progress(os->cid, os->size, os->offset);
 		break;
 	case OBEX_EV_ABORT:
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
