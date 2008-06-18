@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <fcntl.h>
 
 #include <glib.h>
@@ -45,6 +46,7 @@
 #include "logging.h"
 #include "obex.h"
 #include "logging.h"
+#include "dbus.h"
 
 #define TARGET_SIZE	16
 static const guint8 FTP_TARGET[TARGET_SIZE] = { 0xF9, 0xEC, 0x7B, 0xC4,
@@ -60,8 +62,6 @@ typedef struct {
     guint8	flags;
     guint16	mtu;
 } __attribute__ ((packed)) obex_connect_hdr_t;
-
-#define FTP_ROOT "/tmp/obexd"
 
 static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
 {
@@ -127,11 +127,12 @@ static void cmd_connect(struct obex_session *os,
 	os->mtu = newsize;
 
 	debug("Resizing stream chunks to %d", newsize);
-	/* FIXME: Use the new size */
+
+	/* connection id will be used to track the sessions, even for OPP */
+	os->cid = ++cid;
 
 	if (os->target == NULL) {
 		/* OPP doesn't contains target or connection id. */
-		os->cid = 0;
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 		return;
 	}
@@ -152,25 +153,26 @@ static void cmd_connect(struct obex_session *os,
 			OBEX_HDR_WHO, hd, TARGET_SIZE,
 			OBEX_FL_FIT_ONE_PACKET);
 	hd.bs = NULL;
-	hd.bq4 = ++cid;
+	hd.bq4 = cid;
 	OBEX_ObjectAddHeader(obex, obj,
 			OBEX_HDR_CONNECTION, hd, 4,
 			OBEX_FL_FIT_ONE_PACKET);
 
 	OBEX_ObjectSetRsp (obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
-
-	os->cid = cid;
 }
 
 static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 {
+	struct obex_session *os;
 	obex_headerdata_t hd;
 	guint hlen;
 	guint8 hi;
 	gboolean ret = FALSE;
 
-	/* OPUSH doesn't provide a connection id. This is an invalid cid. */
-	if (cid == 0)
+	os = OBEX_GetUserData(obex);
+
+	/* OPUSH doesn't provide a connection id. */
+	if (os->target == NULL)
 		return TRUE;
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
@@ -290,6 +292,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 		case OBEX_HDR_LENGTH:
 			os->size = hd.bq4;
+			debug("OBEX_HDR_LENGTH: %d", os->size);
 			break;
 		}
 	}
@@ -346,8 +349,7 @@ gint os_setup_by_name(struct obex_session *os, gchar *file)
 
 	os->fd = fd;
 	os->buf = g_new0(guint8, os->mtu);
-	os->start = 0;
-	os->size = os->mtu;
+	os->offset = 0;
 
 	return stats.st_size;
 
@@ -377,6 +379,8 @@ static gint obex_write(struct obex_session *os,
 		return -err;
 	}
 
+	os->offset += len;
+
 	if (len == 0) {
 		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
 					OBEX_FL_STREAM_DATAEND);
@@ -395,8 +399,7 @@ static gint obex_write(struct obex_session *os,
 static gint obex_read(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
-	gint size;
-	gint len = 0;
+	gint size, len = 0;
 	const guint8 *buffer;
 
 	if (os->fd < 0)
@@ -423,7 +426,46 @@ static gint obex_read(struct obex_session *os,
 		len += w;
 	}
 
+	os->offset += len;
+
 	return 0;
+}
+
+static void check_put(obex_t *obex, obex_object_t *obj)
+{
+	struct obex_session *os;
+	struct statvfs buf;
+	obex_headerdata_t hd;
+	guint hlen, len = 0;
+	guint8 hi;
+	guint64 free;
+
+	os = OBEX_GetUserData(obex);
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen))
+		if (hi == OBEX_HDR_LENGTH) {
+			debug("OBEX_HDR_LENGTH %d", hd.bq4);
+			len = hd.bq4;
+		}
+
+	os->size = len;
+
+	OBEX_ObjectReParseHeaders(obex, obj);
+
+	if (!len)
+		return;
+
+	if (fstatvfs(os->fd, &buf) < 0) {
+		error("fstatvfs() fail");
+		return;
+	}
+
+	free = buf.f_bsize * buf.f_bavail;
+	debug ("Free space in disk: %d", free);
+	if (len > free) {
+		debug("Free disk space not available");
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	}
 }
 
 static void prepare_put(obex_t *obex, obex_object_t *obj)
@@ -438,6 +480,8 @@ static void prepare_put(obex_t *obex, obex_object_t *obj)
 	os->fd = mkstemp(temp_file);
 	os->temp = temp_file;
 
+	emit_transfer_started(os->cid);
+
 	OBEX_ObjectReadStream(obex, obj, NULL);
 }
 
@@ -449,6 +493,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 
 	switch (evt) {
 	case OBEX_EV_PROGRESS:
+		os = OBEX_GetUserData(obex);
+		emit_transfer_progress(os->cid, os->size, os->offset);
 		break;
 	case OBEX_EV_ABORT:
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
@@ -484,6 +530,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQCHECK:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
+			check_put(obex, obj);
 			break;
 		default:
 			break;
@@ -515,7 +562,10 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		break;
 	case OBEX_EV_STREAMAVAIL:
 		os = OBEX_GetUserData(obex);
-		obex_read(os, obex, obj);
+		if (obex_read(os, obex, obj) < 0) {
+			debug("error obex_read()");
+			OBEX_CancelRequest(obex, 1);
+		}
 		break;
 	case OBEX_EV_STREAMEMPTY:
 		os = OBEX_GetUserData(obex);
@@ -540,6 +590,9 @@ static void obex_handle_destroy(gpointer user_data)
 	obex_t *obex = user_data;
 
 	os = OBEX_GetUserData(obex);
+
+	emit_transfer_completed(os->cid, os->offset == os->size);
+
 	obex_session_free(os);
 
 	OBEX_Cleanup(obex);
@@ -575,18 +628,19 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	case OBEX_OPUSH:
 		os->target = NULL;
 		os->cmds = &opp;
-		os->current_path = g_strdup(server->folder);
 		break;
 	case OBEX_FTP:
 		os->target = FTP_TARGET;
 		os->cmds = &ftp;
-		os->current_path = g_strdup(server->folder);
 		break;
 	default:
 		g_free(os);
 		debug("Invalid OBEX server");
 		return -EINVAL;
 	}
+
+	os->server = server;
+	os->current_path = g_strdup(server->folder);
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
 	if (!obex)

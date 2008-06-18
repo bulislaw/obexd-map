@@ -11,7 +11,8 @@ sbin_PROGRAMS = obexd
 
 obexd_SOURCES = main.c obexd.h manager.c \
 				logging.h logging.c obex.h obex.c \
-				opp.c ftp.c bluetooth.h bluetooth.c
+				opp.c ftp.c bluetooth.h bluetooth.c \
+				dbus.h
 
 obexd_LDADD = @GDBUS_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
 				@OPENOBEX_LIBS@ @BLUEZ_LIBS@

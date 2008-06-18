@@ -30,6 +30,9 @@
 #include <gdbus.h>
 
 #include "obexd.h"
+#include "logging.h"
+
+#define TRANSFER_INTERFACE OPENOBEX_SERVICE ".Transfer"
 
 struct agent {
 	gchar	*bus_name;
@@ -121,6 +124,18 @@ static GDBusMethodTable manager_methods[] = {
 };
 
 static GDBusSignalTable manager_signals[] = {
+	{ "TransferStarted", 	"o" 	},
+	{ "TransferCompleted",	"ob"	},
+	{ }
+};
+
+static GDBusMethodTable transfer_methods[] = {
+	{ "Cancel",	""	},
+	{ }
+};
+
+static GDBusSignalTable transfer_signals[] = {
+	{ "Progress",	"uu"	},
 	{ }
 };
 
@@ -156,4 +171,60 @@ void manager_cleanup(void)
 	}
 
 	dbus_connection_unref(connection);
+}
+
+/* FIXME: Change the name  */
+void emit_transfer_started(guint32 id)
+{
+	gchar *path = g_strdup_printf("/transfer%u", id);
+	gboolean ret;
+
+	ret = g_dbus_register_interface(connection, path,
+				TRANSFER_INTERFACE,
+				transfer_methods, transfer_signals, NULL,
+				NULL, NULL);
+	if (ret == FALSE) {
+		error("Cannot register Transfer interface.");
+		return;
+	}
+
+	ret = g_dbus_emit_signal(connection, OPENOBEX_MANAGER_PATH,
+			OPENOBEX_MANAGER_INTERFACE, "TransferStarted",
+			DBUS_TYPE_OBJECT_PATH, &path,
+			DBUS_TYPE_INVALID);
+	if (ret == FALSE) {
+		error("Cannot send Transfer started signal");
+		return;
+	}
+
+	g_free(path);
+}
+
+void emit_transfer_completed(guint32 id, gboolean success)
+{
+	gchar *path = g_strdup_printf("/transfer%u", id);
+
+	g_dbus_emit_signal(connection, OPENOBEX_MANAGER_PATH,
+			OPENOBEX_MANAGER_INTERFACE, "TransferCompleted",
+			DBUS_TYPE_OBJECT_PATH, &path,
+			DBUS_TYPE_BOOLEAN, &success,
+			DBUS_TYPE_INVALID);
+
+	g_dbus_unregister_interface(connection, path,
+				TRANSFER_INTERFACE);
+
+	g_free(path);
+}
+
+void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
+{
+	gchar *path = g_strdup_printf("/transfer%u", id);
+
+	g_dbus_emit_signal(connection, path,
+			TRANSFER_INTERFACE, "Progress",
+			DBUS_TYPE_UINT32, &total,
+			DBUS_TYPE_UINT32, &transfered,
+			DBUS_TYPE_INVALID);
+
+	g_free(path);
 }
