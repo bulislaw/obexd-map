@@ -54,11 +54,15 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 	if (os == NULL)
 		return;
 
-	if (os->current_path == NULL)
-		goto fail;
+	if (os->current_path == NULL) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
+	}
 
-	if (os->name == NULL)
-		goto fail;
+	if (os->name == NULL) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
+		return;
+	}
 
 	path = g_build_filename(os->current_path, os->name, NULL);
 
@@ -70,9 +74,6 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 	g_free(path);
 
 	return;
-
-fail:
-	OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 }
 
 void opp_get(obex_t *obex, obex_object_t *obj)
