@@ -350,7 +350,6 @@ gint os_setup_by_name(struct obex_session *os, gchar *file)
 	os->fd = fd;
 	os->buf = g_new0(guint8, os->mtu);
 	os->offset = 0;
-	os->size = os->mtu;
 
 	return stats.st_size;
 
@@ -448,6 +447,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			debug("OBEX_HDR_LENGTH %d", hd.bq4);
 			len = hd.bq4;
 		}
+
+	os->size = len;
 
 	OBEX_ObjectReParseHeaders(obex, obj);
 
@@ -589,6 +590,9 @@ static void obex_handle_destroy(gpointer user_data)
 	obex_t *obex = user_data;
 
 	os = OBEX_GetUserData(obex);
+
+	emit_transfer_completed(os->cid, os->offset == os->size);
+
 	obex_session_free(os);
 
 	OBEX_Cleanup(obex);

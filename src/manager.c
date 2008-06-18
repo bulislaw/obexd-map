@@ -105,7 +105,7 @@ void emit_transfer_started(guint32 id)
 	g_free(path);
 }
 
-void emit_transfer_comleted(guint32 id, gboolean success)
+void emit_transfer_completed(guint32 id, gboolean success)
 {
 	gchar *path = g_strdup_printf("/transfer%u", id);
 
