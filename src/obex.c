@@ -194,7 +194,8 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hd;
-	guint hlen, len;
+	guint hlen;
+	gint32 len;
 	guint8 hi;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
@@ -364,7 +365,7 @@ static gint obex_write(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hv;
-	gint len;
+	gint32 len;
 
 	debug("name: %s type: %s mtu: %d fd: %d",
 			os->name, os->type, os->mtu, os->fd);
@@ -399,7 +400,8 @@ static gint obex_write(struct obex_session *os,
 static gint obex_read(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
-	gint size, len = 0;
+	gint size;
+	gint32 len = 0;
 	const guint8 *buffer;
 
 	if (os->fd < 0)
@@ -436,7 +438,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	struct obex_session *os;
 	struct statvfs buf;
 	obex_headerdata_t hd;
-	guint hlen, len = 0;
+	guint hlen;
+	guint32 len = 0;
 	guint8 hi;
 	guint64 free;
 
