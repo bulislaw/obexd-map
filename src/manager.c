@@ -41,6 +41,13 @@ struct agent {
 
 static struct agent *agent = NULL;
 
+static void agent_free(struct agent *agent)
+{
+	g_free(agent->bus_name);
+	g_free(agent->path);
+	g_free(agent);
+}
+
 static inline DBusMessage *invalid_args(DBusMessage *msg)
 {
 	return g_dbus_create_error(msg,
@@ -69,10 +76,17 @@ static inline DBusMessage *not_authorized(DBusMessage *msg)
 			"Not authorized");
 }
 
+static void agent_disconnected(void *user_data)
+{
+	debug("Agent exited");
+	agent_free(agent);
+	agent = NULL;
+}
+
 static DBusMessage *register_agent(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
-	const gchar *path;
+	const gchar *path, *sender;
 
 	if (agent)
 		return agent_already_exists(msg);
@@ -82,9 +96,13 @@ static DBusMessage *register_agent(DBusConnection *conn,
 				DBUS_TYPE_INVALID))
 		return invalid_args(msg);
 
+	sender = dbus_message_get_sender(msg);
 	agent = g_new0(struct agent, 1);
-	agent->bus_name = g_strdup(dbus_message_get_sender(msg));
+	agent->bus_name = g_strdup(sender);
 	agent->path = g_strdup(path);
+
+	g_dbus_add_disconnect_watch(conn, sender,
+			agent_disconnected, NULL, NULL);
 
 	return dbus_message_new_method_return(msg);
 }
@@ -109,9 +127,7 @@ static DBusMessage *unregister_agent(DBusConnection *conn,
 	if (strcmp(agent->bus_name, sender) != 0)
 		return not_authorized(msg);
 
-	g_free(agent->bus_name);
-	g_free(agent->path);
-	g_free(agent);
+	agent_free(agent);
 	agent = NULL;
 
 	return dbus_message_new_method_return(msg);
@@ -164,11 +180,8 @@ void manager_cleanup(void)
 
 	/* FIXME: Release agent? */
 
-	if (agent) {
-		g_free(agent->bus_name);
-		g_free(agent->path);
-		g_free(agent);
-	}
+	if (agent)
+		agent_free(agent);
 
 	dbus_connection_unref(connection);
 }
