@@ -451,13 +451,12 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			len = hd.bq4;
 		}
 
-	os->size = len;
-
 	OBEX_ObjectReParseHeaders(obex, obj);
 
-	if (!len)
+	if (!len) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
+	}
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		error("fstatvfs() fail");
