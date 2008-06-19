@@ -439,36 +439,39 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	struct statvfs buf;
 	obex_headerdata_t hd;
 	guint hlen;
-	gint32 len = 0;
 	guint8 hi;
 	guint64 free;
 
 	os = OBEX_GetUserData(obex);
 
+	os->size = NULL;
+
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen))
 		if (hi == OBEX_HDR_LENGTH) {
 			debug("OBEX_HDR_LENGTH %d", hd.bq4);
-			len = hd.bq4;
+			os->size = hd.bq4;
 		}
 
-	OBEX_ObjectReParseHeaders(obex, obj);
-
-	if (!len) {
+	if (!os->size) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
 	}
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		error("fstatvfs() fail");
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
 
 	free = buf.f_bsize * buf.f_bavail;
 	debug ("Free space in disk: %d", free);
-	if (len > free) {
+	if (os->size > free) {
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
 	}
+
+	OBEX_ObjectReParseHeaders(obex, obj);
 }
 
 static void prepare_put(obex_t *obex, obex_object_t *obj)
