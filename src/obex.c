@@ -220,7 +220,7 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os->temp = NULL;
 	}
 
-	while(OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
 			if (hlen == 0)
@@ -376,7 +376,7 @@ fail:
 static gint obex_write(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
-	obex_headerdata_t hv;
+	obex_headerdata_t hd;
 	gint32 len;
 
 	debug("name: %s type: %s mtu: %d fd: %d",
@@ -395,15 +395,15 @@ static gint obex_write(struct obex_session *os,
 	os->offset += len;
 
 	if (len == 0) {
-		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, 0,
+		OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hd, 0,
 					OBEX_FL_STREAM_DATAEND);
 		g_free(os->buf);
 		os->buf = NULL;
 		return len;
 	}
 
-	hv.bs = os->buf;
-	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hv, len,
+	hd.bs = os->buf;
+	OBEX_ObjectAddHeader(obex, obj, OBEX_HDR_BODY, hd, len,
 				OBEX_FL_STREAM_DATA);
 
 	return len;
@@ -613,7 +613,8 @@ static void obex_handle_destroy(gpointer user_data)
 	OBEX_Cleanup(obex);
 }
 
-static gboolean obex_handle_input(GIOChannel *io, GIOCondition cond, gpointer user_data)
+static gboolean obex_handle_input(GIOChannel *io,
+				GIOCondition cond, gpointer user_data)
 {
 	obex_t *obex = user_data;
 
