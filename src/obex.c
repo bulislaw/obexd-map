@@ -63,16 +63,10 @@ typedef struct {
     guint16	mtu;
 } __attribute__ ((packed)) obex_connect_hdr_t;
 
-static void cmd_not_implemented(obex_t *obex, obex_object_t *obj)
-{
-	OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-			OBEX_RSP_NOT_IMPLEMENTED);
-}
-
 struct obex_commands opp = {
 	.get		= opp_get,
 	.put		= opp_put,
-	.setpath	= cmd_not_implemented,
+	.setpath	= NULL,
 };
 
 struct obex_commands ftp = {
@@ -200,6 +194,12 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
+	if (!os->cmds->get) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
+
 	if (os->type) {
 		g_free(os->type);
 		os->type = NULL;
@@ -251,6 +251,12 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	guint8 hi;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
+
+	if (!os->cmds->put) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
 
 	if (os->type) {
 		g_free(os->type);
@@ -309,6 +315,12 @@ static void cmd_setpath(struct obex_session *os,
 	guint8 hi;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
+
+	if (!os->cmds->setpath) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
 
 	if (os->name) {
 		g_free(os->name);
