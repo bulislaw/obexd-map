@@ -456,6 +456,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	OBEX_ObjectReParseHeaders(obex, obj);
 
 	if (!len)
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
 
 	if (fstatvfs(os->fd, &buf) < 0) {
