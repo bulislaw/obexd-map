@@ -12,8 +12,15 @@ class Agent(dbus.service.Object):
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="osssii", out_signature="s")
 	def Authorize(self, path, device, filename, type, length, time):
-		print "Authorize (%s, %s, %s)" % (path, device, filename)
-		return "/tmp"
+		print "Authorize (%s, %s, %s) Y/n" % (path, device, filename)
+		auth = raw_input()
+
+		if auth == "n" or auth == "N":
+			raise dbus.DBusException("org.openobex.Error.Rejected: Not Autorized")
+
+		print "Insert save path:"
+
+		return raw_input()
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="", out_signature="")
