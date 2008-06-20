@@ -151,7 +151,7 @@ static GDBusMethodTable transfer_methods[] = {
 };
 
 static GDBusSignalTable transfer_signals[] = {
-	{ "Progress",	"uu"	},
+	{ "Progress",	"ii"	},
 	{ }
 };
 

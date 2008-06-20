@@ -110,7 +110,7 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 	return;
 
 fail:
-	OBEX_ObjectSetRsp (obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 
 	return;
 }
@@ -153,7 +153,7 @@ void ftp_setpath(obex_t *obex, obex_object_t *obj)
 
 		debug("Set to parent path: %s", os->current_path);
 
-		OBEX_ObjectSetRsp (obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_SUCCESS, OBEX_RSP_SUCCESS);
 		return;
 	}
 

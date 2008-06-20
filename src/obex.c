@@ -152,7 +152,7 @@ static void cmd_connect(struct obex_session *os,
 			OBEX_HDR_CONNECTION, hd, 4,
 			OBEX_FL_FIT_ONE_PACKET);
 
-	OBEX_ObjectSetRsp (obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 }
 
 static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
@@ -463,12 +463,12 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			len = hd.bq4;
 		}
 
-	os->size = len;
-
 	OBEX_ObjectReParseHeaders(obex, obj);
 
-	if (!len)
+	if (!len) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
+	}
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		error("fstatvfs() fail");
@@ -476,7 +476,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	free = buf.f_bsize * buf.f_bavail;
-	debug ("Free space in disk: %d", free);
+	debug("Free space in disk: %d", free);
 	if (len > free) {
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
