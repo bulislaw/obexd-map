@@ -428,6 +428,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	guint64 free;
 	int ret;
 	gint32 time;
+	gchar *new_folder;
 
 	os = OBEX_GetUserData(obex);
 
@@ -477,14 +478,24 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		return;
 	}
 
+	if (os->server->auto_accept)
+		goto skip_auth;
+
 	time = 0;
 	ret = request_authorization(os->cid, OBEX_GetFD(obex), os->name,
-				os->type, os->size, time, &os->current_path);
+				os->type, os->size, time, &new_folder);
+
 	if (ret < 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
 
+	if (new_folder) {
+		g_free(os->current_path);
+		os->current_path = g_strdup(new_folder);
+	}
+
+skip_auth:
 	if (prepare_put(os) < 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
@@ -667,6 +678,7 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 		return -EINVAL;
 	}
 
+	os->current_path = g_strdup(server->folder);
 	os->server = server;
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);

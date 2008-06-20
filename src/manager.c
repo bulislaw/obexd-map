@@ -296,16 +296,14 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 		return -EPERM;
 	}
 
-	if (!dbus_message_get_args(reply, NULL,
+	*dir = NULL;
+	if (dbus_message_get_args(reply, NULL,
 					DBUS_TYPE_STRING, &pdir,
 					DBUS_TYPE_INVALID)) {
-		dbus_message_unref(reply);
-		return -EPERM;
+		*dir = g_strdup(pdir);
 	}
 
 	dbus_message_unref(reply);
-
-	*dir = g_strdup(pdir);
 
 	return 0;
 }
