@@ -502,6 +502,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	if (os->size > free) {
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
 	}
 
 	OBEX_ObjectReParseHeaders(obex, obj);
