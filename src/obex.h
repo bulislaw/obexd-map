@@ -34,6 +34,7 @@
 
 struct obex_commands {
 	void (*get) (obex_t *obex, obex_object_t *obj);
+	gint (*chkput) (obex_t *obex, obex_object_t *obj);
 	void (*put) (obex_t *obex, obex_object_t *obj);
 	void (*setpath) (obex_t *obex, obex_object_t *obj);
 };
@@ -63,11 +64,10 @@ struct obex_session {
 gint obex_server_start(gint fd, gint mtu, struct server *server);
 gint obex_server_stop();
 
-void opp_connect(obex_t *obex, obex_object_t *obj);
+gint opp_chkput(obex_t *obex, obex_object_t *obj);
 void opp_put(obex_t *obex, obex_object_t *obj);
 void opp_get(obex_t *obex, obex_object_t *obj);
 
-void ftp_connect(obex_t *obex, obex_object_t *obj);
 void ftp_get(obex_t *obex, obex_object_t *obj);
 void ftp_put(obex_t *obex, obex_object_t *obj);
 void ftp_setpath(obex_t *obex, obex_object_t *obj);

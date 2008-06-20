@@ -65,6 +65,7 @@ typedef struct {
 
 struct obex_commands opp = {
 	.get		= opp_get,
+	.chkput		= opp_chkput,
 	.put		= opp_put,
 	.setpath	= NULL,
 };
@@ -395,28 +396,6 @@ static gint obex_read(struct obex_session *os,
 	return 0;
 }
 
-static gint prepare_put(struct obex_session *os)
-{
-	gchar *temp_file;
-	int err;
-
-	temp_file = g_build_filename(os->current_folder, "tmp_XXXXXX", NULL);
-
-	os->fd = mkstemp(temp_file);
-	if (os->fd < 0) {
-		err = errno;
-		error("mkstemp: %s(%d)", strerror(err), err);
-		g_free(temp_file);
-		return -err;
-	}
-
-	os->temp = temp_file;
-
-	emit_transfer_started(os->cid);
-
-	return 0;
-}
-
 static void check_put(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
@@ -426,9 +405,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	gint32 len;
 	guint8 hi;
 	guint64 free;
-	int ret;
-	gint32 time;
-	gchar *new_folder;
 
 	os = OBEX_GetUserData(obex);
 
@@ -473,30 +449,10 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		}
 	}
 
-	if (!os->size) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
+	if (!os->cmds->chkput)
 		return;
-	}
 
-	if (os->server->auto_accept)
-		goto skip_auth;
-
-	time = 0;
-	ret = request_authorization(os->cid, OBEX_GetFD(obex), os->name,
-				os->type, os->size, time, &new_folder);
-
-	if (ret < 0) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
-		return;
-	}
-
-	if (new_folder) {
-		g_free(os->current_folder);
-		os->current_folder = g_strdup(new_folder);
-	}
-
-skip_auth:
-	if (prepare_put(os) < 0) {
+	if (os->cmds->chkput(obex, obj) < 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
