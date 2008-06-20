@@ -18,7 +18,7 @@ class Agent(dbus.service.Object):
 		if auth == "n" or auth == "N":
 			raise dbus.DBusException("org.openobex.Error.Rejected: Not Autorized")
 
-		print "Insert save path:"
+		print "Location/file name:"
 
 		return raw_input()
 
