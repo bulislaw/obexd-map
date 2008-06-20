@@ -54,7 +54,7 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 	if (os == NULL)
 		return;
 
-	if (os->current_path == NULL) {
+	if (os->current_folder == NULL) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
@@ -64,7 +64,7 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 		return;
 	}
 
-	path = g_build_filename(os->current_path, os->name, NULL);
+	path = g_build_filename(os->current_folder, os->name, NULL);
 
 	close(os->fd);
 	rename(os->temp, path);

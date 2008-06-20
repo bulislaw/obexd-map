@@ -49,7 +49,7 @@ struct obex_session {
 	guint16		mtu;
 	gchar		*name;
 	gchar		*type;
-	gchar		*current_path;
+	gchar		*current_folder;
 	guint8		*buf;
 	gchar		*temp;
 	gint32		offset;

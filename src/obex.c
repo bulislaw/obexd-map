@@ -81,8 +81,8 @@ static void obex_session_free(struct obex_session *os)
 		g_free(os->name);
 	if (os->type)
 		g_free(os->type);
-	if (os->current_path)
-		g_free(os->current_path);
+	if (os->current_folder)
+		g_free(os->current_folder);
 	if (os->buf)
 		g_free(os->buf);
 	if (os->fd > 0)
@@ -400,7 +400,7 @@ static gint prepare_put(struct obex_session *os)
 	gchar *temp_file;
 	int err;
 
-	temp_file = g_build_filename(os->current_path, "tmp_XXXXXX", NULL);
+	temp_file = g_build_filename(os->current_folder, "tmp_XXXXXX", NULL);
 
 	os->fd = mkstemp(temp_file);
 	if (os->fd < 0) {
@@ -491,8 +491,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	if (new_folder) {
-		g_free(os->current_path);
-		os->current_path = g_strdup(new_folder);
+		g_free(os->current_folder);
+		os->current_folder = g_strdup(new_folder);
 	}
 
 skip_auth:
@@ -678,7 +678,7 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 		return -EINVAL;
 	}
 
-	os->current_path = g_strdup(server->folder);
+	os->current_folder = g_strdup(server->folder);
 	os->server = server;
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
