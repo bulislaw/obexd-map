@@ -194,12 +194,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
-	if (!os->cmds->get) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-				OBEX_RSP_NOT_IMPLEMENTED);
-		return;
-	}
-
 	if (os->type) {
 		g_free(os->type);
 		os->type = NULL;
@@ -248,12 +242,6 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
-	if (!os->cmds->put) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-				OBEX_RSP_NOT_IMPLEMENTED);
-		return;
-	}
-
 	os->cmds->put(obex, obj);
 }
 
@@ -265,12 +253,6 @@ static void cmd_setpath(struct obex_session *os,
 	guint8 hi;
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
-
-	if (!os->cmds->setpath) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-				OBEX_RSP_NOT_IMPLEMENTED);
-		return;
-	}
 
 	if (os->name) {
 		g_free(os->name);
@@ -491,6 +473,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 					gint evt, gint cmd, gint rsp)
 {
 	struct obex_session *os;
+	gboolean hint = TRUE;
+
 	obex_debug(evt, cmd, rsp);
 
 	switch (evt) {
@@ -514,20 +498,28 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		}
 		break;
 	case OBEX_EV_REQHINT:
+		os = OBEX_GetUserData(obex);
 		switch (cmd) {
 		case OBEX_CMD_PUT:
-			prepare_put(obex, obj);
-		case OBEX_CMD_GET:
-		case OBEX_CMD_CONNECT:
-		case OBEX_CMD_DISCONNECT:
-			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
-					OBEX_RSP_SUCCESS);
+			if (os->cmds->put)
+				prepare_put(obex, obj);
+			else
+				hint = FALSE;
 			break;
-		default:
-			OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-					OBEX_RSP_NOT_IMPLEMENTED);
+		case OBEX_CMD_GET:
+			hint = (os->cmds->get ? TRUE : FALSE);
+			break;
+		case OBEX_CMD_SETPATH:
+			hint = (os->cmds->setpath ? TRUE : FALSE);
 			break;
 		}
+
+		if (hint)
+			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+					OBEX_RSP_SUCCESS);
+		else
+			OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+					OBEX_RSP_NOT_IMPLEMENTED);
 		break;
 	case OBEX_EV_REQCHECK:
 		switch (cmd) {
