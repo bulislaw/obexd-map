@@ -25,9 +25,14 @@
 #include <config.h>
 #endif
 
-#include <string.h>
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/l2cap.h>
+#include <bluetooth/rfcomm.h>
 
+#include <string.h>
+#include <errno.h>
 #include <gdbus.h>
+#include <sys/socket.h>
 
 #include "obexd.h"
 #include "logging.h"
@@ -234,4 +239,62 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
 			DBUS_TYPE_INVALID);
 
 	g_free(path);
+}
+
+int request_authorization(int cid, int fd, const gchar *filename,
+		const gchar *type, int length, int time, gchar **dir)
+{
+	DBusMessage *msg, *reply;
+	DBusError derr;
+	struct sockaddr_l2 addr;
+	bdaddr_t dst;
+	socklen_t addrlen;
+	gchar address[18];
+	const gchar *bda = address;
+	gchar *path;
+
+	if (!agent)
+		return -1;
+
+	memset(&addr, 0, sizeof(addr));
+	addrlen = sizeof(addr);
+
+	if (getpeername(fd, (struct sockaddr *) &addr, &addrlen) < 0)
+		return -1;
+
+	bacpy(&dst, &addr.l2_bdaddr);
+	ba2str(&dst, address);
+
+	path = g_strdup_printf(path, "/transfer%d", cid);
+
+	dbus_error_init(&derr);
+
+	msg = dbus_message_new_method_call(agent->bus_name, agent->path,
+			"org.openobex.Agent", "Authorize");
+
+	dbus_message_append_args(msg,
+			DBUS_TYPE_OBJECT_PATH, &path,
+			DBUS_TYPE_STRING, &bda,
+			DBUS_TYPE_STRING, &filename,
+			DBUS_TYPE_STRING, &type,
+			DBUS_TYPE_INT32, &length,
+			DBUS_TYPE_INT32, &time,
+			DBUS_TYPE_INVALID);
+
+	reply = dbus_connection_send_with_reply_and_block(connection,
+			msg, -1, &derr);
+	if (dbus_error_is_set(&derr)) {
+		error("error: %s", derr.message);
+		dbus_error_free(&derr);
+		g_free(path);
+		return -EPERM;
+	}
+
+	dbus_message_get_args(reply, NULL,
+			DBUS_TYPE_STRING, dir,
+			DBUS_TYPE_INVALID);
+
+	g_free(path);
+
+	return 0;
 }
