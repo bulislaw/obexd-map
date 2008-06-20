@@ -241,20 +241,23 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
 	g_free(path);
 }
 
-int request_authorization(int cid, int fd, const gchar *filename,
-		const gchar *type, int length, int time, gchar **dir)
+int request_authorization(gint32 cid, int fd, const gchar *filename,
+		const gchar *type, gint32 length, gint32 time, gchar **dir)
 {
 	DBusMessage *msg, *reply;
 	DBusError derr;
-	struct sockaddr_l2 addr;
-	bdaddr_t dst;
+	struct sockaddr_rc addr;
 	socklen_t addrlen;
 	gchar address[18];
 	const gchar *bda = address;
 	gchar *path;
+	const gchar *pdir;
 
 	if (!agent)
 		return -1;
+
+	if (!dir)
+		return -EINVAL;
 
 	memset(&addr, 0, sizeof(addr));
 	addrlen = sizeof(addr);
@@ -262,10 +265,9 @@ int request_authorization(int cid, int fd, const gchar *filename,
 	if (getpeername(fd, (struct sockaddr *) &addr, &addrlen) < 0)
 		return -1;
 
-	bacpy(&dst, &addr.l2_bdaddr);
-	ba2str(&dst, address);
+	ba2str(&addr.rc_bdaddr, address);
 
-	path = g_strdup_printf(path, "/transfer%d", cid);
+	path = g_strdup_printf("/transfer%d", cid);
 
 	dbus_error_init(&derr);
 
@@ -281,20 +283,22 @@ int request_authorization(int cid, int fd, const gchar *filename,
 			DBUS_TYPE_INT32, &time,
 			DBUS_TYPE_INVALID);
 
+	g_free(path);
+
 	reply = dbus_connection_send_with_reply_and_block(connection,
 			msg, -1, &derr);
 	if (dbus_error_is_set(&derr)) {
 		error("error: %s", derr.message);
 		dbus_error_free(&derr);
-		g_free(path);
 		return -EPERM;
 	}
 
-	dbus_message_get_args(reply, NULL,
-			DBUS_TYPE_STRING, dir,
-			DBUS_TYPE_INVALID);
+	if (!dbus_message_get_args(reply, NULL,
+					DBUS_TYPE_STRING, &pdir,
+					DBUS_TYPE_INVALID))
+		return -EPERM;
 
-	g_free(path);
+	*dir = g_strdup(pdir);
 
 	return 0;
 }

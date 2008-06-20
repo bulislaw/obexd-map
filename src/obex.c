@@ -395,6 +395,28 @@ static gint obex_read(struct obex_session *os,
 	return 0;
 }
 
+static gint prepare_put(struct obex_session *os)
+{
+	gchar *temp_file;
+	int err;
+
+	temp_file = g_build_filename(os->current_path, "tmp_XXXXXX", NULL);
+
+	os->fd = mkstemp(temp_file);
+	if (os->fd < 0) {
+		err = errno;
+		error("mkstemp: %s(%d)", strerror(err), err);
+		g_free(temp_file);
+		return -err;
+	}
+
+	os->temp = temp_file;
+
+	emit_transfer_started(os->cid);
+
+	return 0;
+}
+
 static void check_put(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
@@ -404,6 +426,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	gint32 len;
 	guint8 hi;
 	guint64 free;
+	int ret;
+	gint32 time;
 
 	os = OBEX_GetUserData(obex);
 
@@ -453,6 +477,19 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		return;
 	}
 
+	time = 0;
+	ret = request_authorization(os->cid, OBEX_GetFD(obex), os->name,
+				os->type, os->size, time, &os->current_path);
+	if (ret < 0) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
+	}
+
+	if (prepare_put(os) < 0) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return;
+	}
+
 	if (fstatvfs(os->fd, &buf) < 0) {
 		int err = errno;
 		error("fstatvfs(): %s(%d)", strerror(err), err);
@@ -468,23 +505,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	OBEX_ObjectReParseHeaders(obex, obj);
-}
-
-static void prepare_put(obex_t *obex, obex_object_t *obj)
-{
-	struct obex_session *os;
-	gchar *temp_file;
-
-	os = OBEX_GetUserData(obex);
-
-	temp_file = g_build_filename(os->current_path, "tmp_XXXXXX", NULL);
-
-	os->fd = mkstemp(temp_file);
-	os->temp = temp_file;
-
-	emit_transfer_started(os->cid);
-
-	OBEX_ObjectReadStream(obex, obj, NULL);
 }
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
@@ -517,9 +537,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQHINT:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
-			os = OBEX_GetUserData(obex);
-			if (os->cmds->put)
-				prepare_put(obex, obj);
+			OBEX_ObjectReadStream(obex, obj, NULL);
 		case OBEX_CMD_GET:
 		case OBEX_CMD_SETPATH:
 		case OBEX_CMD_CONNECT:
@@ -649,7 +667,6 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	}
 
 	os->server = server;
-	os->current_path = g_strdup(server->folder);
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
 	if (!obex)

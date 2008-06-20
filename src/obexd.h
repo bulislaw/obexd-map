@@ -36,5 +36,3 @@
 
 gboolean manager_init(DBusConnection *conn);
 void manager_cleanup(void);
-int request_authorization(int cid, int fd, const gchar *filename,
-				const gchar *type, int length, int time, gchar **dir);
