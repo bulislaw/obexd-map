@@ -39,6 +39,8 @@
 
 #define TRANSFER_INTERFACE OPENOBEX_SERVICE ".Transfer"
 
+#define TIMEOUT 60*1000 /* Timeout for user response (miliseconds) */
+
 struct agent {
 	gchar	*bus_name;
 	gchar	*path;
@@ -286,7 +288,8 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 	g_free(path);
 
 	reply = dbus_connection_send_with_reply_and_block(connection,
-			msg, -1, &derr);
+			msg, TIMEOUT, &derr);
+	dbus_message_unref(msg);
 	if (dbus_error_is_set(&derr)) {
 		error("error: %s", derr.message);
 		dbus_error_free(&derr);
@@ -295,8 +298,12 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 
 	if (!dbus_message_get_args(reply, NULL,
 					DBUS_TYPE_STRING, &pdir,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		dbus_message_unref(reply);
 		return -EPERM;
+	}
+
+	dbus_message_unref(reply);
 
 	*dir = g_strdup(pdir);
 
