@@ -192,6 +192,12 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	gint32 len;
 	guint8 hi;
 
+	if (!os->cmds->get) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
+
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	if (os->type) {
@@ -240,6 +246,12 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
+	if (!os->cmds->put) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
+
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	os->cmds->put(obex, obj);
@@ -251,6 +263,12 @@ static void cmd_setpath(struct obex_session *os,
 	obex_headerdata_t hd;
 	guint32 hlen;
 	guint8 hi;
+
+	if (!os->cmds->setpath) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
+		return;
+	}
 
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
@@ -473,7 +491,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 					gint evt, gint cmd, gint rsp)
 {
 	struct obex_session *os;
-	gboolean hint = TRUE;
 
 	obex_debug(evt, cmd, rsp);
 
@@ -498,33 +515,30 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		}
 		break;
 	case OBEX_EV_REQHINT:
-		os = OBEX_GetUserData(obex);
 		switch (cmd) {
 		case OBEX_CMD_PUT:
+			os = OBEX_GetUserData(obex);
 			if (os->cmds->put)
 				prepare_put(obex, obj);
-			else
-				hint = FALSE;
-			break;
 		case OBEX_CMD_GET:
-			hint = (os->cmds->get ? TRUE : FALSE);
-			break;
 		case OBEX_CMD_SETPATH:
-			hint = (os->cmds->setpath ? TRUE : FALSE);
-			break;
-		}
-
-		if (hint)
+		case OBEX_CMD_CONNECT:
+		case OBEX_CMD_DISCONNECT:
 			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 					OBEX_RSP_SUCCESS);
-		else
+			break;
+		default:
 			OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 					OBEX_RSP_NOT_IMPLEMENTED);
+			break;
+		}
 		break;
 	case OBEX_EV_REQCHECK:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
-			check_put(obex, obj);
+			os = OBEX_GetUserData(obex);
+			if (os->cmds->put)
+				check_put(obex, obj);
 			break;
 		default:
 			break;
