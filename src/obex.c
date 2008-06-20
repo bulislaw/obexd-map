@@ -246,62 +246,12 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
-	obex_headerdata_t hd;
-	guint hlen, len;
-	guint8 hi;
-
 	g_return_if_fail(chk_cid(obex, obj, os->cid));
 
 	if (!os->cmds->put) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
 				OBEX_RSP_NOT_IMPLEMENTED);
 		return;
-	}
-
-	if (os->type) {
-		g_free(os->type);
-		os->type = NULL;
-	}
-
-	if (os->name) {
-		g_free(os->name);
-		os->name = NULL;
-	}
-
-	if (os->buf) {
-		g_free(os->buf);
-		os->buf = NULL;
-	}
-
-	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
-		switch (hi) {
-		case OBEX_HDR_NAME:
-			if (hlen == 0)
-				continue;
-
-			len = (hlen / 2) + 1;
-			os->name = g_malloc0(len);
-			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
-			debug("OBEX_HDR_NAME: %s", os->name);
-			break;
-
-		case OBEX_HDR_TYPE:
-			if (hlen == 0)
-				continue;
-
-			os->type = g_strndup((const gchar *) hd.bs, hlen);
-			debug("OBEX_HDR_TYPE: %s", os->type);
-			break;
-
-		case OBEX_HDR_BODY:
-			os->size = -1;
-			break;
-
-		case OBEX_HDR_LENGTH:
-			os->size = hd.bq4;
-			debug("OBEX_HDR_LENGTH: %d", os->size);
-			break;
-		}
 	}
 
 	os->cmds->put(obex, obj);
@@ -451,19 +401,54 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	struct statvfs buf;
 	obex_headerdata_t hd;
 	guint hlen;
-	gint32 len = 0;
+	gint32 len;
 	guint8 hi;
 	guint64 free;
 
 	os = OBEX_GetUserData(obex);
 
-	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen))
-		if (hi == OBEX_HDR_LENGTH) {
-			debug("OBEX_HDR_LENGTH %d", hd.bq4);
-			len = hd.bq4;
-		}
+	if (os->type) {
+		g_free(os->type);
+		os->type = NULL;
+	}
 
-	if (!len) {
+	if (os->name) {
+		g_free(os->name);
+		os->name = NULL;
+	}
+
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
+		switch (hi) {
+		case OBEX_HDR_NAME:
+			if (hlen == 0)
+				continue;
+
+			len = (hlen / 2) + 1;
+			os->name = g_malloc0(len);
+			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
+			debug("OBEX_HDR_NAME: %s", os->name);
+			break;
+
+		case OBEX_HDR_TYPE:
+			if (hlen == 0)
+				continue;
+
+			os->type = g_strndup((const gchar *) hd.bs, hlen);
+			debug("OBEX_HDR_TYPE: %s", os->type);
+			break;
+
+		case OBEX_HDR_BODY:
+			os->size = -1;
+			break;
+
+		case OBEX_HDR_LENGTH:
+			os->size = hd.bq4;
+			debug("OBEX_HDR_LENGTH: %d", os->size);
+			break;
+		}
+	}
+
+	if (!os->size) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
 	}
@@ -476,7 +461,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	free = buf.f_bsize * buf.f_bavail;
-	debug("Free space in disk: %d", free);
+	debug("Free space in disk: %lu", free);
 	if (len > free) {
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
