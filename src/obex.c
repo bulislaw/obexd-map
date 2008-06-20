@@ -463,15 +463,15 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			len = hd.bq4;
 		}
 
-	OBEX_ObjectReParseHeaders(obex, obj);
-
 	if (!len) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
 		return;
 	}
 
 	if (fstatvfs(os->fd, &buf) < 0) {
-		error("fstatvfs() fail");
+		int err = errno;
+		error("fstatvfs(): %s(%d)", strerror(err), err);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
 
@@ -481,6 +481,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 	}
+
+	OBEX_ObjectReParseHeaders(obex, obj);
 }
 
 static void prepare_put(obex_t *obex, obex_object_t *obj)
