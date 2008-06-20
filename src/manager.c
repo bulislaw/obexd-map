@@ -236,8 +236,8 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
 
 	g_dbus_emit_signal(connection, path,
 			TRANSFER_INTERFACE, "Progress",
-			DBUS_TYPE_UINT32, &total,
-			DBUS_TYPE_UINT32, &transfered,
+			DBUS_TYPE_INT32, &total,
+			DBUS_TYPE_INT32, &transfered,
 			DBUS_TYPE_INVALID);
 
 	g_free(path);
