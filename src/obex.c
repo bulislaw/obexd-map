@@ -45,7 +45,6 @@
 
 #include "logging.h"
 #include "obex.h"
-#include "logging.h"
 #include "dbus.h"
 
 #define TARGET_SIZE	16
@@ -105,7 +104,6 @@ static void cmd_connect(struct obex_session *os,
 	guint16 mtu;
 	guint8 hi;
 
-	/* FIXME: Reject if NonHdrData is invalid? */
 	if (OBEX_ObjectGetNonHdrData(obj, &buffer) != sizeof(*nonhdr)) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		debug("Invalid OBEX CONNECT packet");
@@ -141,13 +139,10 @@ static void cmd_connect(struct obex_session *os,
 		return;
 	}
 
-	/* FIXME: Add non header values */
-
 	/* Append received UUID in WHO header */
 	OBEX_ObjectAddHeader(obex, obj,
 			OBEX_HDR_WHO, hd, TARGET_SIZE,
 			OBEX_FL_FIT_ONE_PACKET);
-	hd.bs = NULL;
 	hd.bq4 = cid;
 	OBEX_ObjectAddHeader(obex, obj,
 			OBEX_HDR_CONNECTION, hd, 4,
@@ -290,7 +285,7 @@ static void cmd_setpath(struct obex_session *os,
 			}
 
 			os->name = (char *) g_malloc0(hlen/2 + 1);
-			OBEX_UnicodeToChar((uint8_t *)os->name, hd.bs, hlen/2);
+			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, hlen/2);
 			debug("Set path name: %s", os->name);
 			break;
 		}
