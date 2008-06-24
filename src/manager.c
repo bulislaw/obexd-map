@@ -46,6 +46,12 @@ struct agent {
 	gchar	*path;
 };
 
+struct agent_response {
+	gboolean	waiting;
+	gboolean	authorized;
+	gchar		*dir;
+};
+
 static struct agent *agent = NULL;
 
 static void agent_free(struct agent *agent)
@@ -243,17 +249,42 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
 	g_free(path);
 }
 
+static void agent_reply(DBusPendingCall *call, gpointer user_data)
+{
+	DBusMessage *reply = dbus_pending_call_steal_reply(call);
+	struct agent_response *rsp = user_data;
+	const gchar *pdir;
+	DBusError derr;
+
+	rsp->waiting = FALSE;
+	dbus_error_init(&derr);
+	if (dbus_set_error_from_message(&derr, reply)) {
+		error("Agent replied with an error: %s, %s",
+				derr.name, derr.message);
+		dbus_error_free(&derr);
+		rsp->authorized = FALSE;
+		return;
+	}
+
+	if (dbus_message_get_args(reply, NULL,
+				DBUS_TYPE_STRING, &pdir,
+				DBUS_TYPE_INVALID))
+		rsp->dir = g_strdup(pdir);
+
+	rsp->authorized = TRUE;
+}
+
 int request_authorization(gint32 cid, int fd, const gchar *filename,
 		const gchar *type, gint32 length, gint32 time, gchar **dir)
 {
-	DBusMessage *msg, *reply;
-	DBusError derr;
+	struct agent_response *rsp;
+	DBusMessage *msg;
+	DBusPendingCall *call;
 	struct sockaddr_rc addr;
 	socklen_t addrlen;
 	gchar address[18];
 	const gchar *bda = address;
 	gchar *path;
-	const gchar *pdir;
 
 	if (!agent)
 		return -1;
@@ -271,10 +302,8 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 
 	path = g_strdup_printf("/transfer%d", cid);
 
-	dbus_error_init(&derr);
-
 	msg = dbus_message_new_method_call(agent->bus_name, agent->path,
-			"org.openobex.Agent", "Authorize");
+					"org.openobex.Agent", "Authorize");
 
 	dbus_message_append_args(msg,
 			DBUS_TYPE_OBJECT_PATH, &path,
@@ -287,23 +316,34 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 
 	g_free(path);
 
-	reply = dbus_connection_send_with_reply_and_block(connection,
-			msg, TIMEOUT, &derr);
+	if (!dbus_connection_send_with_reply(connection,
+					msg, &call, TIMEOUT))
+		return -EPERM;
+
 	dbus_message_unref(msg);
-	if (dbus_error_is_set(&derr)) {
-		error("error: %s", derr.message);
-		dbus_error_free(&derr);
+
+	rsp = g_new0(struct agent_response, 1);
+	rsp->waiting = TRUE;
+
+	dbus_pending_call_set_notify(call, agent_reply, rsp, NULL);
+	dbus_pending_call_unref(call);
+
+	/* Workaround: process events while agent doesn't reply */
+	while (rsp->waiting)
+		g_main_context_iteration(NULL, TRUE);
+
+	if (!rsp->authorized) {
+		g_free(rsp);
 		return -EPERM;
 	}
 
-	*dir = NULL;
-	if (dbus_message_get_args(reply, NULL,
-					DBUS_TYPE_STRING, &pdir,
-					DBUS_TYPE_INVALID)) {
-		*dir = g_strdup(pdir);
-	}
+	if (rsp->dir) {
+		*dir = g_strdup(rsp->dir);
+		g_free(rsp->dir);
+	} else
+		*dir = NULL;
 
-	dbus_message_unref(reply);
+	g_free(rsp);
 
 	return 0;
 }
