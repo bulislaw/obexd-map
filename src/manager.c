@@ -42,20 +42,19 @@
 #define TIMEOUT 60*1000 /* Timeout for user response (miliseconds) */
 
 struct agent {
-	gchar	*bus_name;
-	gchar	*path;
-};
-
-struct agent_response {
-	gboolean	waiting;
-	gboolean	authorized;
-	gchar		*name;		/* Includes folder and name */
+	gchar		*bus_name;
+	gchar		*path;
+	gboolean	auth_pending;
+	gchar		*new_name;
+	gchar		*new_folder;
 };
 
 static struct agent *agent = NULL;
 
 static void agent_free(struct agent *agent)
 {
+	g_free(agent->new_folder);
+	g_free(agent->new_name);
 	g_free(agent->bus_name);
 	g_free(agent->path);
 	g_free(agent);
@@ -252,12 +251,10 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered)
 static void agent_reply(DBusPendingCall *call, gpointer user_data)
 {
 	DBusMessage *reply = dbus_pending_call_steal_reply(call);
-	struct agent_response *rsp = user_data;
 	const gchar *name;
 	DBusError derr;
 
-	rsp->waiting = FALSE;
-	rsp->authorized = FALSE;
+	agent->auth_pending = FALSE;
 
 	dbus_error_init(&derr);
 	if (dbus_set_error_from_message(&derr, reply)) {
@@ -270,8 +267,15 @@ static void agent_reply(DBusPendingCall *call, gpointer user_data)
 	if (dbus_message_get_args(reply, NULL,
 				DBUS_TYPE_STRING, &name,
 				DBUS_TYPE_INVALID)) {
-		rsp->name = g_strdup(name);
-		rsp->authorized = TRUE;
+		/* Splits folder and name */
+		const gchar *slash = strrchr(name, '/');
+		if (!slash) {
+			agent->new_name = g_strdup(name);
+			agent->new_folder = NULL;
+		} else {
+			agent->new_name = g_strdup(slash + 1);
+			agent->new_folder = g_strndup(name, slash - name);
+		}
 	}
 }
 
@@ -279,7 +283,6 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 			const gchar *type, gint32 length, gint32 time,
 			gchar **new_folder, gchar **new_name)
 {
-	struct agent_response *rsp;
 	DBusMessage *msg;
 	DBusPendingCall *call;
 	struct sockaddr_rc addr;
@@ -290,6 +293,9 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 
 	if (!agent)
 		return -1;
+
+	if (agent->auth_pending)
+		return -EPERM;
 
 	if (!new_folder || !new_name)
 		return -EINVAL;
@@ -324,37 +330,23 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 
 	dbus_message_unref(msg);
 
-	rsp = g_new0(struct agent_response, 1);
-	rsp->waiting = TRUE;
+	agent->auth_pending = TRUE;
 
-	dbus_pending_call_set_notify(call, agent_reply, rsp, NULL);
+	dbus_pending_call_set_notify(call, agent_reply, NULL, NULL);
 	dbus_pending_call_unref(call);
 
 	/* Workaround: process events while agent doesn't reply */
-	while (rsp->waiting)
+	while (agent->auth_pending)
 		g_main_context_iteration(NULL, TRUE);
 
-	if (!rsp->authorized) {
-		g_free(rsp);
+	if (!agent->new_name) {
 		return -EPERM;
 	}
 
-	if (rsp->name) {
-		/* Splits folder and name */
-		const gchar *slash = strrchr(rsp->name, '/');
-		if (!slash) {
-			*new_name = g_strdup(rsp->name);
-		} else {
-			*new_name = g_strdup(slash + 1);
-			*new_folder = g_strndup(rsp->name, slash - rsp->name);
-		}
-		g_free(rsp->name);
-	} else {
-		*new_folder = NULL;
-		*new_name = NULL;
-	}
-
-	g_free(rsp);
+	*new_folder = agent->new_folder;
+	*new_name = agent->new_name;
+	agent->new_folder = NULL;
+	agent->new_name = NULL;
 
 	return 0;
 }
