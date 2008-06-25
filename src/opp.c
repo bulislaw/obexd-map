@@ -73,7 +73,7 @@ static gint prepare_put(struct obex_session *os)
 gint opp_chkput(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
-	gchar *new_folder;
+	gchar *new_folder, *new_name;
 	gint32 time;
 	gint ret;
 
@@ -89,15 +89,19 @@ gint opp_chkput(obex_t *obex, obex_object_t *obj)
 
 	time = 0;
 	ret = request_authorization(os->cid, OBEX_GetFD(obex), os->name,
-				os->type, os->size, time, &new_folder);
+				os->type, os->size, time, &new_folder, &new_name);
 
 	if (ret < 0)
 		return -EPERM;
 
 	if (new_folder) {
 		g_free(os->current_folder);
-		os->current_folder = g_strdup(new_folder);
-		g_free(new_folder);
+		os->current_folder = new_folder;
+	}
+
+	if (new_name) {
+		g_free(os->name);
+		os->name = new_name;
 	}
 
 skip_auth:

@@ -49,7 +49,7 @@ struct agent {
 struct agent_response {
 	gboolean	waiting;
 	gboolean	authorized;
-	gchar		*dir;
+	gchar		*name;		/* Includes folder and name */
 };
 
 static struct agent *agent = NULL;
@@ -253,29 +253,31 @@ static void agent_reply(DBusPendingCall *call, gpointer user_data)
 {
 	DBusMessage *reply = dbus_pending_call_steal_reply(call);
 	struct agent_response *rsp = user_data;
-	const gchar *pdir;
+	const gchar *name;
 	DBusError derr;
 
 	rsp->waiting = FALSE;
+	rsp->authorized = FALSE;
+
 	dbus_error_init(&derr);
 	if (dbus_set_error_from_message(&derr, reply)) {
 		error("Agent replied with an error: %s, %s",
 				derr.name, derr.message);
 		dbus_error_free(&derr);
-		rsp->authorized = FALSE;
 		return;
 	}
 
 	if (dbus_message_get_args(reply, NULL,
-				DBUS_TYPE_STRING, &pdir,
-				DBUS_TYPE_INVALID))
-		rsp->dir = g_strdup(pdir);
-
-	rsp->authorized = TRUE;
+				DBUS_TYPE_STRING, &name,
+				DBUS_TYPE_INVALID)) {
+		rsp->name = g_strdup(name);
+		rsp->authorized = TRUE;
+	}
 }
 
 int request_authorization(gint32 cid, int fd, const gchar *filename,
-		const gchar *type, gint32 length, gint32 time, gchar **dir)
+			const gchar *type, gint32 length, gint32 time,
+			gchar **new_folder, gchar **new_name)
 {
 	struct agent_response *rsp;
 	DBusMessage *msg;
@@ -289,7 +291,7 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 	if (!agent)
 		return -1;
 
-	if (!dir)
+	if (!new_folder || !new_name)
 		return -EINVAL;
 
 	memset(&addr, 0, sizeof(addr));
@@ -337,11 +339,20 @@ int request_authorization(gint32 cid, int fd, const gchar *filename,
 		return -EPERM;
 	}
 
-	if (rsp->dir) {
-		*dir = g_strdup(rsp->dir);
-		g_free(rsp->dir);
-	} else
-		*dir = NULL;
+	if (rsp->name) {
+		/* Splits folder and name */
+		const gchar *slash = strrchr(rsp->name, '/');
+		if (!slash) {
+			*new_name = g_strdup(rsp->name);
+		} else {
+			*new_name = g_strdup(slash + 1);
+			*new_folder = g_strndup(rsp->name, slash - rsp->name);
+		}
+		g_free(rsp->name);
+	} else {
+		*new_folder = NULL;
+		*new_name = NULL;
+	}
 
 	g_free(rsp);
 
