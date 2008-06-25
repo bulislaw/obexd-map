@@ -19,9 +19,8 @@ Methods
 
 			This method gets called when the service daemon
 			needs to accept/reject a Bluetooth object push request.
-			Returns the directory name where the object shall be
-			stored. If directory is not returned, the object will
-			be saved in the default path.
+			Returns the directory name including the filename where
+			the object shall be stored.
 
 			Possible errors: org.openobex.Error.Rejected
 			                 org.openobex.Error.Canceled
