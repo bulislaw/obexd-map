@@ -144,7 +144,8 @@ int main(int argc, char *argv[])
 	optind = 0;
 
 	if (!(opush || ftp)) {
-		fprintf(stderr, "Server not informed\n");
+		fprintf(stderr, "No server selected (use either "
+					"--opp or --ftp or both)\n");
 		exit(1);
 	}
 
