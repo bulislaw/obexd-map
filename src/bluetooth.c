@@ -47,11 +47,6 @@
 #include "logging.h"
 #include "obex.h"
 
-#define OPUSH_CHANNEL	9
-#define FTP_CHANNEL	10
-
-#define ROOT_PATH "/tmp"
-
 static GSList *handles = NULL;
 static sdp_session_t *session = NULL;
 
@@ -196,7 +191,7 @@ static void server_destroyed(gpointer user_data)
 	g_free(server);
 }
 
-static gint server_register(const gchar *name, guint16 service,
+static gint server_register(guint16 service, const gchar *name,
 		guint8 channel, const gchar *folder, gboolean auto_accept)
 {
 	struct sockaddr_rc laddr;
@@ -272,82 +267,19 @@ failed:
 	return -err;
 }
 
-static gint setup_server(GKeyFile *keyfile,
-			const gchar *group, gint16 service)
+gint bluetooth_init(guint service, const gchar *name, const gchar *folder,
+			guint8 channel, gboolean auto_accept)
 {
-	const gchar *name, *folder;
-	gchar *key_name, *key_folder;
-	gboolean auto_accept;
-	gint8 channel;
-	gint ret;
-
-	key_name = g_key_file_get_string(keyfile, group, "name", NULL);
-	channel = g_key_file_get_integer(keyfile, group, "channel", NULL);
-	key_folder = g_key_file_get_string(keyfile, group, "folder", NULL);
-	auto_accept = g_key_file_get_boolean(keyfile, group,
-						"auto_accept", NULL);
-
-	switch (service) {
-	case OBEX_OPUSH:
-		name = (key_name ? : "OBEX OPUSH server");
-		folder = (key_folder ? : ROOT_PATH);
-		channel = (channel ? : OPUSH_CHANNEL);
-		break;
-	case OBEX_FTP:
-		name = (key_name ? : "OBEX FTP server");
-		folder = (key_folder ? : ROOT_PATH);
-		channel = (channel ? : FTP_CHANNEL);
-		break;
-	default:
-		ret = -EINVAL;
-		goto failed;
-	}
-
-	ret = server_register(name, service, channel, folder, auto_accept);
-
-failed:
-	g_free(key_name);
-	g_free(key_folder);
-
-	return ret;
-}
-
-gint bluetooth_init(GKeyFile *keyfile)
-{
-	gint err;
-	gchar **list;
-	gint i;
-
-	session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
 	if (!session) {
-		gint err = errno;
-		error("sdp_connect(): %s(%d)", strerror(err), err);
-		return -err;
+		session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
+		if (!session) {
+			gint err = errno;
+			error("sdp_connect(): %s(%d)", strerror(err), err);
+			return -err;
+		}
 	}
 
-	err = 0;
-	list = g_key_file_get_string_list(keyfile, "Bluetooth", "Enable", NULL, NULL);
-	if (list == NULL)
-		goto failed;
-
-	for (i = 0; list[i]; i++) {
-		if (g_str_equal(list[i], "OPUSH"))
-			err = setup_server(keyfile, "OPUSH", OBEX_OPUSH);
-		if (g_str_equal(list[i], "FTP"))
-			err = setup_server(keyfile, "FTP", OBEX_FTP);
-	}
-
-	g_strfreev(list);
-
-	if (err < 0)
-		goto failed;
-
-	return 0;
-
-failed:
-	sdp_close(session);
-
-	return -1;
+	return server_register(service, name, channel, folder, auto_accept);
 }
 
 static void unregister_record(gpointer rec_handle, gpointer user_data)
