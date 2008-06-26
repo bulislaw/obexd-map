@@ -113,7 +113,7 @@ static void cmd_connect(struct obex_session *os,
 	/* Leave space for headers */
 	newsize = mtu - 200;
 
-	os->mtu = newsize;
+	os->tx_mtu = newsize;
 
 	debug("Resizing stream chunks to %d", newsize);
 
@@ -298,7 +298,7 @@ gint os_setup_by_name(struct obex_session *os, gchar *file)
 		goto fail;
 
 	os->fd = fd;
-	os->buf = g_new0(guint8, os->mtu);
+	os->buf = g_new0(guint8, os->tx_mtu);
 	os->offset = 0;
 
 	return stats.st_size;
@@ -316,13 +316,13 @@ static gint obex_write(struct obex_session *os,
 	obex_headerdata_t hd;
 	gint32 len;
 
-	debug("name: %s type: %s mtu: %d fd: %d",
-			os->name, os->type, os->mtu, os->fd);
+	debug("obex_write name: %s type: %s tx_mtu: %d fd: %d",
+			os->name, os->type, os->tx_mtu, os->fd);
 
 	if (os->fd < 0)
 		return -EIO;
 
-	len = read(os->fd, os->buf, os->mtu);
+	len = read(os->fd, os->buf, os->tx_mtu);
 	if (len < 0) {
 		gint err = errno;
 		g_free(os->buf);

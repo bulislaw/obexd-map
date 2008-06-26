@@ -47,7 +47,8 @@ struct server {
 
 struct obex_session {
 	guint32		cid;
-	guint16		mtu;
+	guint16		tx_mtu;
+	guint16		rx_mtu;
 	gchar		*name;
 	gchar		*type;
 	gchar		*current_folder;
