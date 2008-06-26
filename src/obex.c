@@ -213,14 +213,23 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
+			if (os->name) {
+				debug("Ignoring multiple name headers");
+				break;
+			}
+
 			if (hlen == 0)
 				continue;
 
 			os->name = g_convert((const gchar *) hd.bs, hlen,
 					"UTF8", "UTF16BE", NULL, NULL, NULL);
-			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 		case OBEX_HDR_TYPE:
+			if (os->type) {
+				debug("Ignoring multiple type headers");
+				break;
+			}
+
 			if (hlen == 0)
 				continue;
 
@@ -234,7 +243,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 			}
 
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
-			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 		}
 	}
@@ -254,6 +262,9 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os->name = NULL;
 		return;
 	}
+
+	debug("OBEX_HDR_NAME: %s", os->name);
+	debug("OBEX_HDR_TYPE: %s", os->type);
 
 	os->cmds->get(obex, obj);
 }
@@ -293,6 +304,11 @@ static void cmd_setpath(struct obex_session *os,
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_NAME) {
+			if (os->name) {
+				debug("Ignoring multiple name headers");
+				break;
+			}
+
 			/*
 			 * This is because OBEX_UnicodeToChar() accesses
 			 * the string even if its size is zero
@@ -454,15 +470,24 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
+			if (os->name) {
+				debug("Ignoring multiple name headers");
+				break;
+			}
+
 			if (hlen == 0)
 				continue;
 
 			os->name = g_convert((const gchar *) hd.bs, hlen,
 					"UTF8", "UTF16BE", NULL, NULL, NULL);
-			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 
 		case OBEX_HDR_TYPE:
+			if (os->type) {
+				debug("Ignoring multiple type headers");
+				break;
+			}
+
 			if (hlen == 0)
 				continue;
 
@@ -476,7 +501,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			}
 
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
-			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 
 		case OBEX_HDR_BODY:
@@ -505,6 +529,9 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		os->name = NULL;
 		return;
 	}
+
+	debug("OBEX_HDR_NAME: %s", os->name);
+	debug("OBEX_HDR_TYPE: %s", os->type);
 
 	if (!os->cmds->chkput)
 		return;
