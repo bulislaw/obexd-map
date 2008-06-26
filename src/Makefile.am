@@ -1,5 +1,5 @@
 
-servicedir = $(datarootdir)/dbus-1/sevices
+servicedir = $(datarootdir)/dbus-1/services
 
 confdir = $(sysconfdir)/obex
 
