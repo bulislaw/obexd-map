@@ -7,7 +7,7 @@ conf_DATA = obex.conf
 
 service_DATA = org.openobex.service
 
-sbin_PROGRAMS = obexd
+bin_PROGRAMS = obexd
 
 obexd_SOURCES = main.c obexd.h manager.c \
 				logging.h logging.c obex.h obex.c \
