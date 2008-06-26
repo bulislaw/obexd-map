@@ -47,6 +47,10 @@
 #include "obex.h"
 #include "dbus.h"
 
+/* Default MTU's */
+#define RX_MTU 32767
+#define TX_MTU 32767
+
 #define TARGET_SIZE	16
 static const guint8 FTP_TARGET[TARGET_SIZE] = { 0xF9, 0xEC, 0x7B, 0xC4,
 					0x95, 0x3C, 0x11, 0xD2,
@@ -622,6 +626,8 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 
 	os->current_folder = g_strdup(server->folder);
 	os->server = server;
+	os->rx_mtu = RX_MTU;
+	os->tx_mtu = TX_MTU;
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
 	if (!obex)
@@ -629,7 +635,9 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 
 	OBEX_SetUserData(obex, os);
 
-	ret = FdOBEX_TransportSetup(obex, fd, fd, mtu);
+	OBEX_SetTransportMTU(obex, os->rx_mtu, os->tx_mtu);
+
+	ret = FdOBEX_TransportSetup(obex, fd, fd, 0);
 	if (ret < 0) {
 		obex_session_free(os);
 		OBEX_Cleanup(obex);
