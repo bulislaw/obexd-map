@@ -268,7 +268,7 @@ failed:
 }
 
 gint bluetooth_init(guint service, const gchar *name, const gchar *folder,
-			guint8 channel, gboolean auto_accept)
+					guint8 channel, gboolean auto_accept)
 {
 	if (!session) {
 		session = sdp_connect(BDADDR_ANY, BDADDR_LOCAL, SDP_RETRY_IF_BUSY);
