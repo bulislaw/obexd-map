@@ -116,6 +116,8 @@ static DBusMessage *register_agent(DBusConnection *conn,
 	g_dbus_add_disconnect_watch(conn, sender,
 			agent_disconnected, NULL, NULL);
 
+	debug("Agent registered");
+
 	return dbus_message_new_method_return(msg);
 }
 
