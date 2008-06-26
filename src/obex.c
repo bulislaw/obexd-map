@@ -387,9 +387,6 @@ static gint obex_read(struct obex_session *os,
 	gint32 len = 0;
 	const guint8 *buffer;
 
-	if (os->fd < 0)
-		return -EIO;
-
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
 	if (size <= 0) {
 		close(os->fd);
@@ -620,6 +617,7 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 			debug("error obex_read()");
 			OBEX_CancelRequest(obex, 1);
 		}
+
 		break;
 	case OBEX_EV_STREAMEMPTY:
 		os = OBEX_GetUserData(obex);
@@ -671,7 +669,7 @@ static gboolean obex_handle_input(GIOChannel *io,
 	return TRUE;
 }
 
-gint obex_server_start(gint fd, gint mtu, struct server *server)
+gint obex_session_start(gint fd, struct server *server)
 {
 	struct obex_session *os;
 	GIOChannel *io;
@@ -698,10 +696,13 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	os->server = server;
 	os->rx_mtu = RX_MTU;
 	os->tx_mtu = TX_MTU;
+	os->fd = -1;
 
 	obex = OBEX_Init(OBEX_TRANS_FD, obex_event, 0);
-	if (!obex)
+	if (!obex) {
+		obex_session_free(os);
 		return -EIO;
+	}
 
 	OBEX_SetUserData(obex, os);
 
@@ -723,7 +724,7 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	return 0;
 }
 
-gint obex_server_stop()
+gint obex_session_stop()
 {
 	return 0;
 }

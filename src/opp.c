@@ -102,7 +102,7 @@ skip_auth:
 	while (len < os->offset) {
 		gint w;
 
-		w = write(os->fd, os->buf, os->offset);
+		w = write(os->fd, os->buf + len, os->offset - len);
 		if (w < 0) {
 			gint err = errno;
 			if (err == EINTR)
@@ -131,7 +131,7 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	if (os->name == NULL) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST, OBEX_RSP_BAD_REQUEST);
 		return;
 	}
 
