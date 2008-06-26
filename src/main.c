@@ -33,69 +33,44 @@
 #include <signal.h>
 #include <getopt.h>
 #include <syslog.h>
+#include <glib.h>
 
 #include <gdbus.h>
+
+#include <openobex/obex.h>
+#include <openobex/obex_const.h>
+
 
 #include "logging.h"
 #include "bluetooth.h"
 #include "obexd.h"
+#include "obex.h"
 
 #define CONFIG_FILE	"obex.conf"
 
+#define OPUSH_CHANNEL	9
+#define FTP_CHANNEL	10
+
+#define ROOT_PATH "/tmp"
+
 static GMainLoop *main_loop = NULL;
 
-static int server_start(const gchar *config_file)
+static int server_start(int service)
 {
-	GKeyFile *keyfile;
-	GError *gerr = NULL;
-	const gchar *filename = (config_file ? : CONFIGDIR "/" CONFIG_FILE);
-	gchar **key;
-	gsize len;
-	int i;
-
-	debug("Configuration file: %s", filename);
-
-	keyfile = g_key_file_new();
-	if (!g_key_file_load_from_file(keyfile, filename, 0, &gerr)) {
-		error("Parsing %s failed: %s", filename, gerr->message);
-		g_error_free(gerr);
-		goto fail;
+	switch (service) {
+	case OBEX_OPUSH:
+		bluetooth_init(OBEX_OPUSH, "OBEX OPUSH server",
+				ROOT_PATH, OPUSH_CHANNEL, TRUE);
+		break;
+	case OBEX_FTP:
+		bluetooth_init(OBEX_FTP, "OBEX FTP server",
+				ROOT_PATH, FTP_CHANNEL, TRUE);
+		break;
+	default:
+		return -EINVAL;
 	}
-
-	key = g_key_file_get_string_list(keyfile,
-				"General", "EnabledTransports",
-				&len, &gerr);
-	if (gerr) {
-		error("Parsing %s failed: %s", CONFIG_FILE, gerr->message);
-		g_error_free(gerr);
-		goto fail;
-	}
-
-	if (key == NULL || len == 0) {
-		error("EnabledTransports not defined");
-		goto fail;
-	}
-
-	for (i = 0; i < len; i++){
-
-		if (!g_strcasecmp(key[i], "Bluetooth")) {
-			bluetooth_init(keyfile);
-		} else if (!g_strcasecmp(key[i], "USB")) {
-			debug("Not implemented (USB)");
-		} else if (!g_strcasecmp(key[i], "IrDA")) {
-			debug("Not implemented (IrDA)");
-		}
-	}
-
-	g_key_file_free(keyfile);
-	g_strfreev(key);
 
 	return 0;
-
-fail:
-	g_key_file_free(keyfile);
-
-	return -EINVAL;
 }
 
 static void server_stop()
@@ -114,13 +89,14 @@ static void usage(void)
 	printf("OBEX Server version %s\n\n", VERSION);
 
 	printf("Usage:\n"
-		"\tobexd [options]\n"
+		"\tobexd [options] <--opush|--ftp>\n"
 		"\n");
 
 	printf("Options:\n"
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
-		"\t-f, --config         Set configuration file\n"
+		"\t-o, --opush          Enable OPUSH service\n"
+		"\t-f, --ftp            Enable FTP service\n"
 		"\t-h, --help           Display help\n"
 		"\n");
 }
@@ -128,7 +104,8 @@ static void usage(void)
 static struct option options[] = {
 	{ "nodaemon", 0, 0, 'n' },
 	{ "debug",    0, 0, 'd' },
-	{ "config",    0, 0, 'f' },
+	{ "ftp",      0, 0, 'f' },
+	{ "opush",    0, 0, 'o' },
 	{ "help",     0, 0, 'h' },
 	{ }
 };
@@ -139,10 +116,10 @@ int main(int argc, char *argv[])
 	DBusError err;
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
-	int opt, detach = 1, debug = 0;
+	int opt, detach = 1, debug = 0, opush = 0, ftp = 0;
 	gchar *config_file = NULL;
 
-	while ((opt = getopt_long(argc, argv, "+ndhf:", options, NULL)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "+ndhof", options, NULL)) != EOF) {
 		switch(opt) {
 		case 'n':
 			detach = 0;
@@ -151,8 +128,11 @@ int main(int argc, char *argv[])
 			debug = 1;
 			break;
 		case 'h':
+		case 'o':
+			opush = 1;
+			break;
 		case 'f':
-			config_file = g_strdup(optarg);
+			ftp = 1;
 			break;
 		default:
 			usage();
@@ -193,8 +173,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (server_start(config_file) < 0)
-		goto fail;
+	if (opush)
+		server_start(OBEX_OPUSH);
+
+	if (ftp)
+		server_start(OBEX_FTP);
 
 	if (!manager_init(conn))
 		goto fail;
