@@ -124,6 +124,8 @@ static void cmd_connect(struct obex_session *os,
 	/* connection id will be used to track the sessions, even for OPP */
 	os->cid = ++cid;
 
+	register_transfer(os->cid);
+
 	if (os->target == NULL) {
 		/* OPP doesn't contains target or connection id. */
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
@@ -149,6 +151,7 @@ static void cmd_connect(struct obex_session *os,
 			OBEX_FL_FIT_ONE_PACKET);
 
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
+
 }
 
 static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
@@ -391,6 +394,8 @@ static gint obex_read(struct obex_session *os,
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
 	if (size <= 0) {
 		if (os->fd >= 0) {
+			emit_transfer_completed(os->cid,
+						os->offset == os->size);
 			close(os->fd);
 			os->fd = -1;
 		}
@@ -625,6 +630,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		if (obex_read(os, obex, obj) < 0) {
 			debug("error obex_read()");
 			OBEX_CancelRequest(obex, 1);
+			emit_transfer_completed(os->cid,
+						os->offset == os->size);
 		}
 
 		break;
@@ -652,7 +659,11 @@ static void obex_handle_destroy(gpointer user_data)
 
 	os = OBEX_GetUserData(obex);
 
-	emit_transfer_completed(os->cid, os->offset == os->size);
+	/* Got an error during a transfer. */
+	if (os->fd >= 0)
+		emit_transfer_completed(os->cid, os->offset == os->size);
+
+	unregister_transfer(os->cid);
 
 	obex_session_free(os);
 

@@ -30,3 +30,7 @@ void emit_transfer_progress(guint32 id, guint32 total, guint32 transfered);
 int request_authorization(gint32 cid, int fd, const gchar *filename,
 			const gchar *type, gint32 length, gint32 time,
 			gchar **new_folder, gchar **new_name);
+
+void register_transfer(guint32 id);
+
+void unregister_transfer(guint32 id);
