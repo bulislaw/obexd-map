@@ -223,6 +223,7 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 			os->name = g_convert((const gchar *) hd.bs, hlen,
 					"UTF8", "UTF16BE", NULL, NULL, NULL);
+			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 		case OBEX_HDR_TYPE:
 			if (os->type) {
@@ -242,29 +243,13 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 				break;
 			}
 
+			/* FIXME: x-obex/folder-listing - type is mandatory */
+
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
+			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 		}
 	}
-
-	if (!os->name) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
-				OBEX_RSP_BAD_REQUEST);
-		g_free(os->type);
-		os->type = NULL;
-		return;
-	}
-
-	if (!os->type) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
-				OBEX_RSP_BAD_REQUEST);
-		g_free(os->name);
-		os->name = NULL;
-		return;
-	}
-
-	debug("OBEX_HDR_NAME: %s", os->name);
-	debug("OBEX_HDR_TYPE: %s", os->type);
 
 	os->cmds->get(obex, obj);
 }
@@ -480,6 +465,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 
 			os->name = g_convert((const gchar *) hd.bs, hlen,
 					"UTF8", "UTF16BE", NULL, NULL, NULL);
+			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 
 		case OBEX_HDR_TYPE:
@@ -501,6 +487,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			}
 
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
+			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 
 		case OBEX_HDR_BODY:
@@ -521,17 +508,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		os->type = NULL;
 		return;
 	}
-
-	if (!os->type) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
-				OBEX_RSP_BAD_REQUEST);
-		g_free(os->name);
-		os->name = NULL;
-		return;
-	}
-
-	debug("OBEX_HDR_NAME: %s", os->name);
-	debug("OBEX_HDR_TYPE: %s", os->type);
 
 	if (!os->cmds->chkput)
 		return;
