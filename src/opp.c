@@ -102,7 +102,7 @@ skip_auth:
 	while (len < os->offset) {
 		gint w;
 
-		w = write(os->fd, os->buf, os->offset);
+		w = write(os->fd, os->buf + len, os->offset - len);
 		if (w < 0) {
 			gint err = errno;
 			if (err == EINTR)
