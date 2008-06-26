@@ -366,6 +366,23 @@ static gint obex_read(struct obex_session *os,
 		return 0;
 	}
 
+	if (size > os->rx_mtu) {
+		error("Received more data than RX_MAX");
+		return -EIO;
+	}
+
+	if (os->fd < 0) {
+		if (os->buf) {
+			error("Got more data but there is still a pending buffer");
+			return -EIO;
+		}
+
+		os->buf = g_malloc0(os->rx_mtu);
+		memcpy(os->buf, buffer, size);
+		os->offset += size;
+		return 0;
+	}
+
 	while (len < size) {
 		gint w;
 

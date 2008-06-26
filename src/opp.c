@@ -52,7 +52,7 @@ gint opp_chkput(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
 	gchar *new_folder, *new_name, *path;
-	gint32 time;
+	gint32 time, len = 0;
 	gint ret;
 
 	os = OBEX_GetUserData(obex);
@@ -95,6 +95,24 @@ skip_auth:
 	g_free(path);
 
 	emit_transfer_started(os->cid);
+
+	if (!os->buf)
+		return 0;
+
+	while (len < os->offset) {
+		gint w;
+
+		w = write(os->fd, os->buf, os->offset);
+		if (w < 0) {
+			gint err = errno;
+			if (err == EINTR)
+				continue;
+			else
+				return -err;
+		}
+
+		len += w;
+	}
 
 	return 0;
 }
