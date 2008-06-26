@@ -131,7 +131,7 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	if (os->name == NULL) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_BAD_REQUEST);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST, OBEX_RSP_BAD_REQUEST);
 		return;
 	}
 
