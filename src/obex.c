@@ -185,7 +185,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hd;
 	guint hlen;
-	gint32 len;
 	guint8 hi;
 
 	if (!os->cmds->get) {
@@ -217,19 +216,43 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 			if (hlen == 0)
 				continue;
 
-			len = (hlen / 2) + 1;
-			os->name = g_malloc0(len);
-			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
+			os->name = g_convert((const gchar *) hd.bs, hlen,
+					"UTF8", "UTF16BE", NULL, NULL, NULL);
 			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 		case OBEX_HDR_TYPE:
 			if (hlen == 0)
 				continue;
 
+			/* Ensure null termination */
+			if (hd.bs[hlen - 1] != '\0')
+				break;
+
+			if (!g_utf8_validate((const gchar *) hd.bs, -1, NULL)) {
+				debug("Invalid type header: %s", hd.bs);
+				break;
+			}
+
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
 			debug("OBEX_HDR_TYPE: %s", os->type);
 			break;
 		}
+	}
+
+	if (!os->name) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
+				OBEX_RSP_BAD_REQUEST);
+		g_free(os->type);
+		os->type = NULL;
+		return;
+	}
+
+	if (!os->type) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
+				OBEX_RSP_BAD_REQUEST);
+		g_free(os->name);
+		os->name = NULL;
+		return;
 	}
 
 	os->cmds->get(obex, obj);
@@ -279,11 +302,18 @@ static void cmd_setpath(struct obex_session *os,
 				break;
 			}
 
-			os->name = (char *) g_malloc0(hlen/2 + 1);
-			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, hlen/2);
+			os->name = g_convert((const gchar *) hd.bs, hlen,
+					"UTF8", "UTF16BE", NULL, NULL, NULL);
+
 			debug("Set path name: %s", os->name);
 			break;
 		}
+	}
+
+	if (!os->name) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
+				OBEX_RSP_BAD_REQUEST);
+		return;
 	}
 
 	os->cmds->setpath(obex, obj);
@@ -409,7 +439,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	struct statvfs buf;
 	obex_headerdata_t hd;
 	guint hlen;
-	gint32 len;
 	guint8 hi;
 	guint64 free;
 
@@ -431,15 +460,23 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			if (hlen == 0)
 				continue;
 
-			len = (hlen / 2) + 1;
-			os->name = g_malloc0(len);
-			OBEX_UnicodeToChar((uint8_t *) os->name, hd.bs, len);
+			os->name = g_convert((const gchar *) hd.bs, hlen,
+					"UTF8", "UTF16BE", NULL, NULL, NULL);
 			debug("OBEX_HDR_NAME: %s", os->name);
 			break;
 
 		case OBEX_HDR_TYPE:
 			if (hlen == 0)
 				continue;
+
+			/* Ensure null termination */
+			if (hd.bs[hlen - 1] != '\0')
+				break;
+
+			if (!g_utf8_validate((const gchar *) hd.bs, -1, NULL)) {
+				debug("Invalid type header: %s", hd.bs);
+				break;
+			}
 
 			os->type = g_strndup((const gchar *) hd.bs, hlen);
 			debug("OBEX_HDR_TYPE: %s", os->type);
@@ -454,6 +491,22 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 			debug("OBEX_HDR_LENGTH: %d", os->size);
 			break;
 		}
+	}
+
+	if (!os->name) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
+				OBEX_RSP_BAD_REQUEST);
+		g_free(os->type);
+		os->type = NULL;
+		return;
+	}
+
+	if (!os->type) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
+				OBEX_RSP_BAD_REQUEST);
+		g_free(os->name);
+		os->name = NULL;
+		return;
 	}
 
 	if (!os->cmds->chkput)
