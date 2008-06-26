@@ -52,7 +52,6 @@ struct obex_session {
 	gchar		*type;
 	gchar		*current_folder;
 	guint8		*buf;
-	gchar		*temp;
 	gint32		offset;
 	gint32		size;
 	gint		fd;
