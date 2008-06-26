@@ -48,32 +48,10 @@
 #define VCARD_TYPE "text/x-vcard"
 #define VCARD_FILE CONFIGDIR "/vcard.vcf"
 
-static gint prepare_put(struct obex_session *os)
-{
-	gchar *temp_file;
-	int err;
-
-	temp_file = g_build_filename(os->current_folder, "tmp_XXXXXX", NULL);
-
-	os->fd = mkstemp(temp_file);
-	if (os->fd < 0) {
-		err = errno;
-		error("mkstemp: %s(%d)", strerror(err), err);
-		g_free(temp_file);
-		return -err;
-	}
-
-	os->temp = temp_file;
-
-	emit_transfer_started(os->cid);
-
-	return 0;
-}
-
 gint opp_chkput(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
-	gchar *new_folder, *new_name;
+	gchar *new_folder, *new_name, *path;
 	gint32 time;
 	gint ret;
 
@@ -105,8 +83,18 @@ gint opp_chkput(obex_t *obex, obex_object_t *obj)
 	}
 
 skip_auth:
-	if (prepare_put(os) < 0)
+	path = g_build_filename(os->current_folder, os->name, NULL);
+
+	os->fd = open(path, O_WRONLY | O_CREAT, 0600);
+	if (os->fd < 0) {
+		error("open(%s): %s (%d)", path, strerror(errno), errno);
+		g_free(path);
 		return -EPERM;
+	}
+
+	g_free(path);
+
+	emit_transfer_started(os->cid);
 
 	return 0;
 }
@@ -114,7 +102,6 @@ skip_auth:
 void opp_put(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
-	gchar *path;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
@@ -130,16 +117,7 @@ void opp_put(obex_t *obex, obex_object_t *obj)
 		return;
 	}
 
-	path = g_build_filename(os->current_folder, os->name, NULL);
-
-	close(os->fd);
-	rename(os->temp, path);
-
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
-
-	g_free(path);
-
-	return;
 }
 
 void opp_get(obex_t *obex, obex_object_t *obj)

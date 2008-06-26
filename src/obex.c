@@ -87,10 +87,6 @@ static void obex_session_free(struct obex_session *os)
 		g_free(os->buf);
 	if (os->fd > 0)
 		close(os->fd);
-	if (os->temp) {
-		unlink(os->temp);
-		g_free(os->temp);
-	}
 	g_free(os);
 }
 
@@ -209,11 +205,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (os->buf) {
 		g_free(os->buf);
 		os->buf = NULL;
-	}
-
-	if (os->temp) {
-		g_free(os->temp);
-		os->temp = NULL;
 	}
 
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
