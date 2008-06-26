@@ -40,13 +40,10 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
-
 #include "logging.h"
 #include "bluetooth.h"
 #include "obexd.h"
 #include "obex.h"
-
-#define CONFIG_FILE	"obex.conf"
 
 #define OPUSH_CHANNEL	9
 #define FTP_CHANNEL	10
@@ -57,6 +54,8 @@ static GMainLoop *main_loop = NULL;
 
 static int server_start(int service)
 {
+	/* FIXME: Necessary check enabled transports(Bluetooth/USB) */
+
 	switch (service) {
 	case OBEX_OPUSH:
 		bluetooth_init(OBEX_OPUSH, "OBEX OPUSH server",
@@ -89,15 +88,16 @@ static void usage(void)
 	printf("OBEX Server version %s\n\n", VERSION);
 
 	printf("Usage:\n"
-		"\tobexd [options] <--opush|--ftp>\n"
+		"\tobexd [options] <server>\n"
 		"\n");
 
 	printf("Options:\n"
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
-		"\t-o, --opush          Enable OPUSH service\n"
-		"\t-f, --ftp            Enable FTP service\n"
-		"\t-h, --help           Display help\n"
+		"\t-h, --help           Display help\n");
+	printf("Servers:\n"
+		"\t-o, --opush          Enable OPUSH server\n"
+		"\t-f, --ftp            Enable FTP server\n"
 		"\n");
 }
 
@@ -117,7 +117,6 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
 	int opt, detach = 1, debug = 0, opush = 0, ftp = 0;
-	gchar *config_file = NULL;
 
 	while ((opt = getopt_long(argc, argv, "+ndhof", options, NULL)) != EOF) {
 		switch(opt) {
@@ -143,6 +142,12 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	optind = 0;
+
+	if (!(opush || ftp)) {
+		fprintf(stderr, "No server selected (use either "
+					"--opp or --ftp or both)\n");
+		exit(1);
+	}
 
 	if (detach) {
 		if (daemon(0, 0)) {
@@ -194,9 +199,6 @@ int main(int argc, char *argv[])
 	server_stop();
 
 fail:
-	if (config_file)
-		g_free(config_file);
-
 	dbus_connection_unref(conn);
 
 	g_main_loop_unref(main_loop);
