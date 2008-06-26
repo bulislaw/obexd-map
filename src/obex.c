@@ -359,7 +359,8 @@ static gint obex_read(struct obex_session *os,
 
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
 	if (size <= 0) {
-		close(os->fd);
+		if (os->fd >= 0)
+			close(os->fd);
 		return 0;
 	}
 
