@@ -61,8 +61,8 @@ struct obex_session {
 	struct server *server;
 };
 
-gint obex_server_start(gint fd, gint mtu, struct server *server);
-gint obex_server_stop();
+gint obex_session_start(gint fd, struct server *server);
+gint obex_session_stop();
 
 gint opp_chkput(obex_t *obex, obex_object_t *obj);
 void opp_put(obex_t *obex, obex_object_t *obj);

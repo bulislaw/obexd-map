@@ -618,7 +618,7 @@ static gboolean obex_handle_input(GIOChannel *io,
 	return TRUE;
 }
 
-gint obex_server_start(gint fd, gint mtu, struct server *server)
+gint obex_session_start(gint fd, struct server *server)
 {
 	struct obex_session *os;
 	GIOChannel *io;
@@ -670,7 +670,7 @@ gint obex_server_start(gint fd, gint mtu, struct server *server)
 	return 0;
 }
 
-gint obex_server_stop()
+gint obex_session_stop()
 {
 	return 0;
 }

@@ -180,7 +180,7 @@ static gboolean connect_event(GIOChannel *io, GIOCondition cond, gpointer user_d
 	ba2str(&raddr.rc_bdaddr, address);
 	info("New connection from: %s channel: %d", address, raddr.rc_channel);
 
-	if (obex_server_start(nsk, 0, server) < 0)
+	if (obex_session_start(nsk, server) < 0)
 		close(nsk);
 
 	return TRUE;
