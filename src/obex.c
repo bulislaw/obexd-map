@@ -514,7 +514,7 @@ static gboolean check_put(obex_t *obex, obex_object_t *obj)
 	}
 
 	if (!os->cmds->chkput)
-		return;
+		goto done;
 
 	if (os->cmds->chkput(obex, obj) < 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
@@ -536,6 +536,7 @@ static gboolean check_put(obex_t *obex, obex_object_t *obj)
 		return FALSE;
 	}
 
+done:
 	os->checked = TRUE;
 
 	return TRUE;
