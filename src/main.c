@@ -96,10 +96,10 @@ static void usage(void)
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
 		"\t-r, --root <path>    Specify root folder location\n"
-		"\t-a, --auto-accept    Automatically accept OPUSH PUT requests\n"
+		"\t-a, --auto-accept    Automatically accept push requests\n"
 		"\t-h, --help           Display help\n");
 	printf("Servers:\n"
-		"\t-o, --opush          Enable OPUSH server\n"
+		"\t-o, --opp            Enable OPP server\n"
 		"\t-f, --ftp            Enable FTP server\n"
 		"\n");
 }
@@ -108,7 +108,7 @@ static struct option options[] = {
 	{ "nodaemon", 0, 0, 'n' },
 	{ "debug",    0, 0, 'd' },
 	{ "ftp",      0, 0, 'f' },
-	{ "opush",    0, 0, 'o' },
+	{ "opp",      0, 0, 'o' },
 	{ "help",     0, 0, 'h' },
 	{ "root",     1, 0, 'r' },
 	{ "auto-accept", 0, 0, 'a' },
