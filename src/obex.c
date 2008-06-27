@@ -323,7 +323,7 @@ static void cmd_setpath(struct obex_session *os,
 	os->cmds->setpath(obex, obj);
 }
 
-gint os_setup_by_name(struct obex_session *os, gchar *file)
+gboolean os_prepare_get(struct obex_session *os, gchar *file, guint32 *size)
 {
 	gint fd;
 	struct stat stats;
@@ -336,16 +336,20 @@ gint os_setup_by_name(struct obex_session *os, gchar *file)
 		goto fail;
 
 	os->fd = fd;
-	os->buf = g_new0(guint8, os->tx_mtu);
 	os->offset = 0;
 
-	return stats.st_size;
+	if (stats.st_size > 0)
+		os->buf = g_new0(guint8, os->tx_mtu);
+
+	*size = stats.st_size;
+
+	return TRUE;
 
 fail:
 	if (fd >= 0)
 		close(fd);
 
-	return 0;
+	return FALSE;
 }
 
 static gint obex_write(struct obex_session *os,

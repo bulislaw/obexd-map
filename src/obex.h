@@ -72,4 +72,4 @@ void ftp_get(obex_t *obex, obex_object_t *obj);
 void ftp_put(obex_t *obex, obex_object_t *obj);
 void ftp_setpath(obex_t *obex, obex_object_t *obj);
 
-gint os_setup_by_name(struct obex_session *os, gchar *file);
+gboolean os_prepare_get(struct obex_session *os, gchar *file, guint32 *size);

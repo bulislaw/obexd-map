@@ -52,21 +52,12 @@
 
 #define CAP_FILE CONFIGDIR "/capability.xml"
 
-static gint get_by_type(struct obex_session *os, gchar *type)
+static gboolean get_by_type(struct obex_session *os, gchar *type, guint32 *size)
 {
-	gint size = 0;
+	if (g_str_equal(type, CAP_TYPE))
+		return os_prepare_get(os, CAP_FILE, size);
 
-	if (!strcmp(type, CAP_TYPE)) {
-		size = os_setup_by_name(os, CAP_FILE);
-		if (!size)
-			goto fail;
-	} else
-		goto fail;
-
-	return size;
-
-fail:
-	return 0;
+	return FALSE;
 }
 
 void ftp_get(obex_t *obex, obex_object_t *obj)
@@ -83,16 +74,17 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 		goto fail;
 
 	if (os->name) {
+		gboolean ret;
 		gchar *path = g_build_filename(os->current_folder,
 						os->name, NULL);
-		size = os_setup_by_name(os, path);
+		ret = os_prepare_get(os, path, &size);
+
 		g_free(path);
 
-		if (!size)
+		if (!ret)
 			goto fail;
 	} else if (os->type) {
-		size = get_by_type(os, os->type);
-		if (!size)
+		if (!get_by_type(os, os->type, &size))
 			goto fail;
 	} else
 		goto fail;
@@ -102,8 +94,13 @@ void ftp_get(obex_t *obex, obex_object_t *obj)
 
 	/* Add body header */
 	hv.bs = NULL;
-	OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
-			hv, 0, OBEX_FL_STREAM_START);
+	if (size == 0)
+		OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+				hv, 0, OBEX_FL_FIT_ONE_PACKET);
+	else
+		OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+				hv, 0, OBEX_FL_STREAM_START);
+
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 			OBEX_RSP_SUCCESS);
 

@@ -142,7 +142,7 @@ void opp_get(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
 	obex_headerdata_t hv;
-	gint size;
+	guint32 size;
 
 	os = OBEX_GetUserData(obex);
 	if (os == NULL)
@@ -154,9 +154,8 @@ void opp_get(obex_t *obex, obex_object_t *obj)
 	if (os->type == NULL)
 		goto fail;
 
-	if (!strcmp(os->type, VCARD_TYPE)) {
-		size = os_setup_by_name(os, VCARD_FILE);
-		if (!size)
+	if (g_str_equal(os->type, VCARD_TYPE)) {
+		if (!os_prepare_get(os, VCARD_FILE, &size))
 			goto fail;
 	} else
 		goto fail;
@@ -167,8 +166,13 @@ void opp_get(obex_t *obex, obex_object_t *obj)
 
 	/* Add body header */
 	hv.bs = NULL;
-	OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+	if (size == 0)
+		OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
+				hv, 0, OBEX_FL_FIT_ONE_PACKET);
+	else
+		OBEX_ObjectAddHeader (obex, obj, OBEX_HDR_BODY,
 				hv, 0, OBEX_FL_STREAM_START);
+
 	OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE, OBEX_RSP_SUCCESS);
 
 	return;
