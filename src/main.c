@@ -52,18 +52,19 @@
 
 static GMainLoop *main_loop = NULL;
 
-static int server_start(int service, const char *root_path)
+static int server_start(int service, const char *root_path,
+			gboolean auto_accept)
 {
 	/* FIXME: Necessary check enabled transports(Bluetooth/USB) */
 
 	switch (service) {
 	case OBEX_OPUSH:
 		bluetooth_init(OBEX_OPUSH, "OBEX OPUSH server",
-				root_path, OPUSH_CHANNEL, TRUE);
+				root_path, OPUSH_CHANNEL, auto_accept);
 		break;
 	case OBEX_FTP:
 		bluetooth_init(OBEX_FTP, "OBEX FTP server",
-				root_path, FTP_CHANNEL, TRUE);
+				root_path, FTP_CHANNEL, auto_accept);
 		break;
 	default:
 		return -EINVAL;
@@ -95,6 +96,7 @@ static void usage(void)
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
 		"\t-r, --root <path>    Specify root folder location\n"
+		"\t-a, --auto-accept    Automatically accept OPUSH PUT requests\n"
 		"\t-h, --help           Display help\n");
 	printf("Servers:\n"
 		"\t-o, --opush          Enable OPUSH server\n"
@@ -109,6 +111,7 @@ static struct option options[] = {
 	{ "opush",    0, 0, 'o' },
 	{ "help",     0, 0, 'h' },
 	{ "root",     1, 0, 'r' },
+	{ "auto-accept", 0, 0, 'a' },
 	{ }
 };
 
@@ -118,10 +121,10 @@ int main(int argc, char *argv[])
 	DBusError err;
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
-	int opt, detach = 1, debug = 0, opush = 0, ftp = 0;
+	int opt, detach = 1, debug = 0, opush = 0, ftp = 0, auto_accept = 0;
 	const char *root_path = DEFAULT_ROOT_PATH;
 
-	while ((opt = getopt_long(argc, argv, "+ndhofr:", options, NULL)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "+ndhofr:a", options, NULL)) != EOF) {
 		switch(opt) {
 		case 'n':
 			detach = 0;
@@ -138,6 +141,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			root_path = optarg;
+			break;
+		case 'a':
+			auto_accept = 1;
 			break;
 		default:
 			usage();
@@ -185,10 +191,10 @@ int main(int argc, char *argv[])
 	}
 
 	if (opush)
-		server_start(OBEX_OPUSH, root_path);
+		server_start(OBEX_OPUSH, root_path, auto_accept);
 
 	if (ftp)
-		server_start(OBEX_FTP, root_path);
+		server_start(OBEX_FTP, root_path, auto_accept);
 
 	if (!manager_init(conn))
 		goto fail;
