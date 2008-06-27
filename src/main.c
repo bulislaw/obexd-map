@@ -48,22 +48,22 @@
 #define OPUSH_CHANNEL	9
 #define FTP_CHANNEL	10
 
-#define ROOT_PATH "/tmp"
+#define DEFAULT_ROOT_PATH "/tmp"
 
 static GMainLoop *main_loop = NULL;
 
-static int server_start(int service)
+static int server_start(int service, const char *root_path)
 {
 	/* FIXME: Necessary check enabled transports(Bluetooth/USB) */
 
 	switch (service) {
 	case OBEX_OPUSH:
 		bluetooth_init(OBEX_OPUSH, "OBEX OPUSH server",
-				ROOT_PATH, OPUSH_CHANNEL, TRUE);
+				root_path, OPUSH_CHANNEL, TRUE);
 		break;
 	case OBEX_FTP:
 		bluetooth_init(OBEX_FTP, "OBEX FTP server",
-				ROOT_PATH, FTP_CHANNEL, TRUE);
+				root_path, FTP_CHANNEL, TRUE);
 		break;
 	default:
 		return -EINVAL;
@@ -94,6 +94,7 @@ static void usage(void)
 	printf("Options:\n"
 		"\t-n, --nodaemon       Don't fork daemon to background\n"
 		"\t-d, --debug          Enable output of debug information\n"
+		"\t-r, --root <path>    Specify root folder location\n"
 		"\t-h, --help           Display help\n");
 	printf("Servers:\n"
 		"\t-o, --opush          Enable OPUSH server\n"
@@ -107,6 +108,7 @@ static struct option options[] = {
 	{ "ftp",      0, 0, 'f' },
 	{ "opush",    0, 0, 'o' },
 	{ "help",     0, 0, 'h' },
+	{ "root",     1, 0, 'r' },
 	{ }
 };
 
@@ -117,8 +119,9 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int log_option = LOG_NDELAY | LOG_PID;
 	int opt, detach = 1, debug = 0, opush = 0, ftp = 0;
+	const char *root_path = DEFAULT_ROOT_PATH;
 
-	while ((opt = getopt_long(argc, argv, "+ndhof", options, NULL)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "+ndhofr:", options, NULL)) != EOF) {
 		switch(opt) {
 		case 'n':
 			detach = 0;
@@ -132,6 +135,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			ftp = 1;
+			break;
+		case 'r':
+			root_path = optarg;
 			break;
 		default:
 			usage();
@@ -179,10 +185,10 @@ int main(int argc, char *argv[])
 	}
 
 	if (opush)
-		server_start(OBEX_OPUSH);
+		server_start(OBEX_OPUSH, root_path);
 
 	if (ftp)
-		server_start(OBEX_FTP);
+		server_start(OBEX_FTP, root_path);
 
 	if (!manager_init(conn))
 		goto fail;
