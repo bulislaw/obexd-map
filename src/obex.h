@@ -59,6 +59,7 @@ struct obex_session {
 	const guint8	*target;
 	struct obex_commands *cmds;
 	struct server *server;
+	gboolean	checked;
 };
 
 gint obex_session_start(gint fd, struct server *server);

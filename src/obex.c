@@ -257,19 +257,6 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	os->cmds->get(obex, obj);
 }
 
-static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
-{
-	if (!os->cmds->put) {
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
-				OBEX_RSP_NOT_IMPLEMENTED);
-		return;
-	}
-
-	g_return_if_fail(chk_cid(obex, obj, os->cid));
-
-	os->cmds->put(obex, obj);
-}
-
 static void cmd_setpath(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
@@ -446,7 +433,7 @@ static gint obex_read(struct obex_session *os,
 	return 0;
 }
 
-static void check_put(obex_t *obex, obex_object_t *obj)
+static gboolean check_put(obex_t *obex, obex_object_t *obj)
 {
 	struct obex_session *os;
 	struct statvfs buf;
@@ -523,7 +510,7 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 				OBEX_RSP_BAD_REQUEST);
 		g_free(os->type);
 		os->type = NULL;
-		return;
+		return FALSE;
 	}
 
 	if (!os->cmds->chkput)
@@ -531,14 +518,14 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 
 	if (os->cmds->chkput(obex, obj) < 0) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
-		return;
+		return FALSE;
 	}
 
 	if (fstatvfs(os->fd, &buf) < 0) {
 		int err = errno;
 		error("fstatvfs(): %s(%d)", strerror(err), err);
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
-		return;
+		return FALSE;
 	}
 
 	free = buf.f_bsize * buf.f_bavail;
@@ -546,8 +533,30 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 	if (os->size > free) {
 		debug("Free disk space not available");
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
+		return FALSE;
+	}
+
+	os->checked = TRUE;
+
+	return TRUE;
+}
+
+static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
+{
+	if (!os->cmds->put) {
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_NOT_IMPLEMENTED,
+				OBEX_RSP_NOT_IMPLEMENTED);
 		return;
 	}
+
+	g_return_if_fail(chk_cid(obex, obj, os->cid));
+
+	if (!os->checked) {
+		if (!check_put(obex, obj))
+			return;
+	}
+
+	os->cmds->put(obex, obj);
 }
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
@@ -580,6 +589,8 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQHINT:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
+			os = OBEX_GetUserData(obex);
+			os->checked = FALSE;
 			OBEX_ObjectReadStream(obex, obj, NULL);
 		case OBEX_CMD_GET:
 		case OBEX_CMD_SETPATH:
