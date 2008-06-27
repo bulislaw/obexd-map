@@ -99,8 +99,10 @@ skip_auth:
 
 	emit_transfer_started(os->cid);
 
-	if (!os->buf)
+	if (!os->buf) {
+		debug("PUT request authorized, no buffered data");
 		return 0;
+	}
 
 	while (len < os->offset) {
 		gint w;

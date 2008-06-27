@@ -354,6 +354,7 @@ static gint obex_write(struct obex_session *os,
 	len = read(os->fd, os->buf, os->tx_mtu);
 	if (len < 0) {
 		gint err = errno;
+		error("read(): %s (%d)", strerror(err), err);
 		g_free(os->buf);
 		return -err;
 	}
@@ -383,17 +384,9 @@ static gint obex_read(struct obex_session *os,
 	const guint8 *buffer;
 
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
-	if (size <= 0) {
-		if (os->fd >= 0) {
-			emit_transfer_completed(os->cid,
-						os->offset == os->size);
-			close(os->fd);
-			os->fd = -1;
-		}
-		g_free(os->buf);
-		os->buf = NULL;
-		os->offset = 0;
-		return 0;
+	if (size < 0) {
+		error("Error on OBEX stream");
+		return -EIO;
 	}
 
 	if (size > os->rx_mtu) {
@@ -401,7 +394,7 @@ static gint obex_read(struct obex_session *os,
 		return -EIO;
 	}
 
-	if (os->fd < 0) {
+	if (os->fd < 0 && size > 0) {
 		if (os->buf) {
 			error("Got more data but there is still a pending buffer");
 			return -EIO;
@@ -409,7 +402,10 @@ static gint obex_read(struct obex_session *os,
 
 		os->buf = g_malloc0(os->rx_mtu);
 		memcpy(os->buf, buffer, size);
-		os->offset += size;
+		os->offset = size;
+
+		debug("Stored %u bytes into temporary buffer", size);
+
 		return 0;
 	}
 
@@ -583,6 +579,15 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 			break;
 		case OBEX_CMD_PUT:
 		case OBEX_CMD_GET:
+			emit_transfer_completed(os->cid,
+						os->offset == os->size);
+			if (os->fd >= 0) {
+				close(os->fd);
+				os->fd = -1;
+			}
+			g_free(os->buf);
+			os->buf = NULL;
+			os->offset = 0;
 			break;
 		default:
 			break;
@@ -643,8 +648,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		if (obex_read(os, obex, obj) < 0) {
 			debug("error obex_read()");
 			OBEX_CancelRequest(obex, 1);
-			emit_transfer_completed(os->cid,
-						os->offset == os->size);
 		}
 
 		break;
