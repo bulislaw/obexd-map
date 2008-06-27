@@ -566,9 +566,10 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 
 	obex_debug(evt, cmd, rsp);
 
+	os = OBEX_GetUserData(obex);
+
 	switch (evt) {
 	case OBEX_EV_PROGRESS:
-		os = OBEX_GetUserData(obex);
 		emit_transfer_progress(os->cid, os->size, os->offset);
 		break;
 	case OBEX_EV_ABORT:
@@ -589,7 +590,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQHINT:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
-			os = OBEX_GetUserData(obex);
 			os->checked = FALSE;
 			OBEX_ObjectReadStream(obex, obj, NULL);
 		case OBEX_CMD_GET:
@@ -608,7 +608,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 	case OBEX_EV_REQCHECK:
 		switch (cmd) {
 		case OBEX_CMD_PUT:
-			os = OBEX_GetUserData(obex);
 			if (os->cmds->put)
 				check_put(obex, obj);
 			break;
@@ -617,7 +616,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		}
 		break;
 	case OBEX_EV_REQ:
-		os = OBEX_GetUserData(obex);
 		switch (cmd) {
 		case OBEX_CMD_DISCONNECT:
 			break;
@@ -641,7 +639,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 		}
 		break;
 	case OBEX_EV_STREAMAVAIL:
-		os = OBEX_GetUserData(obex);
 		if (obex_read(os, obex, obj) < 0) {
 			debug("error obex_read()");
 			OBEX_CancelRequest(obex, 1);
@@ -651,7 +648,6 @@ static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
 
 		break;
 	case OBEX_EV_STREAMEMPTY:
-		os = OBEX_GetUserData(obex);
 		obex_write(os, obex, obj);
 		break;
 	case OBEX_EV_LINKERR:
