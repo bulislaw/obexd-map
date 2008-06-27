@@ -66,8 +66,11 @@ gint opp_chkput(obex_t *obex, obex_object_t *obj)
 		goto skip_auth;
 
 	time = 0;
-	ret = request_authorization(os->cid, OBEX_GetFD(obex), os->name,
-				os->type, os->size, time, &new_folder, &new_name);
+	ret = request_authorization(os->cid, OBEX_GetFD(obex),
+					os->name ? os->name : "",
+					os->type ? os->type : "",
+					os->size, time, &new_folder,
+				       	&new_name);
 
 	if (ret < 0)
 		return -EPERM;
