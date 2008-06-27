@@ -175,11 +175,11 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, guint32 cid)
 		}
 	}
 
+	OBEX_ObjectReParseHeaders(obex, obj);
+
 	if (ret == FALSE)
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SERVICE_UNAVAILABLE,
 				OBEX_RSP_SERVICE_UNAVAILABLE);
-	else
-		OBEX_ObjectReParseHeaders(obex, obj);
 
 	return ret;
 }
@@ -512,6 +512,8 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		}
 	}
 
+	OBEX_ObjectReParseHeaders(obex, obj);
+
 	if (!os->name) {
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_BAD_REQUEST,
 				OBEX_RSP_BAD_REQUEST);
@@ -542,8 +544,6 @@ static void check_put(obex_t *obex, obex_object_t *obj)
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return;
 	}
-
-	OBEX_ObjectReParseHeaders(obex, obj);
 }
 
 static void obex_event(obex_t *obex, obex_object_t *obj, gint mode,
