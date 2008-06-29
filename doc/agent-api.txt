@@ -15,7 +15,7 @@ Object path	freely definable
 
 Methods
 		string Authorize(object session, string bt_address, string name,
-					string type, int length, int time)
+					string type, int32 length, int32 time)
 
 			This method gets called when the service daemon
 			needs to accept/reject a Bluetooth object push request.
