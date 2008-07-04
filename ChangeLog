@@ -1,2 +1,7 @@
+ver 0.2:
+	Add folder listing support.
+	Add D-Bus session interface.
+	Check for dbus_watch_get_unix_fd function.
+
 ver 0.1:
 	Initial public release.
