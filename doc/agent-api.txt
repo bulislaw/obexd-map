@@ -14,7 +14,7 @@ Interface	org.openobex.Agent
 Object path	freely definable
 
 Methods
-		string Authorize(object session, string bt_address, string name,
+		string Authorize(object transfer, string bt_address, string name,
 					string type, int32 length, int32 time)
 
 			This method gets called when the service daemon
