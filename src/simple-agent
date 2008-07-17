@@ -2,47 +2,146 @@
 
 import gobject
 
-import sys
 import dbus
 import dbus.service
 import dbus.mainloop.glib
 
 class Agent(dbus.service.Object):
+	def __init__(self, transfer_list, conn=None, obj_path=None, bus_name=None):
+		dbus.service.Object.__init__(self, conn, obj_path, bus_name)
+		self.pending_auth = False
+		self.transfers = transfer_list
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="osssii", out_signature="s")
-	def Authorize(self, path, device, filename, type, length, time):
+	def Authorize(self, dpath, device, filename, ftype, length, time):
+		self.pending_auth = True
 		print "Authorize (%s, %s, %s) Y/n" % (path, device, filename)
-		auth = raw_input()
+		auth = raw_input().strip("\n ")
 
 		if auth == "n" or auth == "N":
-			raise dbus.DBusException("org.openobex.Error.Rejected: Not Autorized")
+			self.pending_auth = False
+			raise dbus.DBusException("org.openobex.Error.Rejected: "
+									"Not Autorized")
 
-		print "Location/file name:"
-
-		return raw_input()
+		print "Full filename (including path):"
+		self.pending_auth = False
+		self.transfers.new_transfer(dpath, filename, 0, length)
+		return raw_input().strip("\n ")
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="", out_signature="")
 	def Cancel(self):
-		print "Cancel"
+		print "Authorization Canceled"
+		self.pending_auth = False
+
+
+class Transfer(object):
+	def __init__(self, dpath, filename=None, transfered=-1, size=-1):
+		self.dpath = dpath
+		self.filename = filename
+		self.transfered = transfered
+		self.size = size
+
+	def update(self, filename=None, transfered=-1, total=-1):
+		if filename:
+			self.filename = filename
+		self.transfered = transfered
+		self.size = total
+
+	def cancel(self):
+		transfer_iface = dbus.Interface(bus.get_object("org.openobex",
+														self.dpath),
+										"org.openobex.Transfer")
+		transfer_iface.Cancel()
+
+	def __str__(self):
+		p = float(self.transfered) / float(self.size) * 100
+		return "%s (%s) - %d of %d bytes (%.2f%%)" % (self.filename, self.dpath,
+												self.transfered, self.size, p)
+
+	__repr__ = __str__
+
+
+class Transfers(object):
+	def __init__(self):
+		self.transfers = []
+
+	def active(self):
+		return len(self.transfers) > 0
+
+	def new_transfer(self, dpath, filename, transfered, total):
+		for i in self.transfers:
+			if i.dpath == dpath:
+				return i
+		new = Transfer(dpath, filename, transfered, total)
+		self.transfers.append(new)
+		return new
+
+	def remove(self, dpath):
+		l = [t for t in self.transfers if t.dpath != dpath]
+		self.transfers = l
+
+	def progress(self, dpath, filename, transfered, total):
+		s = []
+		for o in self.transfers:
+			if o.dpath == dpath:
+				o.update(filename, transfered, total)
+			print o
+
 
 if __name__ == '__main__':
+
+	def new_transfer(dpath):
+		print "new transfer"
+		bus.add_signal_receiver(progress,
+								dbus_interface="org.openobex.Transfer",
+								signal_name="Progress",
+								path_keyword="dpath")
+
+	def transfer_completed(dpath, success):
+		print "transfer completed => %s" % (success and "Success" or "Fail")
+		transfers.remove(dpath)
+
+	def progress(total, current, dpath):
+		transfers.progress(dpath, None, current, total)
+
+
 	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 	bus = dbus.SessionBus()
 	manager = dbus.Interface(bus.get_object("org.openobex", "/"),
 							"org.openobex.Manager")
+	transfers = Transfers()
+
+	bus.add_signal_receiver(new_transfer,
+							dbus_interface="org.openobex.Manager",
+							signal_name="TransferStarted")
+
+	bus.add_signal_receiver(transfer_completed,
+							dbus_interface="org.openobex.Manager",
+							signal_name="TransferCompleted")
 
 	path = "/test/agent"
-	agent = Agent(bus, path)
+	agent = Agent(transfers, bus, path, "org.openobex.Agent")
 
 	mainloop = gobject.MainLoop()
 
 	manager.RegisterAgent(path)
 	print "Agent registered"
 
-	mainloop.run()
+	cont = True
+	while cont:
+		try:
+			mainloop.run()
+		except KeyboardInterrupt:
+			if agent.pending_auth:
+				agent.Cancel()
+			elif transfers.active():
+				for a in transfers.transfers:
+					a.cancel()
+			else:
+				cont = False
 
 	# manager.UnregisterAgent(path)
 	# print "Agent unregistered"
