@@ -1,3 +1,8 @@
+ver 0.3:
+	Add support for dynamic capability file.
+	Removing incomplete files on error.
+	Multiple bug fixes.
+
 ver 0.2:
 	Add folder listing support.
 	Add D-Bus session interface.
