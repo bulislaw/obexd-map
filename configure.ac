@@ -96,5 +96,5 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 	fi
 ])
 
-AC_OUTPUT(Makefile gdbus/Makefile src/Makefile test/Makefile doc/Makefile
-						src/org.openobex.service)
+AC_OUTPUT(Makefile gdbus/Makefile src/Makefile plugins/Makefile
+			test/Makefile doc/Makefile src/org.openobex.service)
