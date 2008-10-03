@@ -9,4 +9,4 @@ fi
 		--enable-debug \
 		--prefix=/usr \
 		--mandir=/usr/share/man \
-		--sysconfdir=/etc
+		--sysconfdir=/etc $*

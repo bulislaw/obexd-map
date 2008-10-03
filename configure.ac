@@ -72,7 +72,6 @@ PKG_CHECK_MODULES(DBUS, dbus-1, dummy=yes,
 AC_CHECK_LIB(dbus-1, dbus_watch_get_unix_fd, dummy=yes,
 	AC_DEFINE(NEED_DBUS_WATCH_GET_UNIX_FD, 1,
 		[Define to 1 if you need the dbus_watch_get_unix_fd() function.]))
-
 AC_SUBST(DBUS_CFLAGS)
 AC_SUBST(DBUS_LIBS)
 
@@ -98,6 +97,18 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 		CFLAGS="$CFLAGS -g -O0"
 	fi
 ])
+
+AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
+				[disable compilation of OBEX server]), [
+	enable_server=${enableval}
+])
+AM_CONDITIONAL(SERVER, test "${enable_server}" != "no")
+
+AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-client],
+				[disable compilation of OBEX client]), [
+	enable_client=${enableval}
+])
+AM_CONDITIONAL(CLIENT, test "${enable_client}" != "no")
 
 AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile
 		plugins/Makefile client/Makefile test/Makefile doc/Makefile

@@ -1,7 +1,8 @@
 
-servicedir = $(datarootdir)/dbus-1/services
-
+if SERVER
 confdir = $(sysconfdir)/obex
+
+servicedir = $(datarootdir)/dbus-1/services
 
 service_DATA = org.openobex.service
 
@@ -13,6 +14,7 @@ obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c \
 
 obexd_LDADD = @GDBUS_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
 					@OPENOBEX_LIBS@ @BLUEZ_LIBS@
+endif
 
 if MAINTAINER_MODE
 plugindir = $(abs_top_srcdir)/plugins
