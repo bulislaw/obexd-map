@@ -1,0 +1,22 @@
+OBEX client API description
+***************************
+
+Copyright (C) 2007-2008  Marcel Holtmann <marcel@holtmann.org>
+
+
+Client hierarchy
+================
+
+Service		org.openobex.client
+Interface	org.openobex.Client
+Object path	/
+
+Methods		object CreateSession(dict settings)
+
+		object PushFile(dict settings, string filename, object agent)
+
+Settings	string Target
+
+		string Source
+
+		string Destination
