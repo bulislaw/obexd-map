@@ -89,6 +89,9 @@ AC_SUBST(BLUEZ_LIBS)
 AC_SUBST([GDBUS_CFLAGS], ['-I$(top_srcdir)/gdbus'])
 AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.a'])
 
+AC_SUBST([GWOBEX_CFLAGS], ['-I$(top_srcdir)/gwobex'])
+AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.a'])
+
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 			[enable compiling with debugging information]), [
 	if (test "${enableval}" = "yes" && test "${ac_cv_prog_cc_g}" = "yes"); then
@@ -96,5 +99,6 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 	fi
 ])
 
-AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile plugins/Makefile
-			test/Makefile doc/Makefile src/org.openobex.service)
+AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile
+		plugins/Makefile client/Makefile test/Makefile doc/Makefile
+		src/org.openobex.service client/org.openobex.client.service)

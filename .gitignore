@@ -17,3 +17,5 @@ autom4te.cache
 
 src/org.openobex.service
 src/obexd
+client/org.openobex.client.service
+client/obex-client
