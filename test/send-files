@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+
+class Agent(dbus.service.Object):
+	def __init__(self, conn=None, obj_path=None, bus_name=None):
+		dbus.service.Object.__init__(self, conn, obj_path, bus_name)
+
+	@dbus.service.method("org.openobex.Agent",
+					in_signature="o", out_signature="s")
+	def Request(self, transfer):
+		return ""
+
+	@dbus.service.method("org.openobex.Agent",
+					in_signature="ot", out_signature="")
+	def Progress(self, transfer, transferred):
+		return
+
+	@dbus.service.method("org.openobex.Agent",
+					in_signature="o", out_signature="")
+	def Complete(self, transfer):
+		return
+
+if __name__ == '__main__':
+	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+	bus = dbus.SessionBus()
+	client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+							"org.openobex.Client")
+
+	if (len(sys.argv) < 3):
+		print "Usage: %s <device> <file> [file*]" % (sys.argv[0])
+		sys.exit(1)
+
+	path = "/test/agent"
+	agent = Agent(bus, path, "org.openobex.Agent")
+
+	mainloop = gobject.MainLoop()
+
+	client.SendFiles({ "Destination": sys.argv[1] }, sys.argv[2:], path)
