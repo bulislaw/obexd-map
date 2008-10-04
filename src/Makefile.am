@@ -4,9 +4,11 @@ confdir = $(sysconfdir)/obex
 
 servicedir = $(datarootdir)/dbus-1/services
 
-service_DATA = org.openobex.service
+service_in_files = obexd.service.in
 
-bin_PROGRAMS = obexd
+service_DATA = $(service_in_files:.service.in=.service)
+
+libexec_PROGRAMS = obexd
 
 obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c \
 		logging.h logging.c obex.h obex.c opp.c ftp.c \
@@ -26,6 +28,11 @@ AM_CFLAGS = @OPENOBEX_CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 			@BLUEZ_CFLAGS@ @DBUS_CFLAGS@ @GDBUS_CFLAGS@ \
 					-DPLUGINDIR=\""$(plugindir)"\"
 
-EXTRA_DIST = simple-agent
+CLEANFILES = $(service_DATA)
+
+EXTRA_DIST = $(service_in_files)
 
 MAINTAINERCLEANFILES = Makefile.in
+
+%.service: %.service.in ../config.log
+	sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
