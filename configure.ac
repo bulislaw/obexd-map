@@ -112,4 +112,4 @@ AM_CONDITIONAL(CLIENT, test "${enable_client}" != "no")
 
 AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile
 		plugins/Makefile client/Makefile test/Makefile doc/Makefile
-		src/org.openobex.service client/org.openobex.client.service)
+						src/org.openobex.service)
