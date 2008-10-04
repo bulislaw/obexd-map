@@ -1,4 +1,4 @@
 
-EXTRA_DIST = send-files
+EXTRA_DIST = send-files simple-agent
 
 MAINTAINERCLEANFILES = Makefile.in
