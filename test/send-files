@@ -13,17 +13,26 @@ class Agent(dbus.service.Object):
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="o", out_signature="s")
-	def Request(self, transfer):
+	def Request(self, path):
+		print "Transfer started"
+		transfer = dbus.Interface(bus.get_object("org.openobex.client",
+						path), "org.openobex.Transfer")
+		properties = transfer.GetProperties()
+		for key in properties.keys():
+			print "  %s = %s" % (key, properties[key])
 		return ""
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="ot", out_signature="")
-	def Progress(self, transfer, transferred):
+	def Progress(self, path, transferred):
+		print "Transfer progress (%d bytes)" % (transferred)
 		return
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="o", out_signature="")
-	def Complete(self, transfer):
+	def Complete(self, path):
+		print "Transfer finished"
+		mainloop.quit()
 		return
 
 if __name__ == '__main__':
@@ -43,3 +52,5 @@ if __name__ == '__main__':
 	mainloop = gobject.MainLoop()
 
 	client.SendFiles({ "Destination": sys.argv[1] }, sys.argv[2:], path)
+
+	mainloop.run()
