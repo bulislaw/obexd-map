@@ -15,7 +15,7 @@ missing
 stamp-h1
 autom4te.cache
 
-src/org.openobex.service
 src/obexd
-client/org.openobex.client.service
+src/obexd.service
 client/obex-client
+client/obex-client.service
