@@ -8,5 +8,6 @@ fi
     ./configure --enable-maintainer-mode \
 		--enable-debug \
 		--prefix=/usr \
+		--libexec=/usr/lib \
 		--mandir=/usr/share/man \
 		--sysconfdir=/etc $*
