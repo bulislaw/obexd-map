@@ -34,5 +34,7 @@ EXTRA_DIST = $(service_in_files)
 
 MAINTAINERCLEANFILES = Makefile.in
 
+AUTOMAKE_OPTIONS = -Wno-portability
+
 %.service: %.service.in ../config.log
 	sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
