@@ -15,7 +15,7 @@ In order to compile OBEX daemons you need following software packages:
 	- Bluetooth library
 
 To configure run:
-	./configure --prefix=/usr --libexecdir=/usr/lib \
+	./configure --prefix=/usr --libexecdir=/usr/lib/obex \
 				--mandir=/usr/share/man --sysconfdir=/etc
  
 Configure automatically searches for all required components and packages. 

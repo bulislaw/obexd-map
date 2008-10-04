@@ -8,6 +8,6 @@ fi
     ./configure --enable-maintainer-mode \
 		--enable-debug \
 		--prefix=/usr \
-		--libexec=/usr/lib \
+		--libexec=/usr/lib/obex \
 		--mandir=/usr/share/man \
 		--sysconfdir=/etc $*
