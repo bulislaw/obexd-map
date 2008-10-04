@@ -104,7 +104,7 @@ AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
 ])
 AM_CONDITIONAL(SERVER, test "${enable_server}" != "no")
 
-AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-client],
+AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 				[disable compilation of OBEX client]), [
 	enable_client=${enableval}
 ])
