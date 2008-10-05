@@ -15,13 +15,39 @@ Methods		void SendFiles(dict device, array{string} files, object agent)
 
 			Send one or multiple local files to the specified
 			device. The device is configured via properties. At
-			least the Source property should be specified.
+			least the Destination property should be specified.
+
+		object CreateSession(dict device)
+
+			Create a new OBEX session. The device is configured
+			via properties like in SendFiles.
 
 Properties	string Target
 
 		string Source
 
 		string Destination
+
+
+Session hierarchy
+=================
+
+Service		org.openobex.client
+Interface	org.openobex.Session
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		dict GetProperties()
+
+			Returns all properties for the session.
+
+		void AssignAgent(object agent)
+
+			Assign an OBEX agent to this session. This allows
+			detailed progress reports about the transactions.
+
+		void ReleaseAgent(object agent)
+
+			Release a previously assigned OBEX agent.
 
 
 Transfer hierarchy
