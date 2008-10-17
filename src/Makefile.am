@@ -12,7 +12,7 @@ libexec_PROGRAMS = obexd
 
 obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c \
 		logging.h logging.c obex.h obex.c opp.c ftp.c \
-		bluetooth.h bluetooth.c dbus.h
+		bluetooth.h bluetooth.c phonebook.h phonebook.c dbus.h
 
 obexd_LDADD = @GDBUS_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
 					@OPENOBEX_LIBS@ @BLUEZ_LIBS@
