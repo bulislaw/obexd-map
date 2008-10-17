@@ -1,3 +1,10 @@
+ver 0.6:
+	Use BlueZ service for FTP authorization.
+	Use BlueZ service for service records.
+	Never send an OBEX abort for a server.
+	Set buffer to NULL after freeing it.
+	Include the correct COPYING file.
+
 ver 0.5:
 	Add initial obex-client support.
 	Add missing API documenation.
