@@ -66,7 +66,7 @@ AC_CHECK_LIB(dl, dlopen, dummy=yes,
 			AC_MSG_ERROR(dynamic linking loader is required))
 
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16, dummy=yes,
-				AC_MSG_ERROR(libglib-2.16 or later is required))
+				AC_MSG_ERROR(libglib 2.16 or later is required))
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 
@@ -88,10 +88,6 @@ PKG_CHECK_MODULES(BLUEZ, bluez, dummy=yes,
 AC_SUBST(BLUEZ_CFLAGS)
 AC_SUBST(BLUEZ_LIBS)
 
-PKG_CHECK_MODULES(EBOOK, libebook-1.2, ebook_found=yes, ebook_found=no)
-AC_SUBST(EBOOK_CFLAGS)
-AC_SUBST(EBOOK_LIBS)
-
 AC_SUBST([GDBUS_CFLAGS], ['-I$(top_srcdir)/gdbus'])
 AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.a'])
 
@@ -109,7 +105,22 @@ AC_ARG_ENABLE(ebook, AC_HELP_STRING([--enable-ebook],
 				[enable EBook plugin]), [
 	enable_ebook=${enableval}
 ])
-AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes" && test "${ebook_found}" = "yes")
+AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes")
+
+if (test "${enable_ebook}" = "yes"); then
+	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
+
+	PKG_CHECK_MODULES(EBOOK, libebook-1.2, dummy=yes,
+					AC_MSG_ERROR(libebook is required))
+	AC_SUBST(EBOOK_CFLAGS)
+	AC_SUBST(EBOOK_LIBS)
+
+	PKG_CHECK_MODULES(GTHREAD, gthread-2.0, dummy=yes,
+					AC_MSG_ERROR(libgthread is required))
+
+	GLIB_CFLAGS="$GLIB_CFLAGS $GTHREAD_CFLAGS"
+	GLIB_LIBS="$GLIB_LIBS $GTHREAD_LIBS"
+fi
 
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
 				[disable compilation of OBEX server]), [
