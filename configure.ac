@@ -32,7 +32,12 @@ AC_LANG_C
 AC_PROG_CC
 AC_PROG_CC_PIE
 AC_PROG_INSTALL
-AC_PROG_RANLIB
+
+m4_define([_LT_AC_TAGCONFIG], [])
+m4_ifdef([AC_LIBTOOL_TAGS], [AC_LIBTOOL_TAGS([])])
+
+AC_DISABLE_STATIC
+AC_PROG_LIBTOOL
 
 AC_CACHE_CHECK(for tm_gmtoff in struct tm, ac_cv_struct_tm_gmtoff,
 	AC_TRY_COMPILE([
@@ -85,6 +90,10 @@ PKG_CHECK_MODULES(BLUEZ, bluez, dummy=yes,
 AC_SUBST(BLUEZ_CFLAGS)
 AC_SUBST(BLUEZ_LIBS)
 
+PKG_CHECK_MODULES(EBOOK, libebook-1.2, ebook_found=yes, ebook_found=no)
+AC_SUBST(EBOOK_CFLAGS)
+AC_SUBST(EBOOK_LIBS)
+
 AC_SUBST([GDBUS_CFLAGS], ['-I$(top_srcdir)/gdbus'])
 AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.a'])
 
@@ -97,6 +106,12 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 		CFLAGS="$CFLAGS -g -O0"
 	fi
 ])
+
+AC_ARG_ENABLE(ebook, AC_HELP_STRING([--enable-ebook],
+				[enable EBook plugin]), [
+	enable_ebook=${enableval}
+])
+AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes" && test "${ebook_found}" = "yes")
 
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
 				[disable compilation of OBEX server]), [

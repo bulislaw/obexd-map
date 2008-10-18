@@ -19,7 +19,7 @@ obexd_LDADD = @GDBUS_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
 endif
 
 if MAINTAINER_MODE
-plugindir = $(abs_top_srcdir)/plugins
+plugindir = $(abs_top_srcdir)/plugins/.libs
 else
 plugindir = $(libdir)/obex/plugins
 endif

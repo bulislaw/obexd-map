@@ -10,4 +10,5 @@ fi
 		--prefix=/usr \
 		--libexec=/usr/lib/obex \
 		--mandir=/usr/share/man \
-		--sysconfdir=/etc $*
+		--sysconfdir=/etc \
+		--enable-ebook $*
