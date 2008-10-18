@@ -109,6 +109,7 @@ AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes")
 
 if (test "${enable_ebook}" = "yes"); then
 	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
+	AC_DEFINE(GW_OBEX_THREADS_ENABLED, 1, [Define for gwobex threading])
 
 	PKG_CHECK_MODULES(EBOOK, libebook-1.2, dummy=yes,
 					AC_MSG_ERROR(libebook is required))
