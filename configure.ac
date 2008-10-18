@@ -62,15 +62,13 @@ if (test "$ac_cv_var_timezone" = "yes"); then
 	AC_DEFINE(HAVE_TIMEZONE, 1, [Define if libc defines a timezone variable])
 fi
 
+AC_CHECK_LIB(dl, dlopen, dummy=yes,
+			AC_MSG_ERROR(dynamic linking loader is required))
+
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16, dummy=yes,
 				AC_MSG_ERROR(libglib-2.16 or later is required))
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
-
-PKG_CHECK_MODULES(GMODULE, gmodule-2.0, dummy=yes,
-				AC_MSG_ERROR(libgmodule is required))
-AC_SUBST(GMODULE_CFLAGS)
-AC_SUBST(GMODULE_LIBS)
 
 PKG_CHECK_MODULES(DBUS, dbus-1, dummy=yes,
 				AC_MSG_ERROR(libdbus-1 is required))
