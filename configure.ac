@@ -118,8 +118,8 @@ if (test "${enable_ebook}" = "yes"); then
 	PKG_CHECK_MODULES(GTHREAD, gthread-2.0, dummy=yes,
 					AC_MSG_ERROR(libgthread is required))
 
-	GLIB_CFLAGS="$GLIB_CFLAGS $GTHREAD_CFLAGS"
-	GLIB_LIBS="$GLIB_LIBS $GTHREAD_LIBS"
+	GLIB_CFLAGS="$GTHREAD_CFLAGS"
+	GLIB_LIBS="$GTHREAD_LIBS"
 fi
 
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
