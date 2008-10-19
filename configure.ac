@@ -89,10 +89,10 @@ AC_SUBST(BLUEZ_CFLAGS)
 AC_SUBST(BLUEZ_LIBS)
 
 AC_SUBST([GDBUS_CFLAGS], ['-I$(top_srcdir)/gdbus'])
-AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.a'])
+AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.la'])
 
 AC_SUBST([GWOBEX_CFLAGS], ['-I$(top_srcdir)/gwobex'])
-AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.a'])
+AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.la'])
 
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 			[enable compiling with debugging information]), [
