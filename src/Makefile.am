@@ -14,8 +14,8 @@ obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c \
 		logging.h logging.c obex.h obex.c opp.c ftp.c pbap.c \
 		bluetooth.h bluetooth.c phonebook.h phonebook.c dbus.h
 
-obexd_LDADD = @GDBUS_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
-				@OPENOBEX_LIBS@ @BLUEZ_LIBS@ -ldl
+obexd_LDADD = @GDBUS_LIBS@ @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
+					@OPENOBEX_LIBS@ @BLUEZ_LIBS@ -ldl
 
 obexd_LDFLAGS = -Wl,--export-dynamic
 endif
@@ -26,9 +26,9 @@ else
 plugindir = $(libdir)/obex/plugins
 endif
 
-AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @GLIB_CFLAGS@ \
-				@DBUS_CFLAGS@ @GDBUS_CFLAGS@ \
-					-DPLUGINDIR=\""$(plugindir)"\"
+AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ \
+		@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ @GDBUS_CFLAGS@ \
+						-DPLUGINDIR=\""$(plugindir)"\"
 
 CLEANFILES = $(service_DATA)
 

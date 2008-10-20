@@ -109,7 +109,6 @@ AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes")
 
 if (test "${enable_ebook}" = "yes"); then
 	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
-	AC_DEFINE(GW_OBEX_THREADS_ENABLED, 1, [Define for gwobex threading])
 
 	PKG_CHECK_MODULES(EBOOK, libebook-1.2, dummy=yes,
 					AC_MSG_ERROR(libebook is required))
@@ -118,9 +117,8 @@ if (test "${enable_ebook}" = "yes"); then
 
 	PKG_CHECK_MODULES(GTHREAD, gthread-2.0, dummy=yes,
 					AC_MSG_ERROR(libgthread is required))
-
-	GLIB_CFLAGS="$GTHREAD_CFLAGS"
-	GLIB_LIBS="$GTHREAD_LIBS"
+	AC_SUBST(GTHREAD_CFLAGS)
+	AC_SUBST(GTHREAD_LIBS)
 fi
 
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
