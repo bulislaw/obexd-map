@@ -34,7 +34,59 @@
 
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
+#include <bluetooth/sdp.h>
+#include <bluetooth/sdp_lib.h>
 #include <gw-obex.h>
+
+enum {
+	CONNECT,
+	PULLPHONEBOOK,
+};
+
+static int sdp_search(const bdaddr_t *src, const bdaddr_t *dst,
+					uint16_t uuid, uint8_t *channel)
+{
+	sdp_session_t *session;
+	sdp_list_t *search, *attributes, *rsp;
+	uuid_t svclass;
+	uint16_t attr;
+	int err;
+
+	session = sdp_connect(src, dst, SDP_WAIT_ON_CLOSE);
+	if (session == NULL)
+		return -1;
+
+	sdp_uuid16_create(&svclass, uuid);
+	search = sdp_list_append(NULL, &svclass);
+
+	attr = SDP_ATTR_PROTO_DESC_LIST;
+	attributes = sdp_list_append(NULL, &attr);
+
+	err = sdp_service_search_attr_req(session, search,
+				SDP_ATTR_REQ_INDIVIDUAL, attributes, &rsp);
+	if (err < 0) {
+		sdp_close(session);
+		return -1;
+	}
+
+	for (; rsp; rsp = rsp->next) {
+		sdp_record_t *rec = (sdp_record_t *) rsp->data;
+		sdp_list_t *protos;
+
+		if (!sdp_get_access_protos(rec, &protos)) {
+			uint8_t ch = sdp_get_proto_port(protos, RFCOMM_UUID);
+			if (ch > 0) {
+				*channel = ch;
+				sdp_close(session);
+				return 0;
+			}
+		}
+	}
+
+	sdp_close(session);
+
+	return -1;
+}
 
 static int rfcomm_connect(const bdaddr_t *src, const bdaddr_t *dst,
 							uint8_t channel)
@@ -72,7 +124,9 @@ static gchar *option_device = NULL;
 static gint option_channel = 0;
 static gboolean option_ftp = FALSE;
 static gboolean option_pbap = FALSE;
-static gchar **option_addresses = NULL;
+
+static gchar *option_connect = NULL;
+static gchar *option_pullphonebook = NULL;
 
 static GOptionEntry options[] = {
 	{ "device", 'i', 0, G_OPTION_ARG_STRING, &option_device,
@@ -83,8 +137,12 @@ static GOptionEntry options[] = {
 				"Use File Transfer target" },
 	{ "pbap", 'p', 0, G_OPTION_ARG_NONE, &option_pbap,
 				"Use Phonebook Access target" },
-	{ G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY,
-					&option_addresses, NULL, "address" },
+
+	{ "connect", 0, 0, G_OPTION_ARG_STRING, &option_connect,
+				"Connect remote OBEX session", "DEV" },
+	{ "pullphonebook", 0, 0, G_OPTION_ARG_STRING, &option_pullphonebook,
+				"Pull phonebook from remote device", "DEV" },
+
 	{ NULL },
 };
 
@@ -96,9 +154,12 @@ int main(int argc, char *argv[])
 	int sk;
 
 	GwObex *obex;
+	uint16_t uuid = OBEX_OBJPUSH_SVCLASS_ID;
+	uint8_t channel;
 	gchar *buf;
-	const gchar *uuid = NULL;
-	gint error, buf_len, uuid_len = 0;
+	const gchar *target = NULL;
+	gint error, buf_len, target_len = 0;
+	int mode;
 
 	context = g_option_context_new(NULL);
 	g_option_context_add_main_entries(context, options, NULL);
@@ -120,62 +181,70 @@ int main(int argc, char *argv[])
 	} else
 		bacpy(&src, BDADDR_ANY);
 
-	if (option_channel < 1)
-		option_channel = 11;
+	bacpy(&dst, BDADDR_ANY);
 
-	if (option_addresses == NULL) {
-		fprintf(stderr, "Failed to specify destination address\n");
+	if (option_connect != NULL) {
+		str2ba(option_connect, &dst);
+		g_free(option_connect);
+		mode = CONNECT;
+	}
+
+	if (option_pullphonebook != NULL) {
+		str2ba(option_pullphonebook, &dst);
+		g_free(option_pullphonebook);
+		mode = PULLPHONEBOOK;
+		option_pbap = TRUE;
+	}
+
+	if (option_ftp == TRUE) {
+		uuid = OBEX_FILETRANS_SVCLASS_ID;
+		target = OBEX_FTP_UUID;
+		target_len = OBEX_FTP_UUID_LEN;
+	}
+
+	if (option_pbap == TRUE) {
+		uuid = PBAP_PSE_SVCLASS_ID;
+		target = OBEX_PBAP_UUID;
+		target_len = OBEX_PBAP_UUID_LEN;
+	}
+
+	if (bacmp(&dst, BDADDR_ANY) == 0) {
+		fprintf(stderr, "Failed to provide action with address\n");
 		exit(1);
 	}
 
-	str2ba(option_addresses[0], &dst);
-	g_strfreev(option_addresses);
+	if (option_channel < 1) {
+		if (sdp_search(&src, &dst, uuid, &channel) < 0) {
+			fprintf(stderr, "Failed to get RFCOMM channel\n");
+			exit(1);
+		}
+	} else
+		channel = option_channel;
 
-	sk = rfcomm_connect(&src, &dst, option_channel);
+	sk = rfcomm_connect(&src, &dst, channel);
 	if (sk < 0) {
 		fprintf(stderr, "Failed to connect RFCOMM channel\n");
 		exit(1);
 	}
 
-	if (option_ftp == TRUE) {
-		uuid = OBEX_FTP_UUID;
-		uuid_len = OBEX_FTP_UUID_LEN;
-	}
-
-	if (option_pbap == TRUE) {
-		uuid = OBEX_PBAP_UUID;
-		uuid_len = OBEX_PBAP_UUID_LEN;
-	}
-
-	obex = gw_obex_setup_fd(sk, uuid, uuid_len, NULL, &error);
+	obex = gw_obex_setup_fd(sk, target, target_len, NULL, &error);
 	if (obex == NULL) {
 		fprintf(stderr, "Failed to create OBEX session\n");
 		close(sk);
 		exit(1);
 	}
 
-	if (option_ftp == FALSE && option_pbap == FALSE) {
-		if (gw_obex_get_buf(obex, NULL, "x-obex/capability",
-					&buf, &buf_len, &error) == TRUE) {
-			printf("%s\n", buf);
-			g_free(buf);
-		}
-	}
+	switch (mode) {
+	case CONNECT:
+		break;
 
-	if (option_ftp == TRUE) {
-		if (gw_obex_get_buf(obex, NULL, "x-obex/folder-listing",
-					&buf, &buf_len, &error) == TRUE) {
-			printf("%s\n", buf);
-			g_free(buf);
-		}
-	}
-
-	if (option_pbap == TRUE) {
+	case PULLPHONEBOOK:
 		if (gw_obex_get_buf(obex, "telecom/pb.vcf", "x-bt/phonebook",
 					&buf, &buf_len, &error) == TRUE) {
 			printf("%s\n", buf);
 			g_free(buf);
 		}
+		break;
 	}
 
 	gw_obex_close(obex);
