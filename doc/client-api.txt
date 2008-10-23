@@ -49,6 +49,57 @@ Methods		dict GetProperties()
 
 			Release a previously assigned OBEX agent.
 
+File Transfer hierarchy
+=================
+
+Service		org.openobex.client
+Interface	org.openobex.FileTransfer
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void ChangeFolder(string folder)
+
+			Change the remote device's current folder.
+
+		void CreateFolder(string folder)
+
+			Create a new folder in the remote device.
+
+		array{dict} ListFolder(string folder)
+
+			Returns a dictionary containing the specified folder
+			content. "" and "." represents the current folder.
+
+			Dictionary key | type:
+			"Name" | string: Object name in UTF-8 format
+			"Type" | string: folder of file type
+			"Permission" | string: group, owner and other permission
+			"Size" | integer:  object size or number of items for folders
+			"Modified" | string: Last change
+			"Accessed" | string: Last access
+			"Created" | string: Creation date
+
+		void GetFile(string targetfile, string sourcefile)
+
+			Copy the source file(remote) to the target file(local).
+			A new Transfer object is created to represent this transaction.
+
+		void PutFile(string sourcefile, string targetfile)
+
+			Copy the source file(local) to the target file(remote).
+			A new Transfer object is created to represent this transaction.
+
+		void CopyFile(string sourcefile, string targetfile)
+
+			Copy the source file(remote) to the target in the remote device.
+
+		void MoveFile(string sourcefile, string targetfile)
+
+			Move the source file to the target in the remote device.
+
+		void Delete(string file)
+
+			Deletes the specified file/folder.
+
 
 Transfer hierarchy
 ==================
