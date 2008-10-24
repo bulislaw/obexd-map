@@ -126,6 +126,10 @@ Methods		dict GetProperties()
 			Returns all properties for the transfer. See the
 			properties section for available properties.
 
+		void Cancel()
+
+			Cancels this transfer.
+
 Properties	string Name [read-only]
 
 			Name of the transferred object.
