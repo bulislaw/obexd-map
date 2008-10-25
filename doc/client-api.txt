@@ -17,6 +17,11 @@ Methods		void SendFiles(dict device, array{string} files, object agent)
 			device. The device is configured via properties. At
 			least the Destination property should be specified.
 
+		void PullBusinessCard(dict device, string file)
+
+			Request the business card from a remote device and
+			store it in the local file.
+
 		object CreateSession(dict device)
 
 			Create a new OBEX session. The device is configured
