@@ -22,6 +22,12 @@ Methods		void SendFiles(dict device, array{string} files, object agent)
 			Request the business card from a remote device and
 			store it in the local file.
 
+		void ExchangeBusinessCards(dict device, string clientfile, string file)
+
+			Push the client's business card to the remote device
+			and then retrieve the remote business card and store
+			it in a local file.
+
 		object CreateSession(dict device)
 
 			Create a new OBEX session. The device is configured
