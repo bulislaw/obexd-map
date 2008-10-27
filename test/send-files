@@ -8,8 +8,8 @@ import dbus.service
 import dbus.mainloop.glib
 
 class Agent(dbus.service.Object):
-	def __init__(self, conn=None, obj_path=None, bus_name=None):
-		dbus.service.Object.__init__(self, conn, obj_path, bus_name)
+	def __init__(self, conn=None, obj_path=None):
+		dbus.service.Object.__init__(self, conn, obj_path)
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="o", out_signature="s")
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 		sys.exit(1)
 
 	path = "/test/agent"
-	agent = Agent(bus, path, "org.openobex.Agent")
+	agent = Agent(bus, path)
 
 	mainloop = gobject.MainLoop()
 
