@@ -76,13 +76,10 @@ Methods		void ChangeFolder(string folder)
 
 			Create a new folder in the remote device.
 
-		array{dict} ListFolder(string folder)
+		array{dict} ListFolder()
 
 			Returns a dictionary containing information about
-			the specified folder content.
-
-			For listing the current folder, "" and "." can be
-			used as parameter.
+			the current folder content.
 
 			The following keys are defined:
 
