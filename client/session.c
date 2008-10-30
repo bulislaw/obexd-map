@@ -650,6 +650,146 @@ static GDBusMethodTable session_methods[] = {
 	{ }
 };
 
+static void append_variant(DBusMessageIter *iter, int type, void *val)
+{
+	DBusMessageIter value;
+	char sig[2] = { type, '\0' };
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, sig, &value);
+
+	dbus_message_iter_append_basic(&value, type, val);
+
+	dbus_message_iter_close_container(iter, &value);
+}
+
+static void dict_append_entry(DBusMessageIter *dict,
+			const char *key, int type, void *val)
+{
+	DBusMessageIter entry;
+
+	if (type == DBUS_TYPE_STRING) {
+		const char *str = *((const char **) val);
+		if (str == NULL)
+			return;
+	}
+
+	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY,
+							NULL, &entry);
+
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+
+	append_variant(&entry, type, val);
+
+	dbus_message_iter_close_container(dict, &entry);
+}
+
+static void xml_element(GMarkupParseContext *ctxt,
+			const gchar *element,
+			const gchar **names,
+			const gchar **values,
+			gpointer user_data,
+			GError **gerr)
+{
+	DBusMessageIter dict, *iter = user_data;
+	gchar *key;
+	gint i, dtype = DBUS_TYPE_STRING;
+
+	if (strcasecmp("folder", element) != 0 && strcasecmp("file", element) != 0)
+		return;
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
+			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
+			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &dict);
+
+	dict_append_entry(&dict, "Type", DBUS_TYPE_STRING, &element);
+
+	/* FIXME: User, Group, Other permission must be reviewed */
+
+	i = 0;
+	for (key = (gchar *) names[i]; key; key = (gchar *) names[++i]) {
+		key[0] = g_ascii_toupper(key[0]);
+		if (strcmp("Accessed", key) == 0 ||
+			strcmp("Created", key) == 0 ||
+			strcmp("Modified", key)== 0 ||
+			strcmp("Size", key)== 0)
+			dtype = DBUS_TYPE_UINT64;
+
+		dict_append_entry(&dict, key, dtype, &values[i]);
+	}
+
+	dbus_message_iter_close_container(iter, &dict);
+}
+
+static const GMarkupParser parser = {
+	xml_element,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
+static void list_folder_callback(struct session_data *session,
+					void *user_data)
+{
+	GMarkupParseContext *ctxt;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	reply = dbus_message_new_method_return(session->msg);
+
+	if (session->filled == 0)
+		goto done;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	ctxt = g_markup_parse_context_new(&parser, 0, &iter, NULL);
+	g_markup_parse_context_parse(ctxt, session->buffer,
+					session->filled, NULL);
+	g_markup_parse_context_free(ctxt);
+
+	session->filled = 0;
+
+done:
+	g_dbus_send_message(session->conn, reply);
+	dbus_message_unref(session->msg);
+	session->msg = NULL;
+}
+
+static void get_xfer_progress(GwObexXfer *xfer, gpointer user_data)
+{
+	struct callback_data *callback = user_data;
+	struct session_data *session = callback->session;
+	gint bsize, bread;
+	gboolean ret;
+
+	/* FIXME: Check buffer overflow */
+	bsize = sizeof(session->buffer) - session->filled;
+	ret = gw_obex_xfer_read(xfer, session->buffer + session->filled,
+					bsize, &bread, NULL);
+	session->filled += bread;
+	if (ret == FALSE)
+		goto complete;
+
+	if (bread == gw_obex_xfer_object_size(xfer))
+		goto complete;
+
+	gw_obex_xfer_flush(xfer, NULL);
+
+	return;
+
+complete:
+	gw_obex_xfer_close(xfer, NULL);
+	gw_obex_xfer_free(xfer);
+	callback->session->xfer = NULL;
+
+	callback->func(callback->session, callback->data);
+
+	session_unref(callback->session);
+
+	g_free(callback);
+}
+
 static DBusMessage *change_folder(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
@@ -681,7 +821,48 @@ static DBusMessage *create_folder(DBusConnection *connection,
 static DBusMessage *list_folder(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
-	return dbus_message_new_method_return(message);
+	struct session_data *session = user_data;
+	struct callback_data *callback;
+	GwObexXfer *xfer;
+	int err;
+
+	if (session->msg)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InProgress",
+				"Transfer in progress");
+
+	if (session->obex == NULL)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"Not connected");
+
+	session_ref(session);
+	xfer = gw_obex_get_async(session->obex,
+			NULL, "x-obex/folder-listing", &err);
+	if (xfer == NULL) {
+		session_unref(session);
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				OBEX_ResponseToString(err));
+	}
+
+	callback = g_try_malloc0(sizeof(*callback));
+	if (callback == NULL) {
+		session_unref(session);
+		gw_obex_xfer_free(xfer);
+		return NULL;
+	}
+
+	session->msg = dbus_message_ref(message);
+	session->filled = 0;
+	callback->session = session;
+	callback->func = list_folder_callback;
+
+	gw_obex_xfer_set_callback(xfer, get_xfer_progress, callback);
+
+	session->xfer = xfer;
+
+	return NULL;
 }
 
 static DBusMessage *get_file(DBusConnection *connection,
@@ -733,7 +914,8 @@ static DBusMessage *delete(DBusConnection *connection,
 static GDBusMethodTable ftp_methods[] = {
 	{ "ChangeFolder",	"s", "",	change_folder	},
 	{ "CreateFolder",	"s", "",	create_folder	},
-	{ "ListFolder",		"s", "aa{sv}",	list_folder	},
+	{ "ListFolder",		"", "aa{sv}",	list_folder,
+						G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetFile",		"ss", "",	get_file	},
 	{ "PutFile",		"ss", "",	put_file	},
 	{ "CopyFile",		"ss", "",	copy_file	},
@@ -900,34 +1082,6 @@ int session_send(struct session_data *session, const char *filename,
 	g_dbus_send_message(session->conn, message);
 
 	return 0;
-}
-
-static void get_xfer_progress(GwObexXfer *xfer, gpointer user_data)
-{
-	struct callback_data *callback = user_data;
-	char buf[1024];
-	gint len;
-
-	if (gw_obex_xfer_read(xfer, buf, sizeof(buf), &len, NULL) == FALSE)
-		goto complete;
-
-	if (len == gw_obex_xfer_object_size(xfer))
-		goto complete;
-
-	gw_obex_xfer_flush(xfer, NULL);
-
-	return;
-
-complete:
-	gw_obex_xfer_close(xfer, NULL);
-	gw_obex_xfer_free(xfer);
-	callback->session->xfer = NULL;
-
-	callback->func(callback->session, callback->data);
-
-	session_unref(callback->session);
-
-	g_free(callback);
 }
 
 int session_pull(struct session_data *session,
