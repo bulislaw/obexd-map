@@ -35,6 +35,12 @@ class Agent(dbus.service.Object):
 		return
 
 	@dbus.service.method("org.openobex.Agent",
+					in_signature="os", out_signature="")
+	def Error(self, path, error):
+		print "Transfer finished with an error: %s" % (error)
+		return
+
+	@dbus.service.method("org.openobex.Agent",
 					in_signature="", out_signature="")
 	def Release(self):
 		mainloop.quit()

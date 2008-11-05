@@ -183,3 +183,10 @@ Methods		void Release()
 			argument for convenience.
 
 		void Complete(object transfer)
+
+			Informs that the transfer has completed sucessfully.
+
+                void Error(object transfer, string message)
+
+			Informs that the transfer has been terminated because
+			of some error.
