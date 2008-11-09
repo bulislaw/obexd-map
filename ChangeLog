@@ -1,3 +1,10 @@
+ver 0.7:
+	Fix issue with transfers larger than session buffer size.
+	Fix various memory leaks within session handling.
+	Add support for OBEX client session interface.
+	Add support for File Transfer client interface.
+	Add support for using the any adapter object path.
+
 ver 0.6:
 	Use BlueZ service for FTP authorization.
 	Use BlueZ service for service records.
