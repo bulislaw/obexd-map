@@ -60,6 +60,14 @@ Methods		dict GetProperties()
 
 			Release a previously assigned OBEX agent.
 
+Properties	string Source [read-only]
+
+		string Destination [read-only]
+
+		string AgentPath [read-only]
+
+			Object Path of the assigned agent. This property will
+			not be present if there is no assigned agent.
 
 File Transfer hierarchy
 =======================
@@ -146,6 +154,10 @@ Properties	string Name [read-only]
 
 			Size of the transferred object. If the size is
 			unknown, then this property will not be present.
+
+		string Filename [read-only]
+
+			Complete name of the file being received or sent.
 
 
 Agent hierarchy
