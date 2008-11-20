@@ -1,3 +1,10 @@
+ver 0.8:
+	Fix memory leaks with asynchronous operations.
+	Fix issues with handling larger MTU sizes.
+	Fix session and client disconnect handling.
+	Add basic Nokia PC Suite support.
+	Add support for reinitializing TTY server.
+
 ver 0.7:
 	Fix issue with transfers larger than session buffer size.
 	Fix various memory leaks within session handling.
