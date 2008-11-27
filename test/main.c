@@ -41,6 +41,7 @@
 enum {
 	CONNECT,
 	PULLPHONEBOOK,
+	PULLVCARDLISTING,
 };
 
 static int sdp_search(const bdaddr_t *src, const bdaddr_t *dst,
@@ -122,17 +123,22 @@ static int rfcomm_connect(const bdaddr_t *src, const bdaddr_t *dst,
 
 static gchar *option_device = NULL;
 static gint option_channel = 0;
+static gchar *option_path = NULL;
 static gboolean option_ftp = FALSE;
 static gboolean option_pbap = FALSE;
 
 static gchar *option_connect = NULL;
 static gchar *option_pullphonebook = NULL;
+static gchar *option_setphonebook = NULL;
+static gchar *option_pullvcardlisting = NULL;
 
 static GOptionEntry options[] = {
 	{ "device", 'i', 0, G_OPTION_ARG_STRING, &option_device,
 				"Specify local device interface", "DEV" },
-	{ "channel", 'P', 0, G_OPTION_ARG_INT, &option_channel,
-				"Specify remote RFCOMM channel", "PORT" },
+	{ "channel", 'C', 0, G_OPTION_ARG_INT, &option_channel,
+				"Specify remote RFCOMM channel", "CHANNEL" },
+	{ "path", 'P', 0, G_OPTION_ARG_STRING, &option_path,
+				"Specify initial path to set", "PATH" },
 	{ "ftp", 'f', 0, G_OPTION_ARG_NONE, &option_ftp,
 				"Use File Transfer target" },
 	{ "pbap", 'p', 0, G_OPTION_ARG_NONE, &option_pbap,
@@ -142,6 +148,10 @@ static GOptionEntry options[] = {
 				"Connect remote OBEX session", "DEV" },
 	{ "pullphonebook", 0, 0, G_OPTION_ARG_STRING, &option_pullphonebook,
 				"Pull phonebook from remote device", "DEV" },
+	{ "setphonebook", 0, 0, G_OPTION_ARG_STRING, &option_setphonebook,
+				"Select phonebook on remote device", "DEV" },
+	{ "pullvcardlisting", 0, 0, G_OPTION_ARG_STRING, &option_pullvcardlisting,
+				"Pull vCard listing from remote device", "DEV" },
 
 	{ NULL },
 };
@@ -196,6 +206,24 @@ int main(int argc, char *argv[])
 		option_pbap = TRUE;
 	}
 
+	if (option_setphonebook != NULL) {
+		str2ba(option_setphonebook, &dst);
+		g_free(option_setphonebook);
+		mode = CONNECT;
+		option_pbap = TRUE;
+		if (option_path == NULL)
+			option_path = g_strdup("telecom");
+	}
+
+	if (option_pullvcardlisting != NULL) {
+		str2ba(option_pullvcardlisting, &dst);
+		g_free(option_pullvcardlisting);
+		mode = PULLVCARDLISTING;
+		option_pbap = TRUE;
+		//if (option_path == NULL)
+		//	option_path = g_strdup("telecom");
+	}
+
 	if (option_ftp == TRUE) {
 		uuid = OBEX_FILETRANS_SVCLASS_ID;
 		target = OBEX_FTP_UUID;
@@ -234,15 +262,45 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if (option_path != NULL) {
+		if (gw_obex_chdir(obex, option_path, &error) == FALSE) {
+			fprintf(stderr, "Failed to change directory\n");
+			gw_obex_close(obex);
+			close(sk);
+			exit(1);
+		}
+	}
+
 	switch (mode) {
 	case CONNECT:
 		break;
 
 	case PULLPHONEBOOK:
-		if (gw_obex_get_buf(obex, "telecom/pb.vcf", "x-bt/phonebook",
+		{
+		unsigned char apparam[] = { 0x04, 0x02, 0xff, 0xff };
+		//unsigned char apparam[] = { 0x04, 0x02, 0x00, 0x00 };
+
+		if (gw_obex_get_buf_with_apparam(obex,
+					"telecom/pb.vcf", "x-bt/phonebook",
+					apparam, sizeof(apparam),
 					&buf, &buf_len, &error) == TRUE) {
-			printf("%s\n", buf);
-			g_free(buf);
+			//printf("%s\n", buf);
+			//g_free(buf);
+		}
+		}
+		break;
+
+	case PULLVCARDLISTING:
+		{
+		unsigned char apparam[] = { 0x04, 0x02, 0xff, 0xff };
+
+		if (gw_obex_get_buf_with_apparam(obex,
+					"", "x-bt/vcard-listing",
+					apparam, sizeof(apparam),
+					&buf, &buf_len, &error) == TRUE) {
+			//printf("%s\n", buf);
+			//g_free(buf);
+		}
 		}
 		break;
 	}
@@ -250,6 +308,8 @@ int main(int argc, char *argv[])
 	gw_obex_close(obex);
 
 	close(sk);
+
+	g_free(option_path);
 
 	return 0;
 }
