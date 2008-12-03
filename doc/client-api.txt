@@ -130,6 +130,92 @@ Methods		void ChangeFolder(string folder)
 			Deletes the specified file/folder.
 
 
+Phonebook Access hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.PhonebookAccess
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void Select(string location, string phonebook)
+
+			Select the phonebook object for other operations. Should
+			be call before all the other operations.
+
+			location : Where the phonebook is stored, possible inputs :
+				"INT" ( "INTERNAL" which is default )
+				"SIM" ( "SIM1" )
+				"SIM2"
+				...
+
+			phonebook : Possible inputs :
+				"pb" :	phonebook for the saved contacts
+				"ich":	incoming call history
+				"och":	outgoing call history
+				"mch":	missing call history
+				"cch":	combination of ich och mch
+
+		string PullAll()
+
+			Return the entire phonebook object from the PSE server
+			in plain string with vcard format.
+
+		array{string vcard, string name} List()
+
+			Return an array of vcard-listing data which contains the
+			vcard : name paired string, for example "1.vcf" : "John".
+
+		string Pull(string vcard)
+
+			Retrieve the vcard in the current phonebook object
+			for example : Pull("0.vcf")
+
+		array{string vcard, string name}
+		Search(string field, string value)
+
+			Return an array of vcard-listing data which contains the
+			vcard : name paired string match the search condition.
+
+			field : the field in the vcard to search with
+				{ "name" (default) | "number" | "sound" }
+			value : the string value to search for
+
+		uint16 GetSize()
+
+			Return the number of the non-null entries in the selected
+			phonebook object.
+
+		void SetFormat(string format)
+
+			Indicate the format of the vcard that should be return by
+			related methods.
+
+			format : { "vcard21" (default) | "vcard30" }
+
+		void SetOrder(string order)
+
+			Indicate the sorting method of the vcard-listing data returned
+			by List and Search methods.
+
+			order : { "indexed" (default) | "alphanumeric" | "phonetic" }
+
+		void SetFilters(array{string})
+
+			Indicate fields that should be contained in vcards return by
+			related methods.
+
+			Give an empty array will clear the filter and return all fields
+			available in vcards. And this is the default behavior.
+
+		array{string} ListAllFilters()
+
+			Return All Available fields that can be used in SetFilter method.
+
+		array{string} GetFilters()
+
+			Return the current filter setting
+
+
 Transfer hierarchy
 ==================
 
