@@ -199,17 +199,33 @@ Methods		void Select(string location, string phonebook)
 
 			order : { "indexed" (default) | "alphanumeric" | "phonetic" }
 
-		void SetFilters(array{string})
+		void AddFilter(string filter)
 
-			Indicate fields that should be contained in vcards return by
+			Add a field that should be contained in vcards return by
 			related methods.
 
-			Give an empty array will clear the filter and return all fields
+			If filter List is empty, will return all fields
 			available in vcards. And this is the default behavior.
+
+			filter : { "VERSION" | "FN" | ... | "ALL" | "bit[0-63]" }
+
+			Full list of the available filters can be retrived by
+			ListAllFilters.
+
+			"ALL" will set the internal filter to 0xFFFFFFFF, and "bitxx" will
+			set the corresponding bit, this will allow advanced user to set
+			proprietary bits according to their needs.
+
+		void Removefilter(string filter)
+
+			Remove the field from the filter list
+
+			filter : See AddFilter
 
 		array{string} ListAllFilters()
 
-			Return All Available fields that can be used in SetFilter method.
+			Return All Available fields that can be used in AddFilter /
+			RemoveFilter method.
 
 		array{string} GetFilters()
 
