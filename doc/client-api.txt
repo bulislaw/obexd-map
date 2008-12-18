@@ -199,7 +199,7 @@ Methods		void Select(string location, string phonebook)
 
 			order : { "indexed" (default) | "alphanumeric" | "phonetic" }
 
-		void SetFilters(array{string})
+		void SetFilter(array{string})
 
 			Indicate fields that should be contained in vcards return by
 			related methods.
@@ -207,13 +207,13 @@ Methods		void Select(string location, string phonebook)
 			Give an empty array will clear the filter and return all fields
 			available in vcards. And this is the default behavior.
 
-			Possible filter strings : "VERSION", "FN", ..., "ALL", "bit[0-63]"
+			Possible filter fields : "VERSION", "FN", ..., "ALL", "bit[0-63]"
 
-		array{string} ListAllFilters()
+		array{string} ListFilterFields()
 
-			Return All Available fields that can be used in SefFilters method.
+			Return All Available fields that can be used in SefFilter method.
 
-		array{string} GetFilters()
+		array{string} GetFilter()
 
 			Return the current filter setting
 
