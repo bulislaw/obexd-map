@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+import sys
+import dbus
+
+if __name__ == '__main__':
+
+	bus = dbus.SessionBus()
+	client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+				"org.openobex.Client")
+
+	print "Creating Session"
+	session_path = client.CreateSession({"Destination": sys.argv[1], "Target": "PBAP"})
+	pbap = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+				"org.openobex.PhonebookAccess")
+	session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+				"org.openobex.Session")
+
+	print "\n--- Select Phonebook internal:pb ---\n"
+	pbap.Select("int", "pb")
+
+	print "\n--- PullAll ---\n"
+	ret = pbap.PullAll()
+	print "%s" % (ret)
+
+	print "\n--- GetSize ---\n"
+	ret = pbap.GetSize()
+	print "Size = %d\n" % (ret)
+
+	print "\n--- List vCard ---\n"
+	ret = pbap.List()
+	for item in ret:
+		print "%s : %s" % (item[0], item[1])
+
+	if len(ret) > 0:
+		print "\n--- Pull First Available vCard ---\n"
+		ret = pbap.Pull(ret[0][0])
+		print "%s" % (ret)
+
+	print "\n--- List All Available Filter Fields ---\n"
+	ret = pbap.ListFilterFields()
+	for item in ret:
+		print "%s" % (item)
