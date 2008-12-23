@@ -23,9 +23,7 @@ fi
 AC_DEFINE_UNQUOTED(CONFIGDIR, "${configdir}",
 				[Directory for the configuration files])
 
-if (test "${CFLAGS}" = ""); then
-	CFLAGS="-Wall -O2"
-fi
+COMPILER_FLAGS
 
 AC_LANG_C
 
@@ -97,7 +95,7 @@ AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.la'])
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 			[enable compiling with debugging information]), [
 	if (test "${enableval}" = "yes" && test "${ac_cv_prog_cc_g}" = "yes"); then
-		CFLAGS="$CFLAGS -g -O0 -Werror"
+		CFLAGS="$CFLAGS -g -O0"
 	fi
 ])
 
