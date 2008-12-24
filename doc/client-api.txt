@@ -33,6 +33,10 @@ Methods		void SendFiles(dict device, array{string} files, object agent)
 			Create a new OBEX session. The device is configured
 			via properties like in SendFiles.
 
+		string GetCapabilities(dict device)
+
+			Get remote device capabilities.
+
 Properties	string Target
 
 		string Source
