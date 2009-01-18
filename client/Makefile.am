@@ -8,7 +8,7 @@ service_DATA = $(service_in_files:.service.in=.service)
 
 libexec_PROGRAMS = obex-client
 
-obex_client_SOURCES = main.c session.h session.c pbap.h pbap.c
+obex_client_SOURCES = main.c session.h session.c pbap.h pbap.c sync.h sync.c
 
 obex_client_LDADD = @GWOBEX_LIBS@ @GDBUS_LIBS@ @GLIB_LIBS@ @DBUS_LIBS@ \
 						@OPENOBEX_LIBS@ @BLUEZ_LIBS@

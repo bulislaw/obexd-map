@@ -221,6 +221,31 @@ Methods		void Select(string location, string phonebook)
 
 			Return the current filter setting
 
+Synchronization hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.Synchronization
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void SetLocation(string location)
+
+			Set the phonebook object store location for other operations. Should
+			be called before all the other operations.
+
+			location: Where the phonebook is stored, possible values:
+				"INT" ( "INTERNAL" which is default )
+				"SIM1"
+				"SIM2"
+				......
+
+		string GetPhonebook()
+
+			retrieve an entire Phonebook Object store from remote device
+
+		void PutPhonebook(string obj)
+
+			send an entire Phonebook Object store to remote device
 
 Transfer hierarchy
 ==================
