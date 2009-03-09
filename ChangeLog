@@ -1,3 +1,12 @@
+ver 0.9:
+	Fix O_NOCTTY issue when opening TTY device.
+	Add support for verbose compiler warnings.
+	Add support for application parameters.
+	Add support for generic GetCapabilities command.
+	Add initial support for Synchronization profile.
+	Add basic implementation of Phonebook Access profile.
+	Add basic Phonebook Access client support.
+
 ver 0.8:
 	Fix memory leaks with asynchronous operations.
 	Fix issues with handling larger MTU sizes.
