@@ -11,8 +11,9 @@ ebook_la_LIBADD = @EBOOK_LIBS@
 ebook_la_CFLAGS = @EBOOK_CFLAGS@
 endif
 
-AM_LDFLAGS = -no-undefined -module -avoid-version \
-				-export-symbols-regex obex_plugin_desc
+AM_LDFLAGS = -no-undefined -module -avoid-version
+
+AM_CFLAGS = -fvisibility=hidden
 
 INCLUDES = -I$(top_srcdir)/src
 
