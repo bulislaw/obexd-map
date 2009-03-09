@@ -8,7 +8,7 @@ plugin_LTLIBRARIES += ebook.la
 
 ebook_la_SOURCES = ebook.c
 ebook_la_LIBADD = @EBOOK_LIBS@
-ebook_la_CFLAGS = @EBOOK_CFLAGS@
+ebook_la_CFLAGS = $(AM_CFLAGS) @EBOOK_CFLAGS@
 endif
 
 AM_LDFLAGS = -no-undefined -module -avoid-version
