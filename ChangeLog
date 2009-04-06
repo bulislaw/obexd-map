@@ -1,3 +1,11 @@
+ver 0.10:
+	Fix showing symlinks as files.
+	Fix error codes on OBEX get operations.
+	Fix "not found" error for delete operations.
+	Fix NULL pointer usage of 'nonnull' parameter.
+	Fix TTY handling with PC Suite mode.
+	Fix D-Bus NameOwnerChanged watch handling.
+
 ver 0.9:
 	Fix O_NOCTTY issue when opening TTY device.
 	Add support for verbose compiler warnings.
