@@ -42,6 +42,7 @@ enum {
 	CONNECT,
 	PULLPHONEBOOK,
 	PULLVCARDLISTING,
+	INVALID
 };
 
 static int sdp_search(const bdaddr_t *src, const bdaddr_t *dst,
@@ -169,7 +170,7 @@ int main(int argc, char *argv[])
 	gchar *buf;
 	const gchar *target = NULL;
 	gint error, buf_len, target_len = 0;
-	int mode;
+	int mode = INVALID;
 
 	context = g_option_context_new(NULL);
 	g_option_context_add_main_entries(context, options, NULL);
