@@ -1,3 +1,9 @@
+ver 0.11:
+	Fix bug when canceling an authorization request.
+	Fix broken handling of successful received D-Bus reply.
+	Fix broken escape handling for filenames.
+	Fix blocking issue with opened TTY.
+
 ver 0.10:
 	Fix showing symlinks as files.
 	Fix error codes on OBEX get operations.
