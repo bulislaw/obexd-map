@@ -92,6 +92,9 @@ AC_SUBST([GDBUS_LIBS], ['$(top_builddir)/gdbus/libgdbus.la'])
 AC_SUBST([GWOBEX_CFLAGS], ['-I$(top_srcdir)/gwobex'])
 AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.la'])
 
+AC_SUBST([BTIO_CFLAGS], ['-I$(top_srcdir)/btio'])
+AC_SUBST([BTIO_LIBS], ['$(top_builddir)/btio/libbtio.la'])
+
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 			[enable compiling with debugging information]), [
 	if (test "${enableval}" = "yes" && test "${ac_cv_prog_cc_g}" = "yes"); then
@@ -131,5 +134,5 @@ AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 ])
 AM_CONDITIONAL(CLIENT, test "${enable_client}" != "no")
 
-AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile
+AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile btio/Makefile src/Makefile
 		plugins/Makefile client/Makefile test/Makefile doc/Makefile)

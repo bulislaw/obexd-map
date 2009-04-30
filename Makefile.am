@@ -1,5 +1,5 @@
 
-SUBDIRS = gwobex gdbus src plugins client test doc
+SUBDIRS = gwobex gdbus btio src plugins client test doc
 
 MAINTAINERCLEANFILES = Makefile.in \
 	aclocal.m4 configure config.h.in config.sub config.guess \
