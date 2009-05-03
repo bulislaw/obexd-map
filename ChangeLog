@@ -1,3 +1,11 @@
+ver 0.12:
+	Fix various format string issues.
+	Fix handling of authorizations with no reply.
+	Add support for using BtIO helper library.
+	Add signal handling for toggling debug messages.
+	Add signal handling for USB TTY details.
+	Add test script for folder listing.
+
 ver 0.11:
 	Fix bug when canceling an authorization request.
 	Fix broken handling of successful received D-Bus reply.
