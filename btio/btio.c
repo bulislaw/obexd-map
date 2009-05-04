@@ -99,6 +99,20 @@ static void accept_remove(struct accept *accept)
 	g_free(accept);
 }
 
+static gboolean check_nval(GIOChannel *io)
+{
+	struct pollfd fds;
+
+	memset(&fds, 0, sizeof(fds));
+	fds.fd = g_io_channel_unix_get_fd(io);
+	fds.events = POLLNVAL;
+
+	if (poll(&fds, 1, 0) > 0 && (fds.revents & POLLNVAL))
+		return TRUE;
+
+	return FALSE;
+}
+
 static gboolean accept_cb(GIOChannel *io, GIOCondition cond,
 							gpointer user_data)
 {
@@ -106,7 +120,7 @@ static gboolean accept_cb(GIOChannel *io, GIOCondition cond,
 	GError *err = NULL;
 
 	/* If the user aborted this accept attempt */
-	if (cond & G_IO_NVAL)
+	if ((cond & G_IO_NVAL) || check_nval(io))
 		return FALSE;
 
 	if (cond & (G_IO_HUP | G_IO_ERR))
@@ -127,7 +141,7 @@ static gboolean connect_cb(GIOChannel *io, GIOCondition cond,
 	GError *gerr = NULL;
 
 	/* If the user aborted this connect attempt */
-	if (cond & G_IO_NVAL)
+	if ((cond & G_IO_NVAL) || check_nval(io))
 		return FALSE;
 
 	if (cond & G_IO_OUT) {
@@ -161,7 +175,7 @@ static gboolean server_cb(GIOChannel *io, GIOCondition cond,
 	GIOChannel *cli_io;
 
 	/* If the user closed the server */
-	if (cond & G_IO_NVAL)
+	if ((cond & G_IO_NVAL) || check_nval(io))
 		return FALSE;
 
 	srv_sock = g_io_channel_unix_get_fd(io);
