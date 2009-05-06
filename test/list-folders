@@ -18,12 +18,7 @@ def list_folder(folder):
 		for node in folder.split("/"):
 			ftp.ChangeFolder(node)
 
-	listing = ftp.ListFolder()
-
-	name = None
-	ftype = None
-
-	for i in listing:
+	for i in ftp.ListFolder():
 		if i["Type"] == "folder":
 			print "%s/" % (i["Name"])
 		else:
