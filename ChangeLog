@@ -1,3 +1,10 @@
+ver 0.13:
+	Fix issue when bluetoothd is restarted no record is registered.
+	Fix registration of the Transfer interface for FTP sessions.
+	Add FTP client test script.
+	Add support for OBEX root folder setup script.
+	Make root folder relative to $HOME if it doesn't start with '/'.
+
 ver 0.12:
 	Fix various format string issues.
 	Fix handling of authorizations with no reply.
