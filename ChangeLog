@@ -1,3 +1,10 @@
+ver 0.14:
+	Fix issue with symlinks on TTY based servers.
+	Add proper error logs for os_prepare_get failures.
+	Add proper error checks for finding adapter details.
+	Add support for RFCOMM channel property.
+	Add support for PBAP integration with EDS.
+
 ver 0.13:
 	Fix issue when bluetoothd is restarted no record is registered.
 	Fix registration of the Transfer interface for FTP sessions.
