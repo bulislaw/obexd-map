@@ -43,6 +43,8 @@ Properties	string Target
 
 		string Destination
 
+		byte Channel
+
 
 Session hierarchy
 =================
@@ -67,6 +69,8 @@ Methods		dict GetProperties()
 Properties	string Source [read-only]
 
 		string Destination [read-only]
+
+		byte Channel [read-only]
 
 		string AgentPath [read-only]
 
