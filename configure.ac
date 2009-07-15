@@ -97,10 +97,17 @@ AC_SUBST([GWOBEX_LIBS], ['$(top_builddir)/gwobex/libgwobex.la'])
 AC_SUBST([BTIO_CFLAGS], ['-I$(top_srcdir)/btio'])
 AC_SUBST([BTIO_LIBS], ['$(top_builddir)/btio/libbtio.la'])
 
+AC_ARG_ENABLE(optimization, AC_HELP_STRING([--disable-optimization],
+			[disable code optimization through compiler]), [
+	if (test "${enableval}" = "no"); then
+		CFLAGS="$CFLAGS -O0"
+	fi
+])
+
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 			[enable compiling with debugging information]), [
 	if (test "${enableval}" = "yes" && test "${ac_cv_prog_cc_g}" = "yes"); then
-		CFLAGS="$CFLAGS -g -O0"
+		CFLAGS="$CFLAGS -g"
 	fi
 ])
 
