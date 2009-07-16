@@ -1,3 +1,7 @@
+ver 0.15:
+	Fix BtIO race condition in detecting a closed file descriptor.
+	Fix handling of strict-aliasing rules.
+
 ver 0.14:
 	Fix issue with symlinks on TTY based servers.
 	Add proper error logs for os_prepare_get failures.
