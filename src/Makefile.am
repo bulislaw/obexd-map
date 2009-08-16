@@ -28,7 +28,7 @@ endif
 
 AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ \
 		@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ @GDBUS_CFLAGS@ \
-					@BTIO_CFLAGS@ -DPLUGINDIR=\""$(plugindir)"\"
+				@BTIO_CFLAGS@ -DPLUGINDIR=\""$(plugindir)"\"
 
 CLEANFILES = $(service_DATA)
 
@@ -39,4 +39,4 @@ MAINTAINERCLEANFILES = Makefile.in
 AUTOMAKE_OPTIONS = -Wno-portability
 
 %.service: %.service.in ../config.log
-	sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
+	$(AM_V_GEN)sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@

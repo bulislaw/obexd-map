@@ -26,4 +26,4 @@ MAINTAINERCLEANFILES = Makefile.in
 AUTOMAKE_OPTIONS = -Wno-portability
 
 %.service: %.service.in ../config.log
-	sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
+	$(AM_V_GEN)sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
