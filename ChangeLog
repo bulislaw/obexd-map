@@ -1,3 +1,7 @@
+ver 0.16:
+	Add support for mem-type attribute when in PC Suite mode.
+	Make sure the ONLCR flag is cleared for the TTY.
+
 ver 0.15:
 	Fix BtIO race condition in detecting a closed file descriptor.
 	Fix handling of strict-aliasing rules.
