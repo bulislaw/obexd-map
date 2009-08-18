@@ -11,9 +11,9 @@ test_files = test/simple-agent test/send-files \
 		test/pull-business-card test/exchange-business-cards \
 		test/list-folders test/pbap-client test/ftp-client
 
-gdbus_files = gdbus/gdbus.h gdbus/mainloop.c gdbus/object.c gdbus/watch.c
+gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/object.c gdbus/watch.c
 
-gwobex_files = gwobex/gw-obex.h gwobex/gw-obex.c \
+gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 			gwobex/obex-priv.h gwobex/obex-priv.c \
 			gwobex/obex-xfer.h gwobex/obex-xfer.c \
 			gwobex/utils.h gwobex/utils.c gwobex/log.h
@@ -27,7 +27,7 @@ service_in_files += src/obexd.service.in
 
 libexec_PROGRAMS += src/obexd
 
-src_obexd_SOURCES = $(gdbus_files) \
+src_obexd_SOURCES = $(gdbus_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
 			src/logging.h src/logging.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
@@ -57,7 +57,7 @@ endif
 
 noinst_PROGRAMS = test/obex-test
 
-test_obex_test_SOURCES = $(gwobex_files) test/main.c
+test_obex_test_SOURCES = $(gwobex_sources) test/main.c
 
 test_obex_test_LDADD = @OPENOBEX_LIBS@ @BLUEZ_LIBS@ @GLIB_LIBS@
 endif
@@ -67,7 +67,7 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_files) $(gwobex_files) client/main.c \
+client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) client/main.c \
 				client/session.h client/session.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c
