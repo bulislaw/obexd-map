@@ -85,7 +85,7 @@ INCLUDES = -I$(top_srcdir)/gdbus -I$(top_srcdir)/gwobex -I$(top_srcdir)/src
 
 CLEANFILES = $(service_DATA)
 
-EXTRA_DIST = $(doc_files) $(test_files) \
+EXTRA_DIST = $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server --enable-ebook
