@@ -143,5 +143,5 @@ AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 ])
 AM_CONDITIONAL(CLIENT, test "${enable_client}" != "no")
 
-AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile btio/Makefile src/Makefile
+AC_OUTPUT(Makefile gwobex/Makefile gdbus/Makefile src/Makefile
 		plugins/Makefile client/Makefile test/Makefile doc/Makefile)

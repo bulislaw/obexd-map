@@ -1,5 +1,5 @@
 
-SUBDIRS = gwobex gdbus btio src plugins client test doc
+SUBDIRS = gwobex gdbus src plugins client test doc
 
 AM_MAKEFLAGS = --no-print-directory
 

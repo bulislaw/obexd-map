@@ -10,7 +10,7 @@ service_DATA = $(service_in_files:.service.in=.service)
 
 libexec_PROGRAMS = obexd
 
-obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c \
+obexd_SOURCES = main.c obexd.h plugin.h plugin.c manager.c btio.h btio.c \
 		logging.h logging.c obex.h obex.c opp.c ftp.c pbap.c \
 		bluetooth.h bluetooth.c phonebook.h phonebook.c dbus.h
 
