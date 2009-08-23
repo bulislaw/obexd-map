@@ -94,7 +94,5 @@ MAINTAINERCLEANFILES = Makefile.in \
 	aclocal.m4 configure config.h.in config.sub config.guess \
 	ltmain.sh depcomp missing install-sh mkinstalldirs
 
-AUTOMAKE_OPTIONS = -Wno-portability
-
 %.service: %.service.in config.log
 	$(AM_V_GEN)sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
