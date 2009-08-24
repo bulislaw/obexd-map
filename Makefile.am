@@ -95,4 +95,4 @@ MAINTAINERCLEANFILES = Makefile.in \
 	ltmain.sh depcomp missing install-sh mkinstalldirs
 
 %.service: %.service.in config.log
-	$(AM_V_GEN)sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
+	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
