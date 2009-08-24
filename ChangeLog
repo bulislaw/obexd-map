@@ -1,3 +1,7 @@
+ver 0.17:
+	Fix Bluetooth initialization handling.
+	Add support for full non-recursive build.
+
 ver 0.16:
 	Add support for mem-type attribute when in PC Suite mode.
 	Make sure the ONLCR flag is cleared for the TTY.
