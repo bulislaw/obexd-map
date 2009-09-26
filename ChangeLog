@@ -1,3 +1,7 @@
+ver 0.18:
+	Fix free space calculation on systems where fsfilcnt_t is 32-bit.
+	Fix SendFiles to actually use the source argument.
+
 ver 0.17:
 	Fix Bluetooth initialization handling.
 	Add support for full non-recursive build.
