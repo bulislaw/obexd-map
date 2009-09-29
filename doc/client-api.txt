@@ -66,6 +66,10 @@ Methods		dict GetProperties()
 
 			Release a previously assigned OBEX agent.
 
+		void Close()
+
+			Unregister this session and abort pending transfers.
+
 Properties	string Source [read-only]
 
 		string Destination [read-only]
@@ -319,7 +323,7 @@ Methods		void Release()
 
 			Informs that the transfer has completed sucessfully.
 
-                void Error(object transfer, string message)
+		void Error(object transfer, string message)
 
 			Informs that the transfer has been terminated because
 			of some error.
