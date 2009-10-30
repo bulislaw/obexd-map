@@ -38,6 +38,11 @@ builtin_sources += plugins/opp.c
 builtin_modules += ftp
 builtin_sources += plugins/ftp.c
 
+builtin_modules += pbap
+builtin_sources += plugins/pbap.c
+
+builtin_nodist += plugins/phonebook.c plugins/telephony.c
+
 libexec_PROGRAMS += src/obexd
 
 src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
@@ -49,7 +54,8 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/service.h src/service.c
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
-					@OPENOBEX_LIBS@ @BLUEZ_LIBS@ -ldl
+					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
+					@BLUEZ_LIBS@ -ldl
 
 src_obexd_LDFLAGS = -Wl,--export-dynamic
 
@@ -60,17 +66,6 @@ nodist_src_obexd_SOURCES = $(builtin_files)
 plugindir = $(libdir)/obex/plugins
 
 plugin_LTLIBRARIES =
-
-if EBOOK
-plugin_LTLIBRARIES += plugins/ebook.la
-
-plugins_ebook_la_SOURCES = plugins/ebook.c
-
-plugins_ebook_la_LIBADD = @EBOOK_LIBS@
-
-plugins_ebook_la_CFLAGS = -fvisibility=hidden @EBOOK_CFLAGS@
-plugins_ebook_la_LDFLAGS = -no-undefined -module -avoid-version
-endif
 
 noinst_PROGRAMS = test/obex-test
 
@@ -100,7 +95,7 @@ endif
 
 service_DATA = $(service_in_files:.service.in=.service)
 
-AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ \
+AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 				@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
 				-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
@@ -119,3 +114,9 @@ MAINTAINERCLEANFILES = Makefile.in \
 
 %.service: %.service.in config.log
 	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
+
+plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
+	$(AM_V_GEN)$(LN_S) $(abs_top_srcdir)/$< $@
+
+plugins/telephony.c: plugins/@TELEPHONY_DRIVER@
+	$(AM_V_GEN)$(LN_S) $(abs_top_srcdir)/$< $@

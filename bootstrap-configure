@@ -11,4 +11,4 @@ fi
 		--libexec=/usr/lib/obex \
 		--mandir=/usr/share/man \
 		--sysconfdir=/etc \
-		--enable-ebook $*
+		--with-phonebook=ebook $*

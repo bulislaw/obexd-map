@@ -103,13 +103,12 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 	fi
 ])
 
-AC_ARG_ENABLE(ebook, AC_HELP_STRING([--enable-ebook],
-				[enable EBook plugin]), [
-	enable_ebook=${enableval}
+phonebook_driver=dummy
+AC_ARG_WITH(phonebook, AC_HELP_STRING([--with-phonebook=DRIVER], [select phonebook driver]), [
+	phonebook_driver=${withval}
 ])
-AM_CONDITIONAL(EBOOK, test "${enable_ebook}" = "yes")
 
-if (test "${enable_ebook}" = "yes"); then
+if (test "${phonebook_driver}" = "ebook"); then
 	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
 
 	PKG_CHECK_MODULES(EBOOK, libebook-1.2, dummy=yes,
@@ -122,6 +121,15 @@ if (test "${enable_ebook}" = "yes"); then
 	AC_SUBST(GTHREAD_CFLAGS)
 	AC_SUBST(GTHREAD_LIBS)
 fi
+
+AC_SUBST([PHONEBOOK_DRIVER], [phonebook-${phonebook_driver}.c])
+
+telephony_driver=dummy
+AC_ARG_WITH(telephony, AC_HELP_STRING([--with-telephony=DRIVER], [select telephony driver]), [
+	telephony_driver=${withval}
+])
+
+AC_SUBST([TELEPHONY_DRIVER], [telephony-${telephony_driver}.c])
 
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
 				[disable compilation of OBEX server]), [
