@@ -106,7 +106,7 @@ CLEANFILES = $(service_DATA) $(builtin_files)
 EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in
 
-DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server --enable-ebook
+DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
 MAINTAINERCLEANFILES = Makefile.in \
 	aclocal.m4 configure config.h.in config.sub config.guess \
