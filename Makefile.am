@@ -31,10 +31,9 @@ src_obexd_SOURCES = $(gdbus_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
 			src/logging.h src/logging.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
-			src/opp.c src/ftp.c src/pbap.c \
 			src/bluetooth.h src/bluetooth.c \
-			src/phonebook.h src/phonebook.c \
-			src/mimetype.h src/mimetype.c
+			src/mimetype.h src/mimetype.c \
+			src/service.h src/service.c
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@OPENOBEX_LIBS@ @BLUEZ_LIBS@ -ldl
@@ -51,6 +50,20 @@ plugins_filesystem_la_SOURCES = plugins/filesystem.c
 plugins_filesystem_la_LIBADD =
 plugins_filesystem_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
 plugins_filesystem_la_LDFLAGS = -no-undefined -module -avoid-version
+
+plugin_LTLIBRARIES += plugins/opp.la
+
+plugins_opp_la_SOURCES = plugins/opp.c
+plugins_opp_la_LIBADD =
+plugins_opp_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
+plugins_opp_la_LDFLAGS = -no-undefined -module -avoid-version
+
+plugin_LTLIBRARIES += plugins/ftp.la
+
+plugins_ftp_la_SOURCES = plugins/ftp.c
+plugins_ftp_la_LIBADD =
+plugins_ftp_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
+plugins_ftp_la_LDFLAGS = -no-undefined -module -avoid-version
 
 if EBOOK
 plugin_LTLIBRARIES += plugins/ebook.la
