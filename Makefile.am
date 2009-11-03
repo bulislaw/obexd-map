@@ -39,7 +39,7 @@ builtin_modules += ftp
 builtin_sources += plugins/ftp.c
 
 builtin_modules += pbap
-builtin_sources += plugins/pbap.c
+builtin_sources += plugins/pbap.c plugins/phonebook.h plugins/telephony.h
 
 builtin_nodist += plugins/phonebook.c plugins/telephony.c
 
