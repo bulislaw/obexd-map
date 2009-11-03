@@ -104,7 +104,9 @@ INCLUDES = -I$(top_srcdir)/gdbus -I$(top_srcdir)/gwobex -I$(top_srcdir)/src
 CLEANFILES = $(service_DATA) $(builtin_files)
 
 EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
-			src/obexd.service.in client/obex-client.service.in
+			src/obexd.service.in client/obex-client.service.in \
+			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
+			plugins/telephony-dummy.c
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
