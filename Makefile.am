@@ -33,7 +33,8 @@ src_obexd_SOURCES = $(gdbus_sources) \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
 			src/opp.c src/ftp.c src/pbap.c \
 			src/bluetooth.h src/bluetooth.c \
-			src/phonebook.h src/phonebook.c
+			src/phonebook.h src/phonebook.c \
+			src/mimetype.h src/mimetype.c
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@OPENOBEX_LIBS@ @BLUEZ_LIBS@ -ldl
@@ -43,6 +44,13 @@ src_obexd_LDFLAGS = -Wl,--export-dynamic
 plugindir = $(libdir)/obex/plugins
 
 plugin_LTLIBRARIES =
+
+plugin_LTLIBRARIES += plugins/filesystem.la
+
+plugins_filesystem_la_SOURCES = plugins/filesystem.c
+plugins_filesystem_la_LIBADD =
+plugins_filesystem_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
+plugins_filesystem_la_LDFLAGS = -no-undefined -module -avoid-version
 
 if EBOOK
 plugin_LTLIBRARIES += plugins/ebook.la
