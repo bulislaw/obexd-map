@@ -25,9 +25,22 @@ confdir = $(sysconfdir)/obex
 
 service_in_files += src/obexd.service.in
 
+builtin_modules =
+builtin_sources =
+builtin_nodist =
+
+builtin_modules += filesystem
+builtin_sources += plugins/filesystem.c
+
+builtin_modules += opp
+builtin_sources += plugins/opp.c
+
+builtin_modules += ftp
+builtin_sources += plugins/ftp.c
+
 libexec_PROGRAMS += src/obexd
 
-src_obexd_SOURCES = $(gdbus_sources) \
+src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
 			src/logging.h src/logging.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
@@ -40,30 +53,13 @@ src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 
 src_obexd_LDFLAGS = -Wl,--export-dynamic
 
+builtin_files = src/builtin.h $(builtin_nodist)
+
+nodist_src_obexd_SOURCES = $(builtin_files)
+
 plugindir = $(libdir)/obex/plugins
 
 plugin_LTLIBRARIES =
-
-plugin_LTLIBRARIES += plugins/filesystem.la
-
-plugins_filesystem_la_SOURCES = plugins/filesystem.c
-plugins_filesystem_la_LIBADD =
-plugins_filesystem_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
-plugins_filesystem_la_LDFLAGS = -no-undefined -module -avoid-version
-
-plugin_LTLIBRARIES += plugins/opp.la
-
-plugins_opp_la_SOURCES = plugins/opp.c
-plugins_opp_la_LIBADD =
-plugins_opp_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
-plugins_opp_la_LDFLAGS = -no-undefined -module -avoid-version
-
-plugin_LTLIBRARIES += plugins/ftp.la
-
-plugins_ftp_la_SOURCES = plugins/ftp.c
-plugins_ftp_la_LIBADD =
-plugins_ftp_la_CFLAGS = -fvisibility=hidden @GLIB_CFLAGS@
-plugins_ftp_la_LDFLAGS = -no-undefined -module -avoid-version
 
 if EBOOK
 plugin_LTLIBRARIES += plugins/ebook.la
@@ -81,6 +77,12 @@ noinst_PROGRAMS = test/obex-test
 test_obex_test_SOURCES = $(gwobex_sources) test/main.c
 
 test_obex_test_LDADD = @OPENOBEX_LIBS@ @BLUEZ_LIBS@ @GLIB_LIBS@
+
+src/plugin.$(OBJEXT): src/builtin.h
+
+src/builtin.h: src/genbuiltin $(builtin_sources)
+	$(AM_V_GEN)$(srcdir)/src/genbuiltin $(builtin_modules) > $@
+
 endif
 
 if CLIENT
@@ -100,13 +102,13 @@ service_DATA = $(service_in_files:.service.in=.service)
 
 AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ \
 				@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
-						-DPLUGINDIR=\""$(plugindir)"\"
+				-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
 INCLUDES = -I$(top_srcdir)/gdbus -I$(top_srcdir)/gwobex -I$(top_srcdir)/src
 
-CLEANFILES = $(service_DATA)
+CLEANFILES = $(service_DATA) $(builtin_files)
 
-EXTRA_DIST = $(doc_files) $(test_files) src/obex.conf \
+EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server --enable-ebook
