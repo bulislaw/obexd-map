@@ -96,11 +96,11 @@ endif
 service_DATA = $(service_in_files:.service.in=.service)
 
 AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
-				@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
-				-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
+			@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
+			-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
-INCLUDES = -I$(srcdir)/gdbus -I$(srcdir)/gwobex \
-					-I$(srcdir)/plugins -I$(srcdir)/src
+INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \
+				-I$(srcdir)/gdbus -I$(srcdir)/gwobex
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
