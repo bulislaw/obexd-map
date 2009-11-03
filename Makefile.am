@@ -99,7 +99,8 @@ AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 				@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
 				-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
-INCLUDES = -I$(top_srcdir)/gdbus -I$(top_srcdir)/gwobex -I$(top_srcdir)/src
+INCLUDES = -I$(srcdir)/gdbus -I$(srcdir)/gwobex \
+					-I$(srcdir)/plugins -I$(srcdir)/src
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
