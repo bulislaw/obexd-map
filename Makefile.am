@@ -41,6 +41,9 @@ builtin_sources += plugins/ftp.c
 builtin_modules += pbap
 builtin_sources += plugins/pbap.c plugins/phonebook.h plugins/telephony.h
 
+builtin_modules += syncevolution
+builtin_sources += plugins/syncevolution.c
+
 builtin_nodist += plugins/phonebook.c plugins/telephony.c
 
 libexec_PROGRAMS += src/obexd
