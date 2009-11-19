@@ -1,3 +1,9 @@
+ver 0.19:
+	Fix crash with agent unregister handling.
+	Add support for mimetype and filesystem plugins.
+	Add support for phonebook and telephony drivers.
+	Add initial OBEX server/SyncML binding for SyncEvolution.
+
 ver 0.18:
 	Fix free space calculation on systems where fsfilcnt_t is 32-bit.
 	Fix SendFiles to actually use the source argument.
