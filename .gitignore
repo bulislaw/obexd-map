@@ -23,8 +23,11 @@ missing
 stamp-h1
 autom4te.cache
 
+src/builtin.h
 src/obexd
 src/obexd.service
+plugins/phonebook.c
+plugins/telephony.c
 client/obex-client
 client/obex-client.service
 test/obex-test
