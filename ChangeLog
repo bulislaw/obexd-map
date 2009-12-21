@@ -1,3 +1,9 @@
+ver 0.21:
+	Fix crash caused by D-Bus timeout handling.
+	Fix issue when the object size is unknown.
+	Fix issue with reporting no space left on disk.
+	Fix read callback of various drivers.
+
 ver 0.20:
 	Fix D-Bus error handling on SyncEvolution connect.
 	Fix PC Suite service driver matching.
