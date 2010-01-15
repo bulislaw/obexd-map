@@ -90,6 +90,7 @@ libexec_PROGRAMS += client/obex-client
 
 client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) client/main.c \
 				client/session.h client/session.c \
+				src/logging.h src/logging.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c
 
