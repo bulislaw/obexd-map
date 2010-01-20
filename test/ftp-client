@@ -15,6 +15,11 @@ class Agent(dbus.service.Object):
         self.verbose = verbose
 
     @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="s")
+    def Request(self, path):
+        return ""
+
+    @dbus.service.method("org.openobex.Agent",
                     in_signature="ot", out_signature="")
     def Progress(self, path, transferred):
         if self.verbose:
@@ -55,6 +60,11 @@ def parse_options():
 
     return parser.parse_args()
 
+def error(err):
+    print err
+
+def void_reply():
+    pass
 
 def change_folder(session, new_dir):
     for node in new_dir.split("/"):
@@ -69,11 +79,15 @@ def list_folder(session):
 
 def put_file(session, filename):
     session.PutFile(os.path.abspath(filename),
-                    os.path.basename(filename))
+                    os.path.basename(filename),
+                    reply_handler=void_reply,
+                    error_handler=error)
 
 def get_file(session, filename):
     session.GetFile(os.path.abspath(filename),
-                    os.path.basename(filename))
+                    os.path.basename(filename),
+                    reply_handler=void_reply,
+                    error_handler=error)
 
 
 if  __name__ == '__main__':
@@ -90,8 +104,6 @@ if  __name__ == '__main__':
 
     bus = dbus.SessionBus()
     mainloop = gobject.MainLoop()
-
-    need_mainloop = False
 
     path = "/test/agent"
     agent = Agent(bus, path, options.verbose)
@@ -117,12 +129,9 @@ if  __name__ == '__main__':
         list_folder(ftp)
 
     if options.get_file:
-        need_mainloop = True
         get_file(ftp, options.get_file)
 
     if options.put_file:
-        need_mainloop = True
         put_file(ftp, options.put_file)
 
-    if need_mainloop:
-        mainloop.run()
+    mainloop.run()
