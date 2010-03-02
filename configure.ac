@@ -107,7 +107,11 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 ])
 phonebook_driver=dummy
 AC_ARG_WITH(phonebook, AC_HELP_STRING([--with-phonebook=DRIVER], [select phonebook driver]), [
-	phonebook_driver=${withval}, phonebook_driver=dummy
+	if (test "${withval}" = "no"); then
+		phonebook_driver=dummy;
+	else
+		phonebook_driver=${withval};
+	fi
 ])
 
 if (test "${phonebook_driver}" = "ebook"); then
@@ -128,7 +132,11 @@ AC_SUBST([PHONEBOOK_DRIVER], [phonebook-${phonebook_driver}.c])
 
 telephony_driver=dummy
 AC_ARG_WITH(telephony, AC_HELP_STRING([--with-telephony=DRIVER], [select telephony driver]), [
-	telephony_driver=${withval}, telephony_driver=dummy
+	if (test "${withval}" = "no"); then
+		telephony_driver=dummy;
+	else
+		telephony_driver=${withval};
+	fi
 ])
 
 AC_SUBST([TELEPHONY_DRIVER], [telephony-${telephony_driver}.c])
