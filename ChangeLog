@@ -1,3 +1,15 @@
+ver 0.22:
+	Fix file corruption during PUT operation.
+	Fix the response of PUT requests for PBAP.
+	Fix blocking while waiting capability script to exit.
+	Fix compilation issues with driver and plugin options.
+	Fix service driver selection when WHO header is informed.
+	Fix issue with PC-Suite WHO header.
+	Fix issue when mime type exists but is unknown.
+	Fix issue when opening file fails during SendFiles.
+	Fix error code response when there is no default vCard.
+	Fix a memory leak when opening a folder for listing.
+
 ver 0.21:
 	Fix crash caused by D-Bus timeout handling.
 	Fix issue when the object size is unknown.
