@@ -39,7 +39,8 @@ builtin_modules += ftp
 builtin_sources += plugins/ftp.c
 
 builtin_modules += pbap
-builtin_sources += plugins/pbap.c plugins/phonebook.h
+builtin_sources += plugins/pbap.c plugins/phonebook.h \
+			plugins/vcard.h plugins/vcard.c
 
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
