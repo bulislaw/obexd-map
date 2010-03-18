@@ -3,6 +3,7 @@
 import gobject
 
 import sys
+import time
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -20,12 +21,14 @@ class Agent(dbus.service.Object):
 		properties = transfer.GetProperties()
 		for key in properties.keys():
 			print "  %s = %s" % (key, properties[key])
+		self.start_time = time.time()
 		return ""
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="ot", out_signature="")
 	def Progress(self, path, transferred):
-		print "Transfer progress (%d bytes)" % (transferred)
+		speed = transferred / abs((time.time() - self.start_time) * 1000)
+		print "Transfer progress (%d bytes) @ %d kB/s" % (transferred, speed)
 		return
 
 	@dbus.service.method("org.openobex.Agent",
