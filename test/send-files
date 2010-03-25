@@ -2,6 +2,7 @@
 
 import gobject
 
+import os
 import sys
 import time
 import dbus
@@ -64,7 +65,8 @@ if __name__ == '__main__':
 	agent = Agent(bus, path)
 
 	mainloop = gobject.MainLoop()
+	files = [os.path.realpath(f) for f in sys.argv[2:]]
 
-	client.SendFiles({ "Destination": sys.argv[1] }, sys.argv[2:], path)
+	client.SendFiles({ "Destination": sys.argv[1] }, files, path)
 
 	mainloop.run()
