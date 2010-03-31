@@ -20,6 +20,7 @@ pbap.Select("int", "pb")
 
 print "\n--- PullAll ---\n"
 pbap.SetFormat("vcard30")
+pbap.SetFilter(["VERSION", "FN", "TEL"]);
 ret = pbap.PullAll()
 print "%s" % (ret)
 
@@ -34,6 +35,8 @@ for item in ret:
 
 if len(ret) > 0:
 	print "\n--- Pull First Available vCard ---\n"
+	pbap.SetFormat("vcard30")
+	pbap.SetFilter(["VERSION", "FN", "TEL"]);
 	ret = pbap.Pull(ret[0][0])
 	print "%s" % (ret)
 
