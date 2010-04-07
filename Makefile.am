@@ -39,12 +39,12 @@ builtin_modules += ftp
 builtin_sources += plugins/ftp.c
 
 builtin_modules += pbap
-builtin_sources += plugins/pbap.c plugins/phonebook.h plugins/telephony.h
+builtin_sources += plugins/pbap.c plugins/phonebook.h
 
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
-builtin_nodist += plugins/phonebook.c plugins/telephony.c
+builtin_nodist += plugins/phonebook.c
 
 libexec_PROGRAMS += src/obexd
 
@@ -110,8 +110,7 @@ CLEANFILES = $(service_DATA) $(builtin_files)
 
 EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in \
-			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
-			plugins/telephony-dummy.c
+			plugins/phonebook-dummy.c plugins/phonebook-ebook.c
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
@@ -123,7 +122,4 @@ MAINTAINERCLEANFILES = Makefile.in \
 	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
 
 plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
-	$(AM_V_GEN)$(LN_S) $(abs_top_srcdir)/$< $@
-
-plugins/telephony.c: plugins/@TELEPHONY_DRIVER@
 	$(AM_V_GEN)$(LN_S) $(abs_top_srcdir)/$< $@

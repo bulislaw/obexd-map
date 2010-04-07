@@ -130,17 +130,6 @@ fi
 
 AC_SUBST([PHONEBOOK_DRIVER], [phonebook-${phonebook_driver}.c])
 
-telephony_driver=dummy
-AC_ARG_WITH(telephony, AC_HELP_STRING([--with-telephony=DRIVER], [select telephony driver]), [
-	if (test "${withval}" = "no"); then
-		telephony_driver=dummy;
-	else
-		telephony_driver=${withval};
-	fi
-])
-
-AC_SUBST([TELEPHONY_DRIVER], [telephony-${telephony_driver}.c])
-
 AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
 				[disable compilation of OBEX server]), [
 	enable_server=${enableval}
