@@ -59,7 +59,7 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
-					@BLUEZ_LIBS@ -ldl
+					@BLUEZ_LIBS@ @LIBICAL_LIBS@ -ldl
 
 src_obexd_LDFLAGS = -Wl,--export-dynamic
 
@@ -103,6 +103,7 @@ service_DATA = $(service_in_files:.service.in=.service)
 
 AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 			@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
+			@LIBICAL_CFLAGS@ \
 			-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
 INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \

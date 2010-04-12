@@ -114,6 +114,13 @@ AC_ARG_WITH(phonebook, AC_HELP_STRING([--with-phonebook=DRIVER], [select phonebo
 	fi
 ])
 
+if (test "${phonebook_driver}" = "dummy"); then
+	PKG_CHECK_MODULES(LIBICAL, libical, dummy=yes,
+					AC_MSG_ERROR(libical is required))
+	AC_SUBST(LIBICAL_CFLAGS)
+	AC_SUBST(LIBICAL_LIBS)
+fi
+
 if (test "${phonebook_driver}" = "ebook"); then
 	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
 
