@@ -16,32 +16,42 @@ class Agent(dbus.service.Object):
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="o", out_signature="s")
 	def Request(self, path):
-		print "Transfer started"
-		transfer = dbus.Interface(bus.get_object("org.openobex.client",
+		print "Transfer Request"
+		self.transfer = dbus.Interface(bus.get_object("org.openobex.client",
 						path), "org.openobex.Transfer")
-		properties = transfer.GetProperties()
+		properties = self.transfer.GetProperties()
 		for key in properties.keys():
 			print "  %s = %s" % (key, properties[key])
-		self.start_time = time.time()
+		self.start = True
 		return ""
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="ot", out_signature="")
 	def Progress(self, path, transferred):
-		speed = transferred / abs((time.time() - self.start_time) * 1000)
-		print "Transfer progress (%d bytes) @ %d kB/s" % (transferred, speed)
+		if (self.start):
+			print "Transfer Started"
+			properties = self.transfer.GetProperties()
+			self.transfer_size = properties['Size']
+			self.start_time = time.time()
+			self.start = False
+		else:
+			speed = transferred / abs((time.time() - self.start_time) * 1000)
+			progress = "(" + str(transferred) + "/" + str(self.transfer_size) + " bytes) @ " + str(int(speed)) + " kB/s"
+			out = "\rTransfer progress " + progress
+			sys.stdout.write(out)
+			sys.stdout.flush()
 		return
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="o", out_signature="")
 	def Complete(self, path):
-		print "Transfer finished"
+		print "\nTransfer finished"
 		return
 
 	@dbus.service.method("org.openobex.Agent",
 					in_signature="os", out_signature="")
 	def Error(self, path, error):
-		print "Transfer finished with an error: %s" % (error)
+		print "\nTransfer finished with an error: %s" % (error)
 		return
 
 	@dbus.service.method("org.openobex.Agent",
