@@ -33,6 +33,10 @@ Methods		void SendFiles(dict device, array{string} files, object agent)
 			Create a new OBEX session. The device is configured
 			via properties like in SendFiles.
 
+		void RemoveSession(object session)
+
+			Unregister session and abort pending transfers.
+
 		string GetCapabilities(dict device)
 
 			Get remote device capabilities.
@@ -66,20 +70,12 @@ Methods		dict GetProperties()
 
 			Release a previously assigned OBEX agent.
 
-		void Close()
-
-			Unregister this session and abort pending transfers.
-
 Properties	string Source [read-only]
 
 		string Destination [read-only]
 
 		byte Channel [read-only]
 
-		string AgentPath [read-only]
-
-			Object Path of the assigned agent. This property will
-			not be present if there is no assigned agent.
 
 File Transfer hierarchy
 =======================
