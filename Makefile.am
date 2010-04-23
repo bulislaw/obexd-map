@@ -30,7 +30,7 @@ builtin_sources =
 builtin_nodist =
 
 builtin_modules += filesystem
-builtin_sources += plugins/filesystem.c
+builtin_sources += plugins/filesystem.c plugins/filesystem.h
 
 builtin_modules += opp
 builtin_sources += plugins/opp.c
@@ -52,7 +52,7 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
 			src/logging.h src/logging.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
-			src/bluetooth.h src/bluetooth.c \
+			src/obex-priv.h src/bluetooth.h src/bluetooth.c \
 			src/mimetype.h src/mimetype.c \
 			src/service.h src/service.c
 
