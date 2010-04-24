@@ -1,3 +1,11 @@
+ver 0.23:
+	Fix unneeded reset of session after a CONNECT.
+	Fix folder and object names with enabled auto accept.
+	Fix agent not being released after transfers complete.
+	Fix sending full packets to achieve higher throughput.
+	Add support for mimetype driver to phonebook access.
+	Add support for mimetype driver to SyncEvolution.
+
 ver 0.22:
 	Fix file corruption during PUT operation.
 	Fix the response of PUT requests for PBAP.
