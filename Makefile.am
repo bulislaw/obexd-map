@@ -125,4 +125,4 @@ MAINTAINERCLEANFILES = Makefile.in \
 	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
 
 plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
-	$(AM_V_GEN)$(LN_S) $(abs_top_srcdir)/$< $@
+	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
