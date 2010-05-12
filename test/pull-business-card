@@ -2,13 +2,33 @@
 
 import sys
 import dbus
+import gobject
+import dbus.mainloop.glib
 
-bus = dbus.SessionBus()
-client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+def success():
+	mainloop.quit()
+	return
+
+def failure(error):
+	print error
+	mainloop.quit()
+	return
+
+
+if __name__ == '__main__':
+	dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+	mainloop = gobject.MainLoop()
+
+	bus = dbus.SessionBus()
+	client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
 							"org.openobex.Client")
 
-if (len(sys.argv) < 3):
-	print "Usage: %s <device> <file>" % (sys.argv[0])
-	sys.exit(1)
+	if (len(sys.argv) < 3):
+		print "Usage: %s <device> <file>" % (sys.argv[0])
+		sys.exit(1)
 
-client.PullBusinessCard({ "Destination": sys.argv[1] }, sys.argv[2])
+	client.PullBusinessCard({ "Destination": sys.argv[1] }, sys.argv[2],
+				reply_handler=success, error_handler=failure)
+
+	mainloop.run()
