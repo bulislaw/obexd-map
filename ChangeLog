@@ -1,3 +1,13 @@
+ver 0.24:
+	Fix bug when creating directories.
+	Fix error code when removing non-empty directory.
+	Fix PullBusinessCard not return transfer errors.
+	Fix MaxListCount handling for PBAP PullPhoneBook function.
+	Fix mimetype driver selection and default fallback.
+	Add support to the WHO header in mimetype drivers.
+	Add support for PBAP operations to the back-ends.
+	Add support for PBAP Tracker backend.
+
 ver 0.23:
 	Fix unneeded reset of session after a CONNECT.
 	Fix folder and object names with enabled auto accept.
