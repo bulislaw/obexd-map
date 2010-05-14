@@ -119,7 +119,7 @@ DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
 MAINTAINERCLEANFILES = Makefile.in \
 	aclocal.m4 configure config.h.in config.sub config.guess \
-	ltmain.sh depcomp missing install-sh mkinstalldirs
+	ltmain.sh depcomp compile missing install-sh mkinstalldirs
 
 %.service: %.service.in config.log
 	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
