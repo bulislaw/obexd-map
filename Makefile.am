@@ -113,7 +113,8 @@ CLEANFILES = $(service_DATA) $(builtin_files)
 
 EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in \
-			plugins/phonebook-dummy.c plugins/phonebook-ebook.c
+			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
+			plugins/phonebook-tracker.c
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
