@@ -1,3 +1,6 @@
+ver 0.25:
+	Fix issue with missing phonebook-tracker.c file.
+
 ver 0.24:
 	Fix bug when creating directories.
 	Fix error code when removing non-empty directory.
