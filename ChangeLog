@@ -1,3 +1,14 @@
+ver 0.26:
+	Fix the order of the calls handles.
+	Fix crash when receiving small objects.
+	Fix invalid memory access when removing a file.
+	Fix inverting the list with wrong search attribute.
+	Fix wrong response code for dummy PullvCardListing.
+	Fix sending the Not Found response asynchronously.
+	Fix not resetting buffered data count when resetting the session.
+	Add support for multiple telephone numbers.
+	Add support for the ADR filter.
+
 ver 0.25:
 	Fix issue with missing phonebook-tracker.c file.
 
