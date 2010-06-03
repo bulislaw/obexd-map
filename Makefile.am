@@ -56,7 +56,8 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/obex-priv.h src/bluetooth.h src/bluetooth.c \
 			src/mimetype.h src/mimetype.c \
 			src/service.h src/service.c \
-			src/transport.h src/transport.c
+			src/transport.h src/transport.c \
+			src/server.h src/server.c
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
