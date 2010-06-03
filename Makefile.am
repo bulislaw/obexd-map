@@ -61,7 +61,7 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
 			src/logging.h src/logging.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
-			src/obex-priv.h src/bluetooth.c src/bluetooth.h \
+			src/obex-priv.h \
 			src/mimetype.h src/mimetype.c \
 			src/service.h src/service.c \
 			src/transport.h src/transport.c \
