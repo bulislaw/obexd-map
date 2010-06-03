@@ -32,6 +32,11 @@ builtin_nodist =
 builtin_modules += bluetooth
 builtin_sources += plugins/bluetooth.c
 
+if USB
+builtin_modules += usb
+builtin_sources += plugins/usb.c
+endif
+
 builtin_modules += filesystem
 builtin_sources += plugins/filesystem.c plugins/filesystem.h
 
