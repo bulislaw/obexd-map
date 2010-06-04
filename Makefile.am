@@ -40,6 +40,11 @@ endif
 builtin_modules += filesystem
 builtin_sources += plugins/filesystem.c plugins/filesystem.h
 
+if NOKIA_BACKUP
+builtin_modules += backup
+builtin_sources += plugins/nokia-backup.c
+endif
+
 builtin_modules += opp
 builtin_sources += plugins/opp.c
 

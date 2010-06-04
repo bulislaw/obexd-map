@@ -151,6 +151,13 @@ AC_ARG_ENABLE(usb, AC_HELP_STRING([--enable-usb],
 AM_CONDITIONAL(USB, test "${enable_usb}" = "yes" &&
 				test "${enable_server}" != "no")
 
+AC_ARG_ENABLE(nokia_backup, AC_HELP_STRING([--enable-nokia-backup],
+				[enable nokia-backup plugin]), [
+	enable_nokia_backup=${enableval}
+])
+AM_CONDITIONAL(NOKIA_BACKUP, test "${enable_nokia_backup}" = "yes" &&
+				test "${enable_server}" != "no")
+
 AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 				[disable compilation of OBEX client]), [
 	enable_client=${enableval}
