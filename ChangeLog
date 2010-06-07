@@ -1,3 +1,13 @@
+ver 0.27:
+	Fix GET name handling with FTP service.
+	Fix service driver matching when who is not specified.
+	Fix object name not being updated when agent changes it.
+	Fix inconsistency when using vCard version 2.1.
+	Fix wrong response code to PUT requests for PBAP.
+	Fix crash on PBAP SetPhoneBook function.
+	Add support for transport drivers.
+	Add support for Nokia backup plugin.
+
 ver 0.26:
 	Fix the order of the calls handles.
 	Fix crash when receiving small objects.
