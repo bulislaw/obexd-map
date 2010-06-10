@@ -12,4 +12,4 @@ fi
 		--libexec=/usr/lib/obex \
 		--mandir=/usr/share/man \
 		--sysconfdir=/etc \
-		--with-phonebook=ebook $*
+		--with-phonebook=dummy $*
