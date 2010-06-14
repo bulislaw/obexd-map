@@ -64,7 +64,7 @@ libexec_PROGRAMS += src/obexd
 
 src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
-			src/logging.h src/logging.c src/btio.h src/btio.c \
+			src/log.h src/log.c src/btio.h src/btio.c \
 			src/dbus.h src/manager.c src/obex.h src/obex.c \
 			src/obex-priv.h \
 			src/mimetype.h src/mimetype.c \
@@ -106,7 +106,7 @@ libexec_PROGRAMS += client/obex-client
 
 client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) client/main.c \
 				client/session.h client/session.c \
-				src/logging.h src/logging.c \
+				src/log.h src/log.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
 				client/transfer.h client/transfer.c
