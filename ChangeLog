@@ -1,3 +1,14 @@
+ver 0.28:
+	Fix broken assumption about contacts.
+	Fix issue with exporting empty contacts.
+	Fix issue with not always including the TEL header.
+	Fix wrong response code for PBAP PUT operation.
+	Fix handling of Tracker optional parameters.
+	Fix queries for incoming and outgoing folders.
+	Fix ordering during folder listing.
+	Fix complex logic discovering the type of call.
+	Add support for the X-IRMC-CALL-DATETIME field.
+
 ver 0.27:
 	Fix GET name handling with FTP service.
 	Fix service driver matching when who is not specified.
