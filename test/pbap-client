@@ -18,12 +18,6 @@ session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
 print "\n--- Select Phonebook internal:pb ---\n"
 pbap.Select("int", "pb")
 
-print "\n--- PullAll ---\n"
-pbap.SetFormat("vcard30")
-pbap.SetFilter(["VERSION", "FN", "TEL"]);
-ret = pbap.PullAll()
-print "%s" % (ret)
-
 print "\n--- GetSize ---\n"
 ret = pbap.GetSize()
 print "Size = %d\n" % (ret)
@@ -32,15 +26,13 @@ print "\n--- List vCard ---\n"
 ret = pbap.List()
 for item in ret:
 	print "%s : %s" % (item[0], item[1])
-
-if len(ret) > 0:
-	print "\n--- Pull First Available vCard ---\n"
 	pbap.SetFormat("vcard30")
 	pbap.SetFilter(["VERSION", "FN", "TEL"]);
-	ret = pbap.Pull(ret[0][0])
+	ret = pbap.Pull(item[0])
 	print "%s" % (ret)
 
-print "\n--- List All Available Filter Fields ---\n"
-ret = pbap.ListFilterFields()
-for item in ret:
-	print "%s" % (item)
+print "\n--- PullAll ---\n"
+pbap.SetFormat("vcard30")
+pbap.SetFilter(["VERSION", "FN", "TEL"]);
+ret = pbap.PullAll()
+print "%s" % (ret)
