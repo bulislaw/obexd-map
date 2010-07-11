@@ -1,3 +1,14 @@
+ver 0.29:
+	Fix security requirements for legacy devices.
+	Fix empty 'N:' parameter handling for vCards.
+	Fix order of contacts in the combined calls folder.
+	Fix not replying error when transfer could not be started.
+	Fix not unregistering transfer when completed.
+	Fix memory leak when freeing transfer parameters.
+	Fix issues with handling of driver reset.
+	Add support for responding to Auth Challenge.
+	Add support for dynamic debug feature.
+
 ver 0.28:
 	Fix broken assumption about contacts.
 	Fix issue with exporting empty contacts.
