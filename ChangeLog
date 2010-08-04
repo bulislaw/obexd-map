@@ -1,3 +1,19 @@
+ver 0.30:
+	Fix issue with empty error messages.
+	Fix issue with query for vCarcd listing.
+	Fix problem with incoming calls query.
+	Fix handling of vCard filter settings.
+	Fix potential buffer overflow with target sizes.
+	Fix NULL checking within PBAP GET operation.
+	Fix NULL checking for PBAP name parameter.
+	Fix crash when processing OBEX_EV_PROGRESS event.
+	Fix crash when resetting a session with no service.
+	Fix not closing socket when connection attempt fails.
+	Fix de-registering PBAP drivers on init failure scenarios.
+	Add variable target size support to MIME type drivers.
+	Add support for returning all eBook TEL attributes.
+	Add PBAP client tests for ICH, OCH, MCH and CCH.
+
 ver 0.29:
 	Fix security requirements for legacy devices.
 	Fix empty 'N:' parameter handling for vCards.
