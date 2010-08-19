@@ -55,6 +55,9 @@ builtin_modules += pbap
 builtin_sources += plugins/pbap.c plugins/phonebook.h \
 			plugins/vcard.h plugins/vcard.c
 
+builtin_modules += irmc
+builtin_sources += plugins/irmc.c
+
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
