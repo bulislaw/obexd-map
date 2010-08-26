@@ -1,3 +1,8 @@
+ver 0.32:
+	Fix issues caused by dependencies on phonebook source.
+	Fix handling empty fields in vCards.
+	Fix issues with emails category.
+
 ver 0.31:
 	Fix aborting capability scripts creating zombies.
 	Fix problem with multiple emails in same vcard.
