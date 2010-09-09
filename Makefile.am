@@ -11,7 +11,8 @@ test_files = test/simple-agent test/send-files \
 		test/pull-business-card test/exchange-business-cards \
 		test/list-folders test/pbap-client test/ftp-client
 
-gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/object.c gdbus/watch.c
+gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/watch.c \
+					gdbus/object.c gdbus/polkit.c
 
 gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 			gwobex/obex-priv.h gwobex/obex-priv.c \
