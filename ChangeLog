@@ -1,3 +1,9 @@
+ver 0.33:
+	Fix issue with handling of phonebook size during pull request.
+	Add support for handling of UID contact field in vCard.
+	Add support for handling more than one address in vCard.
+	Add support for merging address fields into single field.
+
 ver 0.32:
 	Fix issues caused by dependencies on phonebook source.
 	Fix handling empty fields in vCards.
