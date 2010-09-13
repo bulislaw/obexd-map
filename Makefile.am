@@ -19,6 +19,8 @@ gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 			gwobex/obex-xfer.h gwobex/obex-xfer.c \
 			gwobex/utils.h gwobex/utils.c gwobex/log.h
 
+btio_sources = btio/btio.h btio/btio.c
+
 libexec_PROGRAMS =
 
 if SERVER
@@ -66,11 +68,10 @@ builtin_nodist += plugins/phonebook.c
 
 libexec_PROGRAMS += src/obexd
 
-src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) \
+src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
 			src/main.c src/obexd.h src/plugin.h src/plugin.c \
-			src/log.h src/log.c src/btio.h src/btio.c \
-			src/dbus.h src/manager.c src/obex.h src/obex.c \
-			src/obex-priv.h \
+			src/log.h src/log.c src/dbus.h src/manager.c \
+			src/obex.h src/obex.c src/obex-priv.h \
 			src/mimetype.h src/mimetype.c \
 			src/service.h src/service.c \
 			src/transport.h src/transport.c \
@@ -108,13 +109,12 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) client/main.c \
-				client/session.h client/session.c \
+client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) $(btio_sources) \
+				client/main.c client/session.h client/session.c \
 				src/log.h src/log.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
-				client/transfer.h client/transfer.c \
-				src/btio.c src/btio.h
+				client/transfer.h client/transfer.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@
 endif
@@ -127,7 +127,8 @@ AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 			-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
 INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \
-				-I$(srcdir)/gdbus -I$(srcdir)/gwobex
+				-I$(srcdir)/gdbus -I$(srcdir)/gwobex \
+				-I$(srcdir)/btio
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
