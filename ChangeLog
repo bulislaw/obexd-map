@@ -1,3 +1,12 @@
+ver 0.34:
+	Fix issue with error detection and last part of transfer buffer.
+	Fix issue with not detecting errors on small files.
+	Fix issue with emitting TransferCompleted twice.
+	Fix issue with default call type from call log.
+	Fix issue with websiteUrl query field not being generic.
+	Add support for binding mch, ich, och and cch call logs.
+	Add handling of TITLE contact's field in vCard.
+
 ver 0.33:
 	Fix issue with handling of phonebook size during pull request.
 	Add support for handling of UID contact field in vCard.
