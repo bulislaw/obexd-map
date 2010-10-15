@@ -1,3 +1,11 @@
+ver 0.35:
+	Fix regression on suspend on opening.
+	Fix suspend stream on opening if no data.
+	Fix memory leaks in phonebook-tracker module.
+	Fix not responding Not Found for filtered vcard-listing.
+	Fix not responding Not Found when no entry is found.
+	Fix issue with X-IRMC-CALL-DATETIME format.
+
 ver 0.34:
 	Fix issue with error detection and last part of transfer buffer.
 	Fix issue with not detecting errors on small files.
