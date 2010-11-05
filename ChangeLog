@@ -1,3 +1,13 @@
+ver 0.36:
+	Fix crash for empty listing and an invalid cache.
+	Fix issue with process pending request if transfer canceled.
+	Fix issue with error setting when canceling suspended requests.
+	Fix issue with folder listing and name header for subfolders.
+	Fix issue with status response after pulling empty call history.
+	Fix issue with not handling nco affiliation fields correctly.
+	Fix issue with history listing queries in phonebook-tracker.
+	Fix regression when formatting timestamps from tracker.
+
 ver 0.35:
 	Fix regression on suspend on opening.
 	Fix suspend stream on opening if no data.
