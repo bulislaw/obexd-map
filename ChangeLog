@@ -1,3 +1,9 @@
+ver 0.37:
+	Fix queries for contact with only one affiliation.
+	Fix pull phonebook with non-zero offset parameter.
+	Fix pull phonebook reply if filter not set.
+	Fix proper type handling for various queries.
+
 ver 0.36:
 	Fix crash for empty listing and an invalid cache.
 	Fix issue with process pending request if transfer canceled.
