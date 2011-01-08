@@ -1,3 +1,10 @@
+ver 0.39:
+	Fix for handling fax and cell phone numbers.
+	Fix for handling emails in pull call history queries.
+	Fix for handling addresses in pull call history queries.
+	Fix for handling default card and empty phonebook.
+	Add support for handling NewMissedCalls.
+
 ver 0.38:
 	Fix regression causing crash in 3-way calling.
 	Fix possible crash when processing session callback.
