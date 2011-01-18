@@ -22,5 +22,6 @@ AC_DEFUN([COMPILER_FLAGS], [
 		CFLAGS+=" -Wmissing-declarations"
 		CFLAGS+=" -Wredundant-decls"
 		CFLAGS+=" -Wcast-align"
+		CFLAGS+=" -DG_DISABLE_DEPRECATED"
 	fi
 ])
