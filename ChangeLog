@@ -1,3 +1,9 @@
+ver 0.40:
+	Fix issue with plugin close & disconnect functions call order.
+	Fix issue with history queries for contacts outside phonebook.
+	Fix issue with crash after fetching single owner vCard.
+	Add support for multiple URLs in phonebooks.
+
 ver 0.39:
 	Fix for handling fax and cell phone numbers.
 	Fix for handling emails in pull call history queries.
