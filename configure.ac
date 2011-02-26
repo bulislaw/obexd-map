@@ -158,12 +158,11 @@ AC_ARG_ENABLE(usb, AC_HELP_STRING([--enable-usb],
 AM_CONDITIONAL(USB, test "${enable_usb}" = "yes" &&
 				test "${enable_server}" != "no")
 
-AC_ARG_ENABLE(nokia_backup, AC_HELP_STRING([--enable-nokia-backup],
-				[enable nokia-backup plugin]), [
-	enable_nokia_backup=${enableval}
+AC_ARG_ENABLE(pcsuite, AC_HELP_STRING([--enable-pcsuite],
+				[enable Nokia PcSuite plugin]), [
+	enable_pcsuite=${enableval}
 ])
-AM_CONDITIONAL(NOKIA_BACKUP, test "${enable_nokia_backup}" = "yes" &&
-				test "${enable_server}" != "no")
+AM_CONDITIONAL(NOKIA_PCSUITE, test "${enable_pcsuite}" = "yes")
 
 AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 				[disable compilation of OBEX client]), [
