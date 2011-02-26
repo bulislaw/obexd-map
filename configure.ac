@@ -155,8 +155,7 @@ AC_ARG_ENABLE(usb, AC_HELP_STRING([--enable-usb],
 				[enable usb plugin]), [
 	enable_usb=${enableval}
 ])
-AM_CONDITIONAL(USB, test "${enable_usb}" = "yes" &&
-				test "${enable_server}" != "no")
+AM_CONDITIONAL(USB, test "${enable_usb}" = "yes")
 
 AC_ARG_ENABLE(pcsuite, AC_HELP_STRING([--enable-pcsuite],
 				[enable Nokia PcSuite plugin]), [
