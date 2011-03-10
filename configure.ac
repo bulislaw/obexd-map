@@ -106,6 +106,18 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 		CFLAGS="$CFLAGS -g"
 	fi
 ])
+
+messages_driver=dummy
+AC_ARG_WITH(messages, AC_HELP_STRING([--with-messages=DRIVER], [select messages driver]), [
+	if (test "${withval}" = "no"); then
+		messages_driver=dummy;
+	else
+		messages_driver=${withval};
+	fi
+])
+
+AC_SUBST([MESSAGES_DRIVER], [messages-${messages_driver}.c])
+
 phonebook_driver=dummy
 AC_ARG_WITH(phonebook, AC_HELP_STRING([--with-phonebook=DRIVER], [select phonebook driver]), [
 	if (test "${withval}" = "no"); then

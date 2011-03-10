@@ -29,6 +29,7 @@ src/obexd
 src/obexd.service
 plugins/phonebook.c
 plugins/telephony.c
+plugins/messages.c
 client/obex-client
 client/obex-client.service
 test/obex-test

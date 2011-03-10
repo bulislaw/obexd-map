@@ -58,6 +58,9 @@ builtin_modules += pbap
 builtin_sources += plugins/pbap.c plugins/phonebook.h \
 			plugins/vcard.h plugins/vcard.c
 
+builtin_modules += mas
+builtin_sources += plugins/mas.c plugins/messages.h
+
 builtin_modules += irmc
 builtin_sources += plugins/irmc.c
 
@@ -65,6 +68,7 @@ builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
 builtin_nodist += plugins/phonebook.c
+builtin_nodist += plugins/messages.c
 
 libexec_PROGRAMS += src/obexd
 
@@ -137,7 +141,8 @@ CLEANFILES = $(service_DATA) $(builtin_files)
 EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
 			src/obexd.service.in client/obex-client.service.in \
 			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
-			plugins/phonebook-tracker.c
+			plugins/phonebook-tracker.c \
+			plugins/messages-dummy.c
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 
@@ -149,4 +154,7 @@ MAINTAINERCLEANFILES = Makefile.in \
 	$(AM_V_GEN)$(SED) -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
 
 plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
+	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
+
+plugins/messages.c: plugins/@MESSAGES_DRIVER@
 	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
