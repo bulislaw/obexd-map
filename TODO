@@ -1,0 +1,26 @@
+Background
+==========
+
+- Priority scale: High, Medium and Low
+
+- Complexity scale: C1, C2, C4 and C8.  The complexity scale is exponential,
+  with complexity 1 being the lowest complexity.  Complexity is a function
+  of both task 'complexity' and task 'scope'.
+
+  The general rule of thumb is that a complexity 1 task should take 1-2 weeks
+  for a person very familiar with BlueZ codebase.  Higher complexity tasks
+  require more time and have higher uncertainty.
+
+  Higher complexity tasks should be refined into several lower complexity tasks
+  once the task is better understood.
+
+General
+==========
+
+- OBEX Actions are used to perform actions not primarily defined as OBEX
+  commands. This actions include, for example, moving, copying and setting the
+  permissions of objects. OBEX actions would be very useful when implementing
+  virtual filesystems over OBEX.
+
+  Priority: Medium
+  Complexity: C2
