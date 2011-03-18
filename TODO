@@ -24,3 +24,18 @@ General
 
   Priority: Medium
   Complexity: C2
+
+- Single Response Mode (SRM): The Single Response Mode header shall be used to
+  enable this mode, while the SRMP header may be used to alter the normal
+  processing of SRM for a single request/response exchange during the current
+  operation. The use of the SRMP header is optional; however, GOEP devices that
+  support SRM shall be able to receive and process this header. SRMP headers
+  should be used judiciously as this will impact the overall throughput of the
+  operation using SRM. Receipt of invalid or unexpected Single Response Mode or
+  SRMP header values shall be ignored by the receiving device.
+
+  When SRM is active the action of suspending a request can be notified using SRMP
+  “wait” option (0x01).
+
+  Priority: Low
+  Complexity: C4
