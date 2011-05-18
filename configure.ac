@@ -149,10 +149,16 @@ if (test "${phonebook_driver}" = "ebook"); then
 fi
 
 if (test "${phonebook_driver}" = "tracker"); then
-	PKG_CHECK_MODULES(TRACKER_SPARQL, tracker-sparql-0.9, dummy=yes,
-				AC_MSG_ERROR(libtracker-sparql is required))
-	AC_SUBST(TRACKER_SPARQL_CFLAGS)
-	AC_SUBST(TRACKER_SPARQL_LIBS)
+	PKG_CHECK_MODULES(TRACKER_09, tracker-sparql-0.9, [
+			TRACKER_CFLAGS=${TRACKER_09_CFLAGS}
+			TRACKER_LIBS=${TRACKER_09_CFLAGS}
+		], [
+			PKG_CHECK_MODULES(TRACKER_10, tracker-sparql-0.10, [
+					TRACKER_CFLAGS=${TRACKER_10_CFLAGS}
+					TRACKER_LIBS=${TRACKER_10_LIBS}
+			], AC_MSG_ERROR(libtracker-sparql is required))])
+	AC_SUBST(TRACKER_CFLAGS)
+	AC_SUBST(TRACKER_LIBS)
 fi
 
 AC_SUBST([PHONEBOOK_DRIVER], [phonebook-${phonebook_driver}.c])
