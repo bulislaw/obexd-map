@@ -151,7 +151,7 @@ fi
 if (test "${phonebook_driver}" = "tracker"); then
 	PKG_CHECK_MODULES(TRACKER_09, tracker-sparql-0.9, [
 			TRACKER_CFLAGS=${TRACKER_09_CFLAGS}
-			TRACKER_LIBS=${TRACKER_09_CFLAGS}
+			TRACKER_LIBS=${TRACKER_09_LIBS}
 		], [
 			PKG_CHECK_MODULES(TRACKER_10, tracker-sparql-0.10, [
 					TRACKER_CFLAGS=${TRACKER_10_CFLAGS}
