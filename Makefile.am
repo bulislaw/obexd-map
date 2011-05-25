@@ -138,7 +138,7 @@ INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
-EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) src/obex.conf \
+EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) \
 			src/obexd.service.in client/obex-client.service.in \
 			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
 			plugins/phonebook-tracker.c \
