@@ -163,14 +163,8 @@ fi
 
 AC_SUBST([PHONEBOOK_DRIVER], [phonebook-${phonebook_driver}.c])
 
-AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
-				[disable compilation of OBEX server]), [
-	enable_server=${enableval}
-])
-AM_CONDITIONAL(SERVER, test "${enable_server}" != "no")
-
 AC_ARG_ENABLE(usb, AC_HELP_STRING([--enable-usb],
-				[enable usb plugin]), [
+				[enable USB plugin]), [
 	enable_usb=${enableval}
 ])
 AM_CONDITIONAL(USB, test "${enable_usb}" = "yes")
@@ -180,6 +174,12 @@ AC_ARG_ENABLE(pcsuite, AC_HELP_STRING([--enable-pcsuite],
 	enable_pcsuite=${enableval}
 ])
 AM_CONDITIONAL(NOKIA_PCSUITE, test "${enable_pcsuite}" = "yes")
+
+AC_ARG_ENABLE(server, AC_HELP_STRING([--disable-server],
+				[disable compilation of OBEX server]), [
+	enable_server=${enableval}
+])
+AM_CONDITIONAL(SERVER, test "${enable_server}" != "no")
 
 AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 				[disable compilation of OBEX client]), [
