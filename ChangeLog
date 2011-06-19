@@ -1,3 +1,10 @@
+ver 0.41:
+	Fix issue with pulling phonebook entries without last name.
+	Fix issue with handling owner data in phonebook pull.
+	Add support for fetching call history in parts.
+	Add support for selective plugin loading.
+	Add support for Message Access Profile plugin.
+
 ver 0.40:
 	Fix issue with plugin close & disconnect functions call order.
 	Fix issue with history queries for contacts outside phonebook.
