@@ -52,7 +52,7 @@ builtin_modules += opp
 builtin_sources += plugins/opp.c
 
 builtin_modules += ftp
-builtin_sources += plugins/ftp.c
+builtin_sources += plugins/ftp.c plugins/ftp.h
 
 builtin_modules += pbap
 builtin_sources += plugins/pbap.c plugins/phonebook.h \
