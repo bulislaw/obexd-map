@@ -114,9 +114,10 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) $(btio_sources) \
-				client/main.c client/session.h client/session.c \
-				src/log.h src/log.c \
+client_obex_client_SOURCES = $(gdbus_sources) \
+				$(gwobex_sources) $(btio_sources) \
+				client/main.c src/log.h src/log.c \
+				client/session.h client/session.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
 				client/transfer.h client/transfer.c
