@@ -7,9 +7,11 @@ fi
 ./bootstrap && \
     ./configure --enable-maintainer-mode \
 		--enable-debug \
-		--enable-usb \
 		--prefix=/usr \
 		--libexec=/usr/lib/obex \
 		--mandir=/usr/share/man \
 		--sysconfdir=/etc \
-		--with-phonebook=dummy $*
+		--with-messages=dummy \
+		--with-phonebook=dummy \
+		--enable-usb \
+		--enable-pcsuite $*
