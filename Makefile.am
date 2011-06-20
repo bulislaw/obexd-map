@@ -23,6 +23,7 @@ btio_sources = btio/btio.h btio/btio.c
 
 gobex_sources = gobex/gobex.h gobex/gobex.c
 
+noinst_PROGRAMS =
 libexec_PROGRAMS =
 
 if SERVER
@@ -99,7 +100,7 @@ plugindir = $(libdir)/obex/plugins
 
 plugin_LTLIBRARIES =
 
-noinst_PROGRAMS = test/obex-test
+noinst_PROGRAMS += test/obex-test
 
 test_obex_test_SOURCES = $(gwobex_sources) test/main.c
 
@@ -162,3 +163,10 @@ plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
 
 plugins/messages.c: plugins/@MESSAGES_DRIVER@
 	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
+
+TESTS = unit/test-gobex
+
+noinst_PROGRAMS += unit/test-gobex
+
+unit_test_gobex_SOURCES = unit/test-gobex.c $(gobex_sources)
+unit_test_gobex_LDADD = @GLIB_LIBS@
