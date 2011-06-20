@@ -21,6 +21,8 @@ gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 
 btio_sources = btio/btio.h btio/btio.c
 
+gobex_sources = gobex/gobex.h gobex/gobex.c
+
 libexec_PROGRAMS =
 
 if SERVER
@@ -73,7 +75,8 @@ builtin_nodist += plugins/messages.c
 libexec_PROGRAMS += src/obexd
 
 src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
-			src/main.c src/obexd.h src/plugin.h src/plugin.c \
+			$(gobex_sources) src/main.c src/obexd.h \
+			src/plugin.h src/plugin.c \
 			src/log.h src/log.c src/dbus.h src/manager.c \
 			src/obex.h src/obex.c src/obex-priv.h \
 			src/mimetype.h src/mimetype.c \
@@ -114,7 +117,7 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_sources) \
+client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				$(gwobex_sources) $(btio_sources) \
 				client/main.c src/log.h src/log.c \
 				client/session.h client/session.c \
@@ -135,7 +138,7 @@ AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 
 INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \
 				-I$(srcdir)/gdbus -I$(srcdir)/gwobex \
-				-I$(srcdir)/btio
+				-I$(srcdir)/btio -I$(srcdir)/gobex
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
