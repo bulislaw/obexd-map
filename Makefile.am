@@ -21,7 +21,7 @@ gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 
 btio_sources = btio/btio.h btio/btio.c
 
-gobex_sources = gobex/gobex.h gobex/gobex.c
+gobex_sources = gobex/gobex.h gobex/gobex.c gobex/obex.h
 
 noinst_PROGRAMS =
 libexec_PROGRAMS =
