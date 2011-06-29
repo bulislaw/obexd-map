@@ -21,7 +21,8 @@ gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 
 btio_sources = btio/btio.h btio/btio.c
 
-gobex_sources = gobex/gobex.h gobex/gobex.c gobex/gobex-defs.h \
+gobex_sources = gobex/gobex.h gobex/gobex.c \
+			gobex/gobex-defs.h gobex/gobex-defs.c \
 			gobex/gobex-packet.c gobex/gobex-packet.h \
 			gobex/gobex-header.c gobex/gobex-header.h
 
