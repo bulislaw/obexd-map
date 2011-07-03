@@ -183,3 +183,8 @@ unit_test_gobex_packet_LDADD = @GLIB_LIBS@
 unit_test_gobex_header_SOURCES = $(gobex_sources) unit/test-gobex-header.c \
 							unit/util.c unit/util.h
 unit_test_gobex_header_LDADD = @GLIB_LIBS@
+
+noinst_PROGRAMS += tools/test-server
+tools_test_server_SOURCES = $(gobex_sources) $(btio_sources) \
+							tools/test-server.c
+tools_test_server_LDADD = @GLIB_LIBS@ @BLUEZ_LIBS@
