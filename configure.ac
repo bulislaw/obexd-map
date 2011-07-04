@@ -35,6 +35,8 @@ AC_PROG_CC_PIE
 AC_PROG_INSTALL
 AC_PROG_SED
 
+AC_PATH_READLINE
+
 m4_define([_LT_AC_TAGCONFIG], [])
 m4_ifdef([AC_LIBTOOL_TAGS], [AC_LIBTOOL_TAGS([])])
 
@@ -186,5 +188,7 @@ AC_ARG_ENABLE(client, AC_HELP_STRING([--disable-client],
 	enable_client=${enableval}
 ])
 AM_CONDITIONAL(CLIENT, test "${enable_client}" != "no")
+
+AM_CONDITIONAL(READLINE, test "${readline_found}" = "yes")
 
 AC_OUTPUT(Makefile)

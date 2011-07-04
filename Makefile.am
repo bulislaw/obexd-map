@@ -184,10 +184,12 @@ unit_test_gobex_header_SOURCES = $(gobex_sources) unit/test-gobex-header.c \
 							unit/util.c unit/util.h
 unit_test_gobex_header_LDADD = @GLIB_LIBS@
 
+if READLINE
 noinst_PROGRAMS += tools/test-client
 tools_test_client_SOURCES = $(gobex_sources) $(btio_sources) \
 							tools/test-client.c
-tools_test_client_LDADD = @GLIB_LIBS@ @BLUEZ_LIBS@
+tools_test_client_LDADD = @GLIB_LIBS@ @BLUEZ_LIBS@ @READLINE_LIBS@
+endif
 
 noinst_PROGRAMS += tools/test-server
 tools_test_server_SOURCES = $(gobex_sources) $(btio_sources) \
