@@ -24,7 +24,8 @@ btio_sources = btio/btio.h btio/btio.c
 gobex_sources = gobex/gobex.h gobex/gobex.c \
 			gobex/gobex-defs.h gobex/gobex-defs.c \
 			gobex/gobex-packet.c gobex/gobex-packet.h \
-			gobex/gobex-header.c gobex/gobex-header.h
+			gobex/gobex-header.c gobex/gobex-header.h \
+			gobex/gobex-transfer.c gobex/gobex-transfer.h
 
 noinst_PROGRAMS =
 libexec_PROGRAMS =
