@@ -33,3 +33,9 @@ plugins/messages.c
 client/obex-client
 client/obex-client.service
 test/obex-test
+tools/test-client
+tools/test-server
+unit/test-gobex
+unit/test-gobex-header
+unit/test-gobex-packet
+unit/test-gobex-transfer
