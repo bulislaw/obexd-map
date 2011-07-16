@@ -1,3 +1,10 @@
+ver 0.42:
+	Fix issue with freeing buffer before transfer is complete.
+	Fix issue with invalid memory read when pulling phonebook.
+	Fix issue with test cases for empty phonebooks.
+	Add support for multiple phonebooks when using EDS.
+	Add support for handling OBEX Action command.
+
 ver 0.41:
 	Fix issue with pulling phonebook entries without last name.
 	Fix issue with handling owner data in phonebook pull.
