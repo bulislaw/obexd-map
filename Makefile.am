@@ -125,6 +125,7 @@ libexec_PROGRAMS += client/obex-client
 client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				$(gwobex_sources) $(btio_sources) \
 				client/main.c src/log.h src/log.c \
+				client/manager.h client/manager.c \
 				client/session.h client/session.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
