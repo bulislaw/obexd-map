@@ -12,10 +12,10 @@ AC_DEFUN([AC_PROG_CC_PIE], [
 
 AC_DEFUN([AC_PATH_READLINE], [
 	AC_CHECK_HEADER(readline/readline.h,
-		AC_CHECK_LIB(readline, main,
+		[AC_CHECK_LIB(readline, main,
 			[ readline_found=yes
 			AC_SUBST(READLINE_LIBS, "-lreadline")
-			], readline_found=no),
+			], readline_found=no)],
 		[])
 ])
 
