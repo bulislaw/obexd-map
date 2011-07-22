@@ -26,6 +26,7 @@
 #endif
 
 #include <errno.h>
+#include <string.h>
 #include <glib.h>
 #include <openobex/obex.h>
 #include <fcntl.h>
@@ -98,18 +99,468 @@
 #define FL_FOLDER_ELEMENT "<folder name=\"%s\"/>"
 #define FL_BODY_END "</folder-listing>"
 
+/* Tags needed to retrieve and set application parameters */
+enum aparam_tag {
+	MAXLISTCOUNT_TAG	= 0x01,
+	STARTOFFSET_TAG		= 0x02,
+	FILTERMESSAGETYPE_TAG	= 0x03,
+	FILTERPERIODBEGIN_TAG	= 0x04,
+	FILTERPERIODEND_TAG	= 0x05,
+	FILTERREADSTATUS_TAG	= 0x06,
+	FILTERRECIPIENT_TAG	= 0x07,
+	FILTERORIGINATOR_TAG	= 0x08,
+	FILTERPRIORITY_TAG	= 0x09,
+	ATTACHMENT_TAG		= 0x0A,
+	TRANSPARENT_TAG		= 0x0B,
+	RETRY_TAG		= 0x0C,
+	NEWMESSAGE_TAG		= 0x0D,
+	NOTIFICATIONSTATUS_TAG	= 0x0E,
+	MASINSTANCEID_TAG	= 0x0F,
+	PARAMETERMASK_TAG	= 0x10,
+	FOLDERLISTINGSIZE_TAG	= 0x11,
+	MESSAGESLISTINGSIZE_TAG	= 0x12,
+	SUBJECTLENGTH_TAG	= 0x13,
+	CHARSET_TAG		= 0x14,
+	FRACTIONREQUEST_TAG	= 0x15,
+	FRACTIONDELIVER_TAG	= 0x16,
+	STATUSINDICATOR_TAG	= 0x17,
+	STATUSVALUE_TAG		= 0x18,
+	MSETIME_TAG		= 0x19,
+	INVALID_TAG		= 0x100,
+};
+
+enum aparam_type {
+	APT_UINT8,
+	APT_UINT16,
+	APT_UINT32,
+	APT_STR
+};
+
+static const struct aparam_def {
+	enum aparam_tag tag;
+	const char *name;
+	enum aparam_type type;
+} aparam_defs[] = {
+	{ MAXLISTCOUNT_TAG,		"MAXLISTCOUNT",
+		APT_UINT16					},
+	{ STARTOFFSET_TAG,		"STARTOFFSET",
+		APT_UINT16					},
+	{ FILTERMESSAGETYPE_TAG,	"FILTERMESSAGETYPE",
+		APT_UINT8					},
+	{ FILTERPERIODBEGIN_TAG,	"FILTERPERIODBEGIN",
+		APT_STR						},
+	{ FILTERPERIODEND_TAG,		"FILTERPERIODEND",
+		APT_STR						},
+	{ FILTERREADSTATUS_TAG,		"FILTERREADSTATUS",
+		APT_UINT8					},
+	{ FILTERRECIPIENT_TAG,		"FILTERRECIPIENT",
+		APT_STR						},
+	{ FILTERORIGINATOR_TAG,		"FILTERORIGINATOR",
+		APT_STR						},
+	{ FILTERPRIORITY_TAG,		"FILTERPRIORITY",
+		APT_UINT8					},
+	{ ATTACHMENT_TAG,		"ATTACHMENT",
+		APT_UINT8					},
+	{ TRANSPARENT_TAG,		"TRANSPARENT",
+		APT_UINT8					},
+	{ RETRY_TAG,			"RETRY",
+		APT_UINT8					},
+	{ NEWMESSAGE_TAG,		"NEWMESSAGE",
+		APT_UINT8					},
+	{ NOTIFICATIONSTATUS_TAG,	"NOTIFICATIONSTATUS",
+		APT_UINT8					},
+	{ MASINSTANCEID_TAG,		"MASINSTANCEID",
+		APT_UINT8					},
+	{ PARAMETERMASK_TAG,		"PARAMETERMASK",
+		APT_UINT32					},
+	{ FOLDERLISTINGSIZE_TAG,	"FOLDERLISTINGSIZE",
+		APT_UINT16					},
+	{ MESSAGESLISTINGSIZE_TAG,	"MESSAGESLISTINGSIZE",
+		APT_UINT16					},
+	{ SUBJECTLENGTH_TAG,		"SUBJECTLENGTH",
+		APT_UINT8					},
+	{ CHARSET_TAG,			"CHARSET",
+		APT_UINT8					},
+	{ FRACTIONREQUEST_TAG,		"FRACTIONREQUEST",
+		APT_UINT8					},
+	{ FRACTIONDELIVER_TAG,		"FRACTIONDELIVER",
+		APT_UINT8					},
+	{ STATUSINDICATOR_TAG,		"STATUSINDICATOR",
+		APT_UINT8					},
+	{ STATUSVALUE_TAG,		"STATUSVALUE",
+		APT_UINT8					},
+	{ MSETIME_TAG,			"MSETIME",
+		APT_STR						},
+	{ INVALID_TAG,			NULL,
+		0						},
+};
+
+struct aparam_entry {
+	enum aparam_tag tag;
+	union {
+		uint32_t val32u;
+		uint16_t val16u;
+		uint8_t val8u;
+		char *valstr;
+	};
+};
+
+/* This comes from OBEX specs */
+struct aparam_header {
+	uint8_t tag;
+	uint8_t len;
+	uint8_t val[0];
+} __attribute__ ((packed));
+
 struct mas_session {
 	struct mas_request *request;
 	void *backend_data;
 	gboolean finished;
 	gboolean nth_call;
 	GString *buffer;
+	GHashTable *inparams;
+	GHashTable *outparams;
 };
 
 static const uint8_t MAS_TARGET[TARGET_SIZE] = {
 			0xbb, 0x58, 0x2b, 0x40, 0x42, 0x0c, 0x11, 0xdb,
 			0xb0, 0xde, 0x08, 0x00, 0x20, 0x0c, 0x9a, 0x66  };
 
+static int find_aparam_tag(uint8_t tag)
+{
+	int i;
+
+	for (i = 0; aparam_defs[i].tag != INVALID_TAG; ++i) {
+		if (aparam_defs[i].tag == tag)
+			return i;
+	}
+
+	return -1;
+}
+
+static void aparams_entry_free(gpointer val)
+{
+	struct aparam_entry *entry = val;
+	int tago;
+
+	tago = find_aparam_tag(entry->tag);
+
+	if (tago < 0)
+		goto notagdata;
+
+	if (aparam_defs[tago].type == APT_STR)
+		g_free(entry->valstr);
+
+notagdata:
+	g_free(entry);
+}
+
+static void aparams_free(GHashTable *aparams)
+{
+	if (!aparams)
+		return;
+
+	g_hash_table_destroy(aparams);
+}
+
+static GHashTable *aparams_new(void)
+{
+	GHashTable *aparams;
+
+	aparams = g_hash_table_new_full(NULL, NULL, NULL, aparams_entry_free);
+
+	return aparams;
+}
+
+/* Add/replace value of given tag in parameters table. If val is null, then
+ * remove selected parameter.
+ */
+static gboolean aparams_write(GHashTable *params, enum aparam_tag tag,
+								gpointer val)
+{
+	struct aparam_entry *param;
+	int tago;
+	union {
+		char *valstr;
+		uint16_t val16u;
+		uint32_t val32u;
+		uint8_t val8u;
+	} *e = val;
+
+	tago = find_aparam_tag(tag);
+
+	if (tago < 0)
+		goto failed;
+
+	param = g_new0(struct aparam_entry, 1);
+	param->tag = tag;
+
+	/* XXX: will it free string? */
+	g_hash_table_remove(params, GINT_TO_POINTER(tag));
+
+	if (!val)
+		return TRUE;
+
+	switch (aparam_defs[tago].type) {
+	case APT_STR:
+		param->valstr = e->valstr;
+		break;
+	case APT_UINT16:
+		param->val16u = e->val16u;
+		break;
+	case APT_UINT32:
+		param->val32u = e->val32u;
+		break;
+	case APT_UINT8:
+		param->val8u = e->val8u;
+		break;
+	default:
+		goto failed;
+	}
+
+	g_hash_table_insert(params, GINT_TO_POINTER(tag), param);
+
+	return TRUE;
+failed:
+	g_free(param);
+	return FALSE;
+}
+
+static void aparams_dump(gpointer tag, gpointer val, gpointer user_data)
+{
+	struct aparam_entry *param = val;
+	int tago;
+
+	tago = find_aparam_tag(GPOINTER_TO_INT(tag));
+
+	switch (aparam_defs[tago].type) {
+	case APT_STR:
+		DBG("%-30s %s", aparam_defs[tago].name, param->valstr);
+		break;
+	case APT_UINT16:
+		DBG("%-30s %08x", aparam_defs[tago].name, param->val16u);
+		break;
+	case APT_UINT32:
+		DBG("%-30s %08x", aparam_defs[tago].name, param->val32u);
+		break;
+	case APT_UINT8:
+		DBG("%-30s %08x", aparam_defs[tago].name, param->val8u);
+		break;
+	}
+}
+
+static gboolean aparams_read(GHashTable *params, enum aparam_tag tag,
+								gpointer val)
+{
+	struct aparam_entry *param;
+	int tago;
+	union {
+		char *valstr;
+		uint16_t val16u;
+		uint32_t val32u;
+		uint8_t val8u;
+	} *e = val;
+
+	param = g_hash_table_lookup(params, GINT_TO_POINTER(tag));
+
+	if (!param)
+		return FALSE;
+
+	if (!val)
+		goto nooutput;
+
+	tago = find_aparam_tag(tag);
+
+	switch (aparam_defs[tago].type) {
+	case APT_STR:
+		e->valstr = param->valstr;
+		break;
+	case APT_UINT16:
+		e->val16u = param->val16u;
+		break;
+	case APT_UINT32:
+		e->val32u = param->val32u;
+		break;
+	case APT_UINT8:
+		e->val8u = param->val8u;
+		break;
+	default:
+		return FALSE;
+	}
+
+nooutput:
+	return TRUE;
+}
+
+static GHashTable *parse_aparam(const uint8_t *buffer, uint32_t hlen)
+{
+	GHashTable *aparams;
+	struct aparam_header *hdr;
+	uint32_t len = 0;
+	uint16_t val16;
+	uint32_t val32;
+	union {
+		char *valstr;
+		uint16_t val16u;
+		uint32_t val32u;
+		uint8_t val8u;
+	} entry;
+	int tago;
+
+	aparams = aparams_new();
+	if (!aparams)
+		return NULL;
+
+	while (len < hlen) {
+		hdr = (void *) buffer + len;
+
+		tago = find_aparam_tag(hdr->tag);
+
+		if (tago < 0)
+			goto skip;
+
+		switch (aparam_defs[tago].type) {
+		case APT_STR:
+			entry.valstr = g_try_malloc0(hdr->len + 1);
+			if (entry.valstr)
+				memcpy(entry.valstr, hdr->val, hdr->len);
+			break;
+		case APT_UINT16:
+			if (hdr->len != 2)
+				goto failed;
+			memcpy(&val16, hdr->val, sizeof(val16));
+			entry.val16u = GUINT16_FROM_BE(val16);
+			break;
+		case APT_UINT32:
+			if (hdr->len != 4)
+				goto failed;
+			memcpy(&val32, hdr->val, sizeof(val32));
+			entry.val32u = GUINT32_FROM_BE(val32);
+			break;
+		case APT_UINT8:
+			if (hdr->len != 1)
+				goto failed;
+			entry.val8u = hdr->val[0];
+			break;
+		default:
+			goto failed;
+		}
+		aparams_write(aparams, hdr->tag, &entry);
+skip:
+		len += hdr->len + sizeof(struct aparam_header);
+	}
+
+	g_hash_table_foreach(aparams, aparams_dump, NULL);
+
+	return aparams;
+failed:
+	aparams_free(aparams);
+
+	return NULL;
+}
+
+static GString *revparse_aparam(GHashTable *aparams)
+{
+	struct aparam_header hdr;
+	gpointer key;
+	gpointer value;
+	uint16_t val16;
+	uint32_t val32;
+	union {
+		char *valstr;
+		uint16_t val16u;
+		uint32_t val32u;
+		uint8_t val8u;
+	} entry;
+	int tago;
+	GHashTableIter iter;
+	GString *buffer = NULL;
+
+	if (!aparams)
+		return NULL;
+
+	g_hash_table_iter_init(&iter, aparams);
+	buffer = g_string_new("");
+
+	while (g_hash_table_iter_next(&iter, &key, &value)) {
+
+		tago = find_aparam_tag(GPOINTER_TO_INT(key));
+
+		if (tago < 0)
+			goto failed;
+
+		hdr.tag = aparam_defs[tago].tag;
+		aparams_read(aparams, GPOINTER_TO_INT(key), &entry);
+
+		switch (aparam_defs[tago].type) {
+		case APT_STR:
+			hdr.len = strlen(entry.valstr);
+			g_string_append_len(buffer, (gpointer)&hdr,
+							sizeof(hdr));
+			g_string_append_len(buffer, entry.valstr, hdr.len);
+			break;
+		case APT_UINT16:
+			hdr.len = 2;
+			val16 = GUINT16_TO_BE(entry.val16u);
+			g_string_append_len(buffer, (gpointer)&hdr,
+							sizeof(hdr));
+			g_string_append_len(buffer, (gpointer)&val16,
+							sizeof(entry.val16u));
+			break;
+		case APT_UINT32:
+			hdr.len = 4;
+			val32 = GUINT32_TO_BE(entry.val32u);
+			g_string_append_len(buffer, (gpointer)&hdr,
+							sizeof(hdr));
+			g_string_append_len(buffer, (gpointer)&val32,
+							sizeof(entry.val32u));
+			break;
+		case APT_UINT8:
+			hdr.len = 1;
+			g_string_append_len(buffer, (gpointer)&hdr,
+							sizeof(hdr));
+			g_string_append_len(buffer, (gpointer)&entry.val8u,
+							sizeof(entry.val8u));
+			break;
+		default:
+			goto failed;
+		}
+
+	}
+
+	return buffer;
+
+failed:
+	g_string_free(buffer, TRUE);
+
+	return NULL;
+}
+
+static int get_params(struct obex_session *os, obex_object_t *obj,
+					struct mas_session *mas)
+{
+	const uint8_t *buffer;
+	GHashTable *inparams = NULL;
+	ssize_t rsize;
+
+	rsize = obex_aparam_read(os, obj, &buffer);
+
+	if (rsize > 0) {
+		inparams = parse_aparam(buffer, rsize);
+		if (inparams == NULL) {
+			DBG("Error when parsing parameters!");
+			return -EBADR;
+		}
+	}
+
+	if (inparams == NULL)
+		inparams = aparams_new();
+
+	mas->inparams = inparams;
+	mas->outparams = aparams_new();
+
+	return 0;
+}
 
 static void reset_request(struct mas_session *mas)
 {
@@ -175,6 +626,10 @@ static int mas_get(struct obex_session *os, obex_object_t *obj, void *user_data)
 	if (type == NULL)
 		return -EBADR;
 
+	ret = get_params(os, obj, mas);
+	if (ret < 0)
+		goto failed;
+
 	ret = obex_get_stream_start(os, name);
 	if (ret < 0)
 		goto failed;
@@ -198,6 +653,10 @@ static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 
 	if (type == NULL)
 		return -EBADR;
+
+	ret = get_params(os, obj, mas);
+	if (ret < 0)
+		goto failed;
 
 	ret = obex_put_stream_start(os, name);
 	if (ret < 0)
