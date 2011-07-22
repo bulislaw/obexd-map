@@ -102,7 +102,7 @@ void messages_disconnect(void *s)
 
 int messages_set_notification_registration(void *session,
 		void (*send_event)(void *session,
-			struct messages_event *event, void *user_data),
+			const struct messages_event *event, void *user_data),
 		void *user_data)
 {
 	return -EINVAL;
@@ -319,7 +319,8 @@ int messages_get_folder_listing(void *s,
 
 int messages_get_messages_listing(void *session,
 		const char *name,
-		uint16_t max, uint16_t offset, struct messages_filter *filter,
+		uint16_t max, uint16_t offset,
+		const struct messages_filter *filter,
 		void (*callback)(void *session, int err, uint16_t size,
 			gboolean newmsg, const struct messages_message *message,
 			void *user_data),
