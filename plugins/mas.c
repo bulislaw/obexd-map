@@ -295,7 +295,7 @@ static gboolean aparams_write(GHashTable *params, enum aparam_tag tag,
 	tago = find_aparam_tag(tag);
 
 	if (tago < 0)
-		goto failed;
+		return FALSE;
 
 	param = g_new0(struct aparam_entry, 1);
 	param->tag = tag;
