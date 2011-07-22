@@ -218,9 +218,11 @@ struct aparam_header {
 struct mas_session {
 	struct mas_request *request;
 	void *backend_data;
+	gboolean ap_sent;
 	gboolean finished;
 	gboolean nth_call;
 	GString *buffer;
+	GString *apbuf;
 	GHashTable *inparams;
 	GHashTable *outparams;
 };
@@ -571,7 +573,12 @@ static void reset_request(struct mas_session *mas)
 		g_string_free(mas->buffer, TRUE);
 		mas->buffer = NULL;
 	}
+	if (mas->apbuf) {
+		g_string_free(mas->apbuf, TRUE);
+		mas->apbuf = NULL;
+	}
 
+	mas->ap_sent = FALSE;
 	mas->nth_call = FALSE;
 	mas->finished = FALSE;
 }
@@ -851,10 +858,22 @@ static void get_folder_listing_cb(void *session, int err, uint16_t size,
 					const char *name, void *user_data)
 {
 	struct mas_session *mas = user_data;
+	uint16_t max = 1024;
 
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
 		return;
+	}
+
+	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
+
+	if (max == 0) {
+		if (!err != -EAGAIN)
+			aparams_write(mas->outparams, FOLDERLISTINGSIZE_TAG,
+					&size);
+		if (!name)
+			mas->finished = TRUE;
+		goto proceed;
 	}
 
 	if (!mas->nth_call) {
@@ -925,8 +944,11 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 
 	DBG("name = %s", name);
 
+	mas->apbuf = NULL;
+	mas->buffer = NULL;
+
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
-	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &offset);
+	aparams_read(mas->inparams, STARTOFFSET_TAG, &offset);
 
 	*err = messages_get_folder_listing(mas->backend_data, name, max, offset,
 			get_folder_listing_cb, mas);
@@ -991,6 +1013,26 @@ static ssize_t any_write(void *object, const void *buf, size_t count)
 	DBG("");
 
 	return count;
+}
+
+static ssize_t any_get_next_header(void *object, void *buf, size_t mtu,
+								uint8_t *hi)
+{
+	struct mas_session *mas = object;
+
+	DBG("");
+
+	if (mas->buffer->len == 0 && !mas->finished)
+		return -EAGAIN;
+
+	*hi = OBEX_HDR_APPARAM;
+
+	if (!mas->ap_sent) {
+		mas->ap_sent = TRUE;
+		mas->apbuf = revparse_aparam(mas->outparams);
+	}
+
+	return string_read(mas->apbuf, buf, mtu);
 }
 
 static ssize_t any_read(void *obj, void *buf, size_t count)
@@ -1060,6 +1102,7 @@ static struct obex_mime_type_driver mime_folder_listing = {
 	.target = MAS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-obex/folder-listing",
+	.get_next_header = any_get_next_header,
 	.open = folder_listing_open,
 	.close = any_close,
 	.read = any_read,
