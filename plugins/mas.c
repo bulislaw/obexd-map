@@ -713,7 +713,7 @@ static void get_messages_listing_cb(void *session, int err,
 	uint32_t parametermask = 0xFFFF;
 	uint16_t max = 1024;
 
-//	aparams_read(mas->request->inparams, MAXLISTCOUNT_TAG, &max);
+	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
 
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
@@ -734,7 +734,7 @@ static void get_messages_listing_cb(void *session, int err,
 		goto proceed;
 	}
 
-//	aparams_read(mas->request->inparams, PARAMETERMASK_TAG, &parametermask);
+	aparams_read(mas->inparams, PARAMETERMASK_TAG, &parametermask);
 	if (parametermask == 0)
 		parametermask = 0xFFFF;
 
@@ -966,8 +966,24 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 {
 	struct mas_session *mas = driver_data;
 	struct messages_filter filter = { 0, };
+	uint16_t max = 1024;
+	uint16_t offset = 0;
 
 	DBG("");
+
+	mas->apbuf = NULL;
+	mas->buffer = NULL;
+
+	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
+	aparams_read(mas->inparams, STARTOFFSET_TAG, &offset);
+	aparams_read(mas->inparams, PARAMETERMASK_TAG, &filter.parameter_mask);
+	aparams_read(mas->inparams, FILTERMESSAGETYPE_TAG, &filter.type);
+	aparams_read(mas->inparams, FILTERPERIODBEGIN_TAG, &filter.period_begin);
+	aparams_read(mas->inparams, FILTERPERIODEND_TAG, &filter.period_end);
+	aparams_read(mas->inparams, FILTERREADSTATUS_TAG, &filter.read_status);
+	aparams_read(mas->inparams, FILTERRECIPIENT_TAG, &filter.recipient);
+	aparams_read(mas->inparams, FILTERORIGINATOR_TAG, &filter.originator);
+	aparams_read(mas->inparams, FILTERPRIORITY_TAG, &filter.priority);
 
 	*err = messages_get_messages_listing(mas->backend_data, name, 0xffff, 0,
 			&filter,
