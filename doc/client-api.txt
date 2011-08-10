@@ -130,7 +130,7 @@ Methods		void ChangeFolder(string folder)
 
 		void MoveFile(string sourcefile, string targetfile)
 
-			Movea file within the remote device from source file
+			Move a file within the remote device from source file
 			to the target file.
 
 		void Delete(string file)
@@ -245,11 +245,11 @@ Methods		void SetLocation(string location)
 
 		string GetPhonebook()
 
-			retrieve an entire Phonebook Object store from remote device
+			Retrieve an entire Phonebook Object store from remote device
 
 		void PutPhonebook(string obj)
 
-			send an entire Phonebook Object store to remote device
+			Send an entire Phonebook Object store to remote device
 
 Transfer hierarchy
 ==================
@@ -317,7 +317,7 @@ Methods		void Release()
 
 		void Complete(object transfer)
 
-			Informs that the transfer has completed sucessfully.
+			Informs that the transfer has completed successfully.
 
 		void Error(object transfer, string message)
 
