@@ -123,8 +123,8 @@ client_obex_client_SOURCES = $(gdbus_sources) \
 				client/sync.h client/sync.c \
 				client/ftp.h client/ftp.c \
 				client/transfer.h client/transfer.c \
-				client/agent.h client/agent.c
-
+				client/agent.h client/agent.c \
+				client/driver.h client/driver.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@
 endif
