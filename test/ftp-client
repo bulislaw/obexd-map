@@ -56,6 +56,12 @@ def parse_options():
                       help="Get FILE", metavar="FILE")
     parser.add_option("-p", "--put", dest="put_file",
                       help="Put FILE", metavar="FILE")
+    parser.add_option("-y", "--copy", dest="copy_file",
+                      help="Copy FILE", metavar="FILE")
+    parser.add_option("-m", "--move", dest="move_file",
+                      help="Move FILE", metavar="FILE")
+    parser.add_option("-n", "--destname", dest="dest_file",
+                      help="Destination FILE", metavar="FILE")
     parser.add_option("-r", "--remove", dest="remove_file",
                       help="Remove FILE", metavar="FILE")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
@@ -93,6 +99,18 @@ def get_file(session, filename):
 
 def remove_file(session, filename):
     session.Delete(filename,
+                    reply_handler=void_reply,
+                    error_handler=error)
+
+def move_file(session, filename, destname):
+    session.MoveFile(filename,
+                    destname,
+                    reply_handler=void_reply,
+                    error_handler=error)
+
+def copy_file(session, filename, destname):
+    session.CopyFile(filename,
+                    destname,
                     reply_handler=void_reply,
                     error_handler=error)
 
@@ -139,6 +157,12 @@ if  __name__ == '__main__':
 
     if options.put_file:
         put_file(ftp, options.put_file)
+
+    if options.move_file:
+        move_file(ftp, options.move_file, options.dest_file)
+
+    if options.copy_file:
+        copy_file(ftp, options.copy_file, options.dest_file)
 
     if options.remove_file:
        remove_file(ftp, options.remove_file)
