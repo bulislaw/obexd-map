@@ -32,6 +32,7 @@
 
 #include "log.h"
 #include "messages.h"
+#include "bmsg.h"
 
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
@@ -41,11 +42,9 @@
 #define MESSAGE_HANDLE_SIZE 16
 #define MESSAGE_HANDLE_PREFIX_LEN 8
 
-/*
- * As stated in MAP errata bmessage-body-content-length-property should be
- * length of: "BEGIN:MSG<CRLF>" + <message content> + "END:MSG<CRLF>"
- */
-#define BMESSAGE_BASE_LEN (9 + 2 + 2 + 7 + 2)
+#define SMS_DEFAULT_CHARSET "UTF-8"
+
+#define MESSAGES_FILTER_BY_HANDLE "FILTER (xsd:string(?msg) = \"message:%s\" ) ."
 
 #define MESSAGE_HANDLE 0
 #define MESSAGE_SUBJECT 1
@@ -127,9 +126,11 @@ struct session {
 	gboolean aborted;
 	reply_list_foreach_cb generate_response;
 	struct messages_filter *filter;
+	unsigned long flags;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
+		messages_get_message_cb message;
 	} cb;
 };
 
@@ -186,6 +187,26 @@ static struct messages_filter *copy_messages_filter(
 	filter->priority = orig->priority;
 
 	return filter;
+}
+
+static char *fill_handle(const char *handle)
+{
+	int fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
+	char *fill = g_strnfill(fill_size, '0');
+	char *ret = g_strdup_printf("%s%s", fill, handle);
+
+	g_free(fill);
+
+	return ret;
+}
+
+static char *strip_handle(const char *handle)
+{
+	const char *ptr_new = handle;
+
+	while (*ptr_new++ == '0') ;
+
+	return g_strdup(ptr_new - 1);
 }
 
 static char **string_array_from_iter(DBusMessageIter iter, int array_len)
@@ -258,7 +279,9 @@ static void query_reply(DBusPendingCall *call, void *user_data)
 
 		node = string_array_from_iter(element, QUERY_RESPONSE_SIZE);
 
-		session->generate_response((const char **) node, session);
+		if (node != NULL)
+			session->generate_response((const char **) node,
+								session);
 
 		g_free(node);
 
@@ -428,6 +451,39 @@ static char *merge_names(const char *name, const char *lastname)
 		tmp = g_strdup("");
 
 	return tmp;
+}
+
+static char *message2folder(const struct messages_message *data)
+{
+	if (data->sent == TRUE)
+		return g_strdup("telecom/msg/sent");
+
+	if (data->sent == FALSE)
+		return g_strdup("telecom/msg/inbox");
+
+	return NULL;
+}
+
+static char *path2query(const char *folder, const char *query,
+							const char *user_rule)
+{
+	if (g_str_has_suffix(folder, "telecom/msg/inbox") == TRUE)
+		return g_strdup_printf(query, "?msg nmo:isSent \"false\" ; "
+					"nmo:isDeleted \"false\" ; "
+					"nmo:isDraft \"false\". ", user_rule);
+
+	if (g_str_has_suffix(folder, "telecom/msg/sent") == TRUE)
+		return g_strdup_printf(query, "?msg nmo:isSent \"true\" ; "
+				"nmo:isDeleted \"false\" . ", user_rule);
+
+	if (g_str_has_suffix(folder, "telecom/msg/deleted") == TRUE)
+		return g_strdup_printf(query, "?msg nmo:isDeleted \"true\" . ",
+					user_rule);
+
+	if (g_str_has_suffix(folder, "telecom/msg") == TRUE)
+		return g_strdup_printf(query, "", user_rule);
+
+	return NULL;
 }
 
 static DBusConnection *dbus_get_connection(DBusBusType type)
@@ -644,6 +700,64 @@ done:
 	g_free(session->filter->originator);
 	g_free(session->filter->recipient);
 	g_free(session->filter);
+}
+
+static void get_message_resp(const char **reply, void *s)
+{
+	struct session *session = s;
+	struct messages_message *msg_data;
+	struct bmsg *bmsg;
+	char *final_bmsg, *status, *folder, *handle;
+	int err;
+
+	DBG("reply %p", reply);
+
+	if (reply == NULL)
+		goto done;
+
+	if (session->aborted)
+		goto aborted;
+
+	msg_data = pull_message_data(reply);
+	handle = fill_handle(msg_data->handle);
+	g_free(msg_data->handle);
+	msg_data->handle = handle;
+
+	status = msg_data->read ? "READ" : "UNREAD";
+
+	folder = message2folder(msg_data);
+
+	bmsg = g_new0(struct bmsg, 1);
+	bmsg_init(bmsg, BMSG_VERSION_1_0, status, BMSG_SMS, folder);
+	bmsg_add_originator(bmsg, "2.1", reply[MESSAGE_FROM_LASTN],
+					msg_data->sender_name,
+					msg_data->sender_addressing, NULL);
+	bmsg_add_envelope(bmsg);
+	bmsg_add_content(bmsg, -1, NULL, SMS_DEFAULT_CHARSET, NULL,
+						reply[MESSAGE_CONTENT]);
+
+	final_bmsg = bmsg_text(bmsg);
+
+	session->cb.message(session, 0, FALSE, final_bmsg, session->user_data);
+
+	bmsg_destroy(bmsg);
+	g_free(folder);
+	g_free(final_bmsg);
+
+	session->count++;
+
+	return;
+
+done:
+	if (session->count == 0)
+		err = -ENOENT;
+	else
+		err = 0;
+
+	session->cb.message(session, err, FALSE, NULL, session->user_data);
+
+aborted:
+	g_free(session->name);
 }
 
 int messages_init(void)
@@ -869,13 +983,46 @@ int messages_get_messages_listing(void *s, const char *name,
 	return err;
 }
 
-int messages_get_message(void *session,
-		const char *handle,
-		unsigned long flags,
-		messages_get_message_cb callback,
-		void *user_data)
+int messages_get_message(void *s, const char *h, unsigned long flags,
+				messages_get_message_cb cb, void *user_data)
 {
-	return -EINVAL;
+	struct session *session = s;
+	DBusPendingCall *call;
+	int err = 0;
+	char *handle = strip_handle(h);
+	char *query_handle = g_strdup_printf(MESSAGES_FILTER_BY_HANDLE, handle);
+	char *query = path2query("telecom/msg", LIST_MESSAGES_QUERY,
+								 query_handle);
+
+	if (query == NULL) {
+		err = -ENOENT;
+
+		goto failed;
+	}
+
+	if (flags & MESSAGES_FRACTION || flags & MESSAGES_NEXT) {
+		err = -EBADR;
+
+		goto failed;
+	}
+
+	session->name = g_strdup(handle);
+	session->flags = flags;
+	session->cb.message = cb;
+	session->generate_response = get_message_resp;
+	session->user_data = user_data;
+	session->aborted = FALSE;
+
+	call = query_tracker(query, session, &err);
+	if (err == 0)
+		new_call(call);
+
+failed:
+	g_free(query_handle);
+	g_free(query);
+	g_free(handle);
+
+	return err;
 }
 
 void messages_abort(void *s)
