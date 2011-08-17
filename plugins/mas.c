@@ -846,6 +846,7 @@ static void get_message_cb(void *session, int err, gboolean fmore,
 {
 	const char *entry = chunk;
 	struct mas_session *mas = user_data;
+	uint8_t fmore_byte;
 
 	DBG("");
 
@@ -856,6 +857,13 @@ static void get_message_cb(void *session, int err, gboolean fmore,
 
 	if (!entry) {
 		mas->finished = TRUE;
+
+		if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, NULL)) {
+			fmore_byte = fmore ? 1 : 0;
+			aparams_write(mas->outparams, FRACTIONDELIVER_TAG,
+									&fmore);
+		}
+
 		goto proceed;
 	}
 
@@ -1011,8 +1019,21 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 				void *driver_data, size_t *size, int *err)
 {
 	struct mas_session *mas = driver_data;
+	unsigned long flags;
+	uint8_t freq;
+	uint8_t charset = 0;
 
 	DBG("");
+
+	if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, &freq)) {
+		flags |= MESSAGES_FRACTION;
+		if (freq & 0x01)
+			flags |= MESSAGES_NEXT;
+	}
+
+	aparams_read(mas->inparams, CHARSET_TAG, &charset);
+	if (charset & 0x01)
+		flags |= MESSAGES_UTF8;
 
 	*err = messages_get_message(mas->backend_data, name, 0,
 			get_message_cb, mas);
