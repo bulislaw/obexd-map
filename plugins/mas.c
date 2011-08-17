@@ -712,6 +712,9 @@ static void get_messages_listing_cb(void *session, int err,
 	struct mas_session *mas = user_data;
 	uint32_t parametermask = 0xFFFF;
 	uint16_t max = 1024;
+	uint8_t newmsg_byte;
+	char timestr[21];
+	time_t t;
 
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
 
@@ -730,6 +733,14 @@ static void get_messages_listing_cb(void *session, int err,
 		if (max)
 			g_string_append(mas->buffer, ML_BODY_END);
 		mas->finished = TRUE;
+
+		newmsg_byte = newmsg ? 1 : 0;
+		aparams_write(mas->outparams, NEWMESSAGE_TAG, &newmsg_byte);
+		aparams_write(mas->outparams, MESSAGESLISTINGSIZE_TAG, &size);
+		time(&t);
+		strftime(timestr, sizeof(timestr), "%Y%m%dT%H%M%S%z",
+				localtime(&t));
+		aparams_write(mas->outparams, MSETIME_TAG, &timestr);
 
 		goto proceed;
 	}
