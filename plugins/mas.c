@@ -85,7 +85,7 @@
   </attribute>								\
 									\
   <attribute id=\"0x0316\">						\
-    <uint8 value=\"0x0F\"/>						\
+    <uint8 value=\"0x02\"/>						\
   </attribute>								\
 </record>"
 
