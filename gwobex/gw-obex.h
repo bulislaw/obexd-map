@@ -88,6 +88,12 @@
 /** Length of OBEX_PBAP_UUID */
 #define OBEX_PBAP_UUID_LEN 16
 
+/** Message Notification Service UUID */
+#define OBEX_MNS_UUID \
+    "\xbb\x58\x2b\x41\x42\x0c\x11\xdb\xb0\xde\x08\x00\x20\x0c\x9a\x66"
+/** Length of OBEX_MNS_UUID */
+#define OBEX_MNS_UUID_LEN 16
+
 /** IrMC Sync Profile UUID */
 #define OBEX_SYNC_UUID \
 	"IRMC-SYNC"
