@@ -177,9 +177,12 @@ void messages_disconnect(void *session);
  * To unregister currently registered notifications, call this with send_event
  * set to NULL.
  */
+typedef void (*messages_event_cb)(void *session,
+		const struct messages_event *event,
+		void *user_data);
+
 int messages_set_notification_registration(void *session,
-		void (*send_event)(void *session,
-			const struct messages_event *event, void *user_data),
+		messages_event_cb callback,
 		void *user_data);
 
 /* Changes current directory.
