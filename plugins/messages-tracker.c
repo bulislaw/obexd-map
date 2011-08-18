@@ -127,6 +127,8 @@ struct session {
 	struct messages_filter *filter;
 	gboolean aborted;
 	unsigned long flags;
+	void *event_user_data;
+	messages_event_cb event_cb;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
@@ -136,6 +138,8 @@ struct session {
 
 static struct message_folder *folder_tree = NULL;
 static DBusConnection *session_connection = NULL;
+static GSList *mns_srv;
+static gint event_watch_id;
 
 static gboolean trace_call(void *data)
 {
@@ -171,6 +175,16 @@ static void free_msg_data(struct messages_message *msg)
 	g_free(msg->attachment_size);
 
 	g_free(msg);
+}
+
+static void free_event_data(struct messages_event *event)
+{
+	g_free(event->handle);
+	g_free(event->folder);
+	g_free(event->old_folder);
+	g_free(event->msg_type);
+
+	g_free(event);
 }
 
 static struct messages_filter *copy_messages_filter(
@@ -741,6 +755,66 @@ aborted:
 	g_free(session->name);
 }
 
+static void notify_new_sms(const char *handle)
+{
+	struct messages_event *data;
+	GSList *next;
+
+	data = g_new0(struct messages_event, 1);
+	data->folder = g_strdup("telecom/msg/inbox");
+	data->type = MET_NEW_MESSAGE;
+	data->msg_type = g_strdup("SMS_GSM");
+	data->old_folder = g_strdup("");
+	data->handle = fill_handle(handle);
+
+	next = mns_srv;
+	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
+		struct session *session = next->data;
+
+		session->event_cb(session, data, session->event_user_data);
+	}
+
+	free_event_data(data);
+}
+
+static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
+							void *user_data)
+{
+	DBusMessageIter arg, inner_arg, struct_arg;
+	unsigned ihandle = 0;
+	char *handle;
+
+	DBG("");
+
+	if (!dbus_message_iter_init(msg, &arg))
+		return TRUE;
+
+	if (dbus_message_iter_get_arg_type(&arg) != DBUS_TYPE_ARRAY)
+		return TRUE;
+
+	dbus_message_iter_recurse(&arg, &inner_arg);
+
+	if (dbus_message_iter_get_arg_type(&inner_arg) != DBUS_TYPE_STRUCT)
+		return TRUE;
+
+	dbus_message_iter_recurse(&inner_arg, &struct_arg);
+
+	if (dbus_message_iter_get_arg_type(&struct_arg) != DBUS_TYPE_INT32)
+		return TRUE;
+
+	dbus_message_iter_get_basic(&struct_arg, &ihandle);
+
+	handle = g_strdup_printf("%d", ihandle);
+
+	DBG("new message: %s", handle);
+
+	notify_new_sms(handle);
+
+	g_free(handle);
+
+	return TRUE;
+}
+
 int messages_init(void)
 {
 	session_connection = dbus_bus_get(DBUS_BUS_SESSION, NULL);
@@ -782,12 +856,35 @@ void messages_disconnect(void *s)
 	g_free(session);
 }
 
-int messages_set_notification_registration(void *session,
-		void (*send_event)(void *session,
-			const struct messages_event *event, void *user_data),
-		void *user_data)
+int messages_set_notification_registration(void *s, messages_event_cb cb,
+							void *user_data)
 {
-	return -EINVAL;
+	struct session *session = s;
+
+	if (cb != NULL) {
+		if (g_slist_length(mns_srv) == 0)
+			event_watch_id = g_dbus_add_signal_watch(
+							session_connection,
+							NULL, NULL,
+							"com.nokia.commhistory",
+							"eventsAdded",
+							handle_new_sms,
+							NULL, NULL);
+		if (event_watch_id == 0)
+			return -EIO;
+
+		session->event_user_data = user_data;
+		session->event_cb = cb;
+
+		mns_srv = g_slist_prepend(mns_srv, session);
+	} else {
+		mns_srv = g_slist_remove(mns_srv, session);
+
+		if (g_slist_length(mns_srv) == 0)
+			g_dbus_remove_watch(session_connection, event_watch_id);
+	}
+
+	return 0;
 }
 
 int messages_set_folder(void *s, const char *name, gboolean cdup)
