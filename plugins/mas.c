@@ -1013,8 +1013,8 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 	aparams_read(mas->inparams, FILTERORIGINATOR_TAG, &filter.originator);
 	aparams_read(mas->inparams, FILTERPRIORITY_TAG, &filter.priority);
 
-	*err = messages_get_messages_listing(mas->backend_data, name, 0xffff, 0,
-			&filter,
+	*err = messages_get_messages_listing(mas->backend_data, name, max,
+			offset, &filter,
 			get_messages_listing_cb, mas);
 
 	mas->buffer = g_string_new("");
