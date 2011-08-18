@@ -308,7 +308,7 @@ static gboolean aparams_write(GHashTable *params, enum aparam_tag tag,
 
 	switch (aparam_defs[tago].type) {
 	case APT_STR:
-		param->valstr = e->valstr;
+		param->valstr = g_strdup(e->valstr);
 		break;
 	case APT_UINT16:
 		param->val16u = e->val16u;
@@ -736,7 +736,7 @@ static void get_messages_listing_cb(void *session, int err,
 		aparams_write(mas->outparams, NEWMESSAGE_TAG, &newmsg_byte);
 		aparams_write(mas->outparams, MESSAGESLISTINGSIZE_TAG, &size);
 		time(&t);
-		strftime(timestr, sizeof(timestr), "%Y%m%dT%H%M%S%z",
+		strftime(timestr, sizeof(*timestr), "%Y%m%dT%H%M%S%z",
 				localtime(&t));
 		aparams_write(mas->outparams, MSETIME_TAG, &timestr);
 
