@@ -578,6 +578,8 @@ static void reset_request(struct mas_session *mas)
 		mas->apbuf = NULL;
 	}
 
+	aparams_free(mas->inparams);
+	aparams_free(mas->outparams);
 	mas->ap_sent = FALSE;
 	mas->nth_call = FALSE;
 	mas->finished = FALSE;
