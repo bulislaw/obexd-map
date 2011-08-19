@@ -916,7 +916,10 @@ int messages_set_folder(void *s, const char *name, gboolean cdup)
 									NULL);
 	g_free(tmp);
 
-	newabs = g_build_filename("/", newrel, NULL);
+	if (newrel[0] != '/')
+		newabs = g_build_filename("/", newrel, NULL);
+	else
+		newabs = g_strdup(newrel);
 
 	session->folder = get_folder(newabs);
 	if (session->folder == NULL) {
@@ -997,6 +1000,9 @@ int messages_get_folder_listing(void *s, const char *name,
 	session->cb.folder_list = callback;
 	session->user_data = user_data;
 	session->aborted = FALSE;
+	session->new_message = FALSE;
+	session->count = FALSE;
+	session->size = 0;
 
 	g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, async_get_folder_listing,
 						session, NULL);
@@ -1093,6 +1099,9 @@ int messages_get_message(void *s, const char *handle, unsigned long flags,
 	session->generate_response = get_message_resp;
 	session->user_data = user_data;
 	session->aborted = FALSE;
+	session->new_message = FALSE;
+	session->count = FALSE;
+	session->size = 0;
 
 	call = query_tracker(query, session, &err);
 	if (err == 0)
