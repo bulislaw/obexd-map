@@ -39,6 +39,8 @@ struct session {
 	char *cwd;
 	char *cwd_absolute;
 	void *request;
+	messages_event_cb cb;
+	void *ev_data;
 };
 
 struct folder_listing_data {
@@ -100,11 +102,34 @@ void messages_disconnect(void *s)
 	g_free(session);
 }
 
-int messages_set_notification_registration(void *session,
+static gboolean trigger(gpointer data)
+{
+	struct session *session = data;
+	struct messages_event ev = { 0, };
+
+	DBG("Triggeeerrrring");
+	ev.type = MET_NEW_MESSAGE;
+	ev.handle = "012345";
+	ev.folder = "";
+	ev.old_folder = "";
+	ev.msg_type = "";
+
+	session->cb(session, &ev, session->ev_data);
+
+	return FALSE;
+}
+
+int messages_set_notification_registration(void *s,
 		void (*send_event)(void *session,
 			const struct messages_event *event, void *user_data),
 		void *user_data)
 {
+	struct session *session = s;
+	session->cb = send_event;
+	session->ev_data = user_data;
+
+	g_timeout_add(1000*20, trigger, session);
+
 	return -EINVAL;
 }
 

@@ -1,0 +1,26 @@
+#!/usr/bin/python -u
+
+import dbus
+import sys
+import time
+
+bus = dbus.SessionBus()
+client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+						"org.openobex.Client")
+print "Creating session...",
+session_path = client.CreateSession({"Destination": sys.argv[1], "Target": "MNS"})
+print "done (session path: %s)" % (session_path)
+mns = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+						"org.openobex.MNS")
+
+print "Sending...",
+mns.SendEvent(0,1,"31337","TELECOM/MSG/INBOX","",2)
+print "done"
+
+print "Removing session...",
+client.RemoveSession(session_path)
+print "done"
+
+print "Sleeping...",
+time.sleep(10)
+print "done"
