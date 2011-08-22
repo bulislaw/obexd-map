@@ -579,7 +579,9 @@ static void reset_request(struct mas_session *mas)
 	}
 
 	aparams_free(mas->inparams);
+	mas->inparams = NULL;
 	aparams_free(mas->outparams);
+	mas->outparams = NULL;
 	mas->ap_sent = FALSE;
 	mas->nth_call = FALSE;
 	mas->finished = FALSE;
@@ -588,6 +590,7 @@ static void reset_request(struct mas_session *mas)
 static void mas_clean(struct mas_session *mas)
 {
 	reset_request(mas);
+	g_free(mas->remote_addr);
 	g_free(mas);
 }
 
