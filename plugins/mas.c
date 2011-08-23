@@ -1352,22 +1352,24 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 		return mas;
 }
 
-static void *notification_registration_open(const char *name, int oflag, mode_t mode,
-				void *driver_data, size_t *size, int *err)
+static void *notification_registration_open(const char *name, int oflag,
+		mode_t mode, void *driver_data, size_t *size, int *err)
 {
-	uint8_t status;
 	struct mas_session *mas = driver_data;
+	uint8_t status;
 	int ret;
 
 	if (!(oflag & O_WRONLY)) {
 		DBG("Tried GET on a PUT-only type");
 		*err = -EBADR;
+
 		return NULL;
 	}
 
 	if (!aparams_read(mas->inparams, NOTIFICATIONSTATUS_TAG, &status)) {
 		DBG("Missing status parameter");
 		*err = -EBADR;
+
 		return NULL;
 	}
 
@@ -1378,6 +1380,7 @@ static void *notification_registration_open(const char *name, int oflag, mode_t 
 #else
 	ret = set_notification_registration(mas, status);
 #endif
+
 	if (ret < 0) {
 		*err = ret;
 		return NULL;
@@ -1392,7 +1395,9 @@ static void *notification_registration_open(const char *name, int oflag, mode_t 
 				NULL,
 				NULL);
 	}
+
 	*err = 0;
+
 	return mas;
 }
 
