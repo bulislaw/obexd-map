@@ -1421,24 +1421,27 @@ static void *message_status_open(const char *name, int oflag, mode_t mode,
 	if (!(oflag & O_WRONLY)) {
 		DBG("Tried GET on a PUT-only type");
 		*err = -EBADR;
+
 		return NULL;
 	}
 
 	if (!aparams_read(mas->inparams, STATUSINDICATOR_TAG, &indicator)) {
 		DBG("Missing status indicator parameter");
 		*err = -EBADR;
+
 		return NULL;
 	}
 
 	if (!aparams_read(mas->inparams, STATUSVALUE_TAG, &value)) {
-		DBG("Missing status indicator parameter");
+		DBG("Missing status value parameter");
 		*err = -EBADR;
+
 		return NULL;
 	}
 
+	DBG("indicator: %d, value: %d", indicator, value);
 	*err = messages_set_message_status(mas->backend_data, name, indicator,
 									value);
-
 	if (*err)
 		return NULL;
 	else
