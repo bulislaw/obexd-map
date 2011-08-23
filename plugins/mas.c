@@ -1324,6 +1324,13 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 
 	DBG("");
 
+	if (!(oflag & O_RDONLY)) {
+		DBG("Message pushing unsupported");
+		*err = -EINVAL;
+
+		return NULL;
+	}
+
 	if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, &freq)) {
 		flags |= MESSAGES_FRACTION;
 		if (freq & 0x01)
