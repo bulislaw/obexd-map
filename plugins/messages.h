@@ -271,6 +271,9 @@ int messages_get_message(void *session,
 		messages_get_message_cb callback,
 		void *user_data);
 
+int messages_set_message_status(void *session, const char *handle,
+		uint8_t indicator, uint8_t value);
+
 /* Aborts currently pending request.
  *
  * session: Backend session.
