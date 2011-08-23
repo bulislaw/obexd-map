@@ -1389,6 +1389,40 @@ static void *notification_registration_open(const char *name, int oflag, mode_t 
 	return mas;
 }
 
+static void *message_status_open(const char *name, int oflag, mode_t mode,
+				void *driver_data, size_t *size, int *err)
+{
+	struct mas_session *mas = driver_data;
+	uint8_t indicator;
+	uint8_t value;
+
+	if (!(oflag & O_WRONLY)) {
+		DBG("Tried GET on a PUT-only type");
+		*err = -EBADR;
+		return NULL;
+	}
+
+	if (!aparams_read(mas->inparams, STATUSINDICATOR_TAG, &indicator)) {
+		DBG("Missing status indicator parameter");
+		*err = -EBADR;
+		return NULL;
+	}
+
+	if (!aparams_read(mas->inparams, STATUSVALUE_TAG, &value)) {
+		DBG("Missing status indicator parameter");
+		*err = -EBADR;
+		return NULL;
+	}
+
+	*err = messages_set_message_status(mas->backend_data, name, indicator,
+									value);
+
+	if (*err)
+		return NULL;
+	else
+		return mas;
+}
+
 static void *any_open(const char *name, int oflag, mode_t mode,
 				void *driver_data, size_t *size, int *err)
 {
@@ -1526,7 +1560,7 @@ static struct obex_mime_type_driver mime_message_status = {
 	.target = MAS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/messageStatus",
-	.open = any_open,
+	.open = message_status_open,
 	.close = any_close,
 	.read = any_read,
 	.write = any_write,
