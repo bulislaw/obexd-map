@@ -1255,7 +1255,7 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 	uint16_t max = 1024;
 	uint16_t offset = 0;
 
-	if (oflag != O_RDONLY) {
+	if (oflag & O_WRONLY) {
 		*err = -EBADR;
 		return NULL;
 	}
@@ -1324,7 +1324,7 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 
 	DBG("");
 
-	if (!(oflag & O_RDONLY)) {
+	if (oflag & O_WRONLY) {
 		DBG("Message pushing unsupported");
 		*err = -EINVAL;
 
