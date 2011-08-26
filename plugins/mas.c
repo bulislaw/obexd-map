@@ -1636,6 +1636,9 @@ static void mas_exit(void)
 {
 	int i;
 
+	/* XXX: Is mas_disconnect() guaranteed before mas_exit()? */
+	/* XXX: Shall I keep waiting here for closing MNS connections? */
+
 	obex_service_driver_unregister(&mas);
 
 	for (i = 0; map_drivers[i] != NULL; ++i)
