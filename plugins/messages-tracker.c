@@ -44,6 +44,8 @@
 
 #define SMS_DEFAULT_CHARSET "UTF-8"
 
+#define STATUS_NOT_SET 0xFF
+
 #define MESSAGES_FILTER_BY_HANDLE "FILTER (xsd:string(?msg) = \"message:%s\" ) ."
 
 #define MESSAGE_HANDLE 0
@@ -131,6 +133,10 @@ struct request {
 	} cb;
 };
 
+struct message_status {
+	uint8_t read;
+};
+
 struct session {
 	char *cwd;
 	struct message_folder *folder;
@@ -138,6 +144,7 @@ struct session {
 	void *event_user_data;
 	messages_event_cb event_cb;
 	struct request *request;
+	GHashTable *msg_stat;
 };
 
 static struct message_folder *folder_tree = NULL;
@@ -659,6 +666,7 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	struct session *session = user_data;
 	struct request *request = session->request;
 	struct messages_message *msg_data;
+	struct message_status *stat;
 
 	DBG("reply %p", reply);
 
@@ -669,6 +677,16 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 		goto aborted;
 
 	msg_data = pull_message_data(reply);
+
+	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
+	if (stat == NULL) {
+		stat = g_new0(struct message_status, 1);
+		stat->read = msg_data->read;
+
+		g_hash_table_insert(session->msg_stat,
+					g_strdup(msg_data->handle), stat);
+	} else if (stat != NULL && stat->read != STATUS_NOT_SET)
+		msg_data->read = stat->read;
 
 	request->size++;
 
@@ -710,6 +728,7 @@ static void get_message_resp(const char **reply, void *s)
 	struct messages_message *msg_data;
 	struct bmsg *bmsg;
 	char *final_bmsg, *status, *folder, *handle;
+	struct message_status *stat;
 	int err;
 
 	DBG("reply %p", reply);
@@ -724,6 +743,10 @@ static void get_message_resp(const char **reply, void *s)
 	handle = fill_handle(msg_data->handle);
 	g_free(msg_data->handle);
 	msg_data->handle = handle;
+
+	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
+	if (stat != NULL && stat->read != STATUS_NOT_SET)
+		msg_data->read = stat->read;
 
 	status = msg_data->read ? "READ" : "UNREAD";
 
@@ -852,6 +875,9 @@ int messages_connect(void **s)
 	session->cwd = g_strdup("/");
 	session->folder = folder_tree;
 
+	session->msg_stat = g_hash_table_new_full(g_str_hash, g_str_equal,
+							g_free, g_free);
+
 	*s = session;
 
 	return 0;
@@ -861,6 +887,8 @@ void messages_disconnect(void *s)
 {
 	struct session *session = s;
 
+	if (session->msg_stat)
+		g_hash_table_destroy(session->msg_stat);
 	g_free(session->cwd);
 	g_free(session);
 }
@@ -1087,13 +1115,14 @@ int messages_get_messages_listing(void *s, const char *name,
 	return err;
 }
 
-int messages_get_message(void *s, const char *handle, unsigned long flags,
+int messages_get_message(void *s, const char *h, unsigned long flags,
 				messages_get_message_cb cb, void *user_data)
 {
 	struct session *session = s;
 	struct request *request;
 	DBusPendingCall *call;
 	int err = 0;
+	char *handle = strip_handle(h);
 	char *query_handle = g_strdup_printf(MESSAGES_FILTER_BY_HANDLE, handle);
 	char *query = path2query("telecom/msg", LIST_MESSAGES_QUERY,
 								 query_handle);
@@ -1127,15 +1156,37 @@ int messages_get_message(void *s, const char *handle, unsigned long flags,
 
 failed:
 	g_free(query_handle);
+	g_free(handle);
 	g_free(query);
 
 	return err;
 }
 
-int messages_set_message_status(void *session, const char *handle,
-		uint8_t indicator, uint8_t value)
+int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
+								uint8_t value)
 {
-	return -EINVAL;
+	struct session *session = s;
+	struct message_status *stat = NULL;
+
+	stat = g_hash_table_lookup(session->msg_stat, handle);
+	if (stat == NULL) {
+		stat = g_new0(struct message_status, 1);
+		stat->read = STATUS_NOT_SET;
+
+		g_hash_table_insert(session->msg_stat, g_strdup(handle), stat);
+	}
+
+	switch (indicator) {
+		case 0x0:
+			stat->read = value;
+			break;
+		case 0x1:
+			return -EPERM;
+		default:
+			return -EBADR;
+	}
+
+	return 0;
 }
 
 void messages_abort(void *s)
