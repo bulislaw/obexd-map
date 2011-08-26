@@ -126,6 +126,7 @@ struct request {
 	reply_list_foreach_cb generate_response;
 	struct messages_filter *filter;
 	unsigned long flags;
+	gboolean deleted;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
@@ -135,6 +136,7 @@ struct request {
 
 struct message_status {
 	uint8_t read;
+	uint8_t deleted;
 };
 
 struct session {
@@ -436,7 +438,7 @@ static void create_folder_tree()
 				"nmo:isSent \"true\" . ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 
-	child = create_folder("deleted", "?msg nmo:isDeleted \"true\" . ");
+	child = create_folder("deleted", " ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 }
 
@@ -671,7 +673,7 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	DBG("reply %p", reply);
 
 	if (reply == NULL)
-		goto done;
+		goto end;
 
 	if (session->aborted)
 		goto aborted;
@@ -688,15 +690,19 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	} else if (stat != NULL && stat->read != STATUS_NOT_SET)
 		msg_data->read = stat->read;
 
+	if (request->deleted && (stat == NULL || !stat->deleted))
+		goto done;
+
+	if (!request->deleted && (stat != NULL && stat->deleted))
+		goto done;
+
 	request->size++;
 
 	if (!msg_data->read)
-			request->new_message = TRUE;
+		request->new_message = TRUE;
 
-	if (request->count == TRUE) {
-		free_msg_data(msg_data);
-		return;
-	}
+	if (request->count == TRUE)
+		goto done;
 
 	if (request->size > request->offset && filter_message(msg_data,
 							request->filter))
@@ -704,10 +710,11 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 						request->new_message, msg_data,
 						request->user_data);
 
+done:
 	free_msg_data(msg_data);
 	return;
 
- done:
+end:
 	request->cb.messages_list(session, 0, request->size,
 						request->new_message, NULL,
 						request->user_data);
@@ -1095,6 +1102,7 @@ int messages_get_messages_listing(void *s, const char *name,
 	request->offset = offset;
 	request->max = max;
 	request->user_data = user_data;
+	request->deleted = g_strcmp0(folder->name, "deleted") ? FALSE : TRUE;
 
 	session->aborted = FALSE;
 	session->request = request;
@@ -1180,7 +1188,8 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 			stat->read = value;
 			break;
 		case 0x1:
-			return -EPERM;
+			stat->deleted = value;
+			break;
 		default:
 			return -EBADR;
 	}
