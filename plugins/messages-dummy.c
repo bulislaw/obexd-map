@@ -114,7 +114,8 @@ static gboolean trigger(gpointer data)
 	ev.old_folder = "";
 	ev.msg_type = "";
 
-	session->cb(session, &ev, session->ev_data);
+	if (session->cb)
+		session->cb(session, &ev, session->ev_data);
 
 	return FALSE;
 }

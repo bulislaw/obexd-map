@@ -235,6 +235,15 @@ struct mas_session {
 	gboolean disconnected;
 };
 
+struct any_object {
+	struct mas_session *mas;
+};
+
+struct notification_registration {
+	struct any_object any;
+	uint8_t status;
+};
+
 static const uint8_t MAS_TARGET[TARGET_SIZE] = {
 			0xbb, 0x58, 0x2b, 0x40, 0x42, 0x0c, 0x11, 0xdb,
 			0xb0, 0xde, 0x08, 0x00, 0x20, 0x0c, 0x9a, 0x66  };
@@ -576,6 +585,7 @@ static void mns_start_session_pcn(DBusPendingCall *pc, void *user_data)
 	DBusMessage *incoming;
 	char *path;
 
+	DBG("");
 	incoming = dbus_pending_call_steal_reply(pc);
 
 	if (!incoming) {
@@ -609,9 +619,7 @@ cleanup:
 		mns_stop_session(mas);
 }
 
-/* XXX: Just wonder whether I should reply to client immediately when it sends
- * SNR or wait until I got connection.
- * XXX: How to act when connection is unexpectedly closed.
+/* XXX: How to act when connection is unexpectedly closed.
  */
 static int mns_start_session(struct mas_session *mas)
 {
@@ -619,6 +627,7 @@ static int mns_start_session(struct mas_session *mas)
 	DBusMessageIter iter, dict;
 	char *mns = "MNS";
 
+	DBG("");
 	mas->mns_enabled = TRUE;
 
 	if (mas->mns_path)
@@ -655,6 +664,7 @@ static int mns_start_session(struct mas_session *mas)
 
 	dbus_message_unref(outgoing);
 
+	DBG("before set notify");
 	dbus_pending_call_set_notify(mas->pending_session,
 			mns_start_session_pcn, mas, NULL);
 
@@ -758,8 +768,8 @@ static void my_messages_event_cb(void *session, const struct messages_event *dat
 /*	if (mas->pending_session || mas->pending_event)
 		return -EAGAIN;*/
 
-	/*if (!mas->mns_path)*/
-		/*return -EACCES;*/
+	if (!mas->mns_path)
+		return; /* -EACCES;*/
 
 	outgoing = dbus_message_new_method_call("org.openobex.client",
 			mas->mns_path, "org.openobex.MNS", "SendEvent");
@@ -796,31 +806,6 @@ static int set_notification_registration(struct mas_session *mas, int state)
 	return 0;
 }
 
-static gboolean ugly_workaround_because_pts_is_broken_cb(gpointer data)
-{
-	struct mas_session *mas = data;
-
-	set_notification_registration((struct mas_session *)data,
-			mas->mns_enabled ? 1 : 0);
-	return FALSE;
-}
-
-static int ugly_workaround_because_pts_is_broken(struct mas_session *mas,
-		int state)
-{
-	DBG("Doing nasty things");
-
-	if (state == 1)
-		mas->mns_enabled = TRUE;
-	else if (state == 0)
-		mas->mns_enabled = FALSE;
-	else
-		return -EBADR;
-
-	g_timeout_add_seconds(3, ugly_workaround_because_pts_is_broken_cb, mas);
-
-	return 0;
-}
 static int get_params(struct obex_session *os, obex_object_t *obj,
 					struct mas_session *mas)
 {
@@ -1366,8 +1351,8 @@ static void *notification_registration_open(const char *name, int oflag,
 		mode_t mode, void *driver_data, size_t *size, int *err)
 {
 	struct mas_session *mas = driver_data;
+	struct notification_registration *nr;
 	uint8_t status;
-	int ret;
 
 	if (!(oflag & O_WRONLY)) {
 		DBG("Tried GET on a PUT-only type");
@@ -1385,18 +1370,36 @@ static void *notification_registration_open(const char *name, int oflag,
 
 	DBG("status: %d", status);
 
-#ifdef USING_PTS
-	ret = ugly_workaround_because_pts_is_broken(mas, status);
-#else
-	ret = set_notification_registration(mas, status);
-#endif
+	if (status > 1) {
+		DBG("Status parameter carrying incorrect value");
+		*err = -EBADR;
 
-	if (ret < 0) {
-		*err = ret;
 		return NULL;
 	}
 
-	if (status) {
+	nr = g_new0(struct notification_registration, 1);
+	nr->any.mas = mas;
+	nr->status = status;
+
+	/* MNS connection operations take place in
+	 * notification_registration_close() - PTS requires that MAS responds to
+	 * SetNotificationReqistration first before changing state of MNS. */
+
+	*err = 0;
+
+	return nr;
+}
+
+static int notification_registration_close(void *obj)
+{
+	struct notification_registration *nr = obj;
+	struct mas_session *mas = nr->any.mas;
+
+	DBG("");
+
+	set_notification_registration(mas, nr->status);
+
+	if (nr->status) {
 		messages_set_notification_registration(mas->backend_data,
 				my_messages_event_cb,
 				mas);
@@ -1406,9 +1409,10 @@ static void *notification_registration_open(const char *name, int oflag,
 				NULL);
 	}
 
-	*err = 0;
+	g_free(nr);
+	reset_request(mas);
 
-	return mas;
+	return 0;
 }
 
 static void *message_status_open(const char *name, int oflag, mode_t mode,
@@ -1576,7 +1580,7 @@ static struct obex_mime_type_driver mime_notification_registration = {
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/MAP-NotificationRegistration",
 	.open = notification_registration_open,
-	.close = any_close,
+	.close = notification_registration_close,
 	.read = any_read,
 	.write = any_write,
 };
