@@ -25,6 +25,8 @@
 #include <config.h>
 #endif
 
+#define USING_PTS
+
 #include <errno.h>
 #include <string.h>
 #include <glib.h>
@@ -216,7 +218,7 @@ struct aparam_header {
 } __attribute__ ((packed));
 
 struct mas_session {
-	struct mas_request *request;
+	char *remote_addr;
 	void *backend_data;
 	gboolean ap_sent;
 	gboolean finished;
@@ -225,6 +227,12 @@ struct mas_session {
 	GString *apbuf;
 	GHashTable *inparams;
 	GHashTable *outparams;
+	DBusConnection *dbus;
+	gboolean mns_enabled;
+	DBusPendingCall *pending_session;
+	DBusPendingCall *pending_event;
+	char *mns_path;
+	gboolean disconnected;
 };
 
 static const uint8_t MAS_TARGET[TARGET_SIZE] = {
@@ -541,6 +549,278 @@ failed:
 	return NULL;
 }
 
+static void append_entry(DBusMessageIter *dict,
+				const char *key, void *val)
+{
+	DBusMessageIter entry, value;
+
+	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY,
+								NULL, &entry);
+
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+
+
+	dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT,
+					DBUS_TYPE_STRING_AS_STRING, &value);
+	dbus_message_iter_append_basic(&value, DBUS_TYPE_STRING, val);
+	dbus_message_iter_close_container(&entry, &value);
+
+	dbus_message_iter_close_container(dict, &entry);
+}
+
+static int mns_stop_session(struct mas_session *mas);
+
+static void mns_start_session_pcn(DBusPendingCall *pc, void *user_data)
+{
+	struct mas_session *mas = user_data;
+	DBusMessage *incoming;
+	char *path;
+
+	incoming = dbus_pending_call_steal_reply(pc);
+
+	if (!incoming) {
+		DBG("No reply!");	/* This probably should not happen */
+		goto cleanup;
+	}
+
+	if (dbus_message_get_type(incoming) != DBUS_MESSAGE_TYPE_METHOD_RETURN) {
+		DBG("Error when starting session!");
+		goto cleanup;
+	}
+
+	if (!dbus_message_has_signature(incoming,
+				DBUS_TYPE_OBJECT_PATH_AS_STRING)) {
+		DBG("Wrong signature!");
+		goto cleanup;
+	}
+
+	dbus_message_get_args(incoming, NULL, DBUS_TYPE_OBJECT_PATH,
+			&path, DBUS_TYPE_INVALID);
+
+	mas->mns_path = g_strdup(path);
+	DBG("Path: %s", mas->mns_path);
+
+cleanup:
+	dbus_message_unref(incoming);
+	dbus_pending_call_unref(pc);
+	mas->pending_session = NULL;
+
+	if (mas->mns_enabled == FALSE)
+		mns_stop_session(mas);
+}
+
+/* XXX: Just wonder whether I should reply to client immediately when it sends
+ * SNR or wait until I got connection.
+ * XXX: How to act when connection is unexpectedly closed.
+ */
+static int mns_start_session(struct mas_session *mas)
+{
+	DBusMessage *outgoing;
+	DBusMessageIter iter, dict;
+	char *mns = "MNS";
+
+	mas->mns_enabled = TRUE;
+
+	if (mas->mns_path)
+		return 0;
+
+	if (mas->pending_session)
+		return 0;
+
+	if (!mas->dbus)
+		mas->dbus = obex_dbus_get_connection();
+
+	outgoing = dbus_message_new_method_call("org.openobex.client", "/",
+			"org.openobex.Client", "CreateSession");
+
+	if (!outgoing) {
+		DBG("Failed message creation.");
+		return -1;
+	}
+
+	dbus_message_iter_init_append(outgoing, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
+			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &dict);
+
+	append_entry(&dict, "Destination", &mas->remote_addr);
+	append_entry(&dict, "Target", &mns);
+
+	dbus_message_iter_close_container(&iter, &dict);
+
+	dbus_connection_send_with_reply(mas->dbus, outgoing,
+			&mas->pending_session, -1);
+
+	dbus_message_unref(outgoing);
+
+	dbus_pending_call_set_notify(mas->pending_session,
+			mns_start_session_pcn, mas, NULL);
+
+	return 0;
+}
+
+static void mas_clean(struct mas_session *mas);
+
+static void mns_stop_session_pcn(DBusPendingCall *pc, void *user_data)
+{
+	struct mas_session *mas = user_data;
+
+	DBG("");
+
+	/* Ignore errors */
+
+	dbus_pending_call_unref(pc);
+	mas->pending_session = NULL;
+
+	g_free(mas->mns_path);
+	mas->mns_path = NULL;
+
+	if (mas->mns_enabled)
+		mns_start_session(mas);
+
+	if (mas->disconnected)
+		mas_clean(mas);
+}
+
+static int mns_stop_session(struct mas_session *mas)
+{
+	DBusMessage *outgoing;
+
+	DBG("");
+
+	mas->mns_enabled = FALSE;
+
+	if (mas->pending_session)
+		return 0;
+
+	if (!mas->mns_path)
+		return -1;
+
+
+	if (!mas->dbus)
+		mas->dbus = obex_dbus_get_connection();
+
+	outgoing = dbus_message_new_method_call("org.openobex.client", "/",
+			"org.openobex.Client", "RemoveSession");
+
+	if (!outgoing) {
+		DBG("Failed message creation.");
+		return -1;
+	}
+
+	dbus_message_append_args(outgoing, DBUS_TYPE_OBJECT_PATH,
+			&mas->mns_path, DBUS_TYPE_INVALID);
+
+	dbus_connection_send_with_reply(mas->dbus, outgoing,
+			&mas->pending_session, -1);
+
+	dbus_message_unref(outgoing);
+
+	dbus_pending_call_set_notify(mas->pending_session,
+			mns_stop_session_pcn, mas, NULL);
+
+	return 0;
+}
+
+static void messages_event_pcn(DBusPendingCall *pc, void *user_data)
+{
+	struct mas_session *mas = user_data;
+	DBusMessage *incoming;
+
+	incoming = dbus_pending_call_steal_reply(pc);
+
+	if (!incoming || dbus_message_get_type(incoming)
+			!= DBUS_MESSAGE_TYPE_METHOD_RETURN) {
+		DBG("Error when sending notification!");
+		mas->mns_enabled = FALSE;
+	}
+
+	dbus_message_unref(incoming);
+	dbus_pending_call_unref(pc);
+	mas->pending_event = NULL;
+
+	/* XXX: Or maybe better call ResetSession without waiting for event
+	 * sending to finish
+	 */
+	if (!mas->mns_enabled)
+		mns_stop_session(mas);
+}
+
+static void my_messages_event_cb(void *session, const struct messages_event *data, void *user_data)
+{
+	struct mas_session *mas = user_data;
+	DBusMessage *outgoing;
+	unsigned char evt = (unsigned char)data->type + 1;
+	unsigned char msgtype = 2;
+
+/*	if (mas->pending_session || mas->pending_event)
+		return -EAGAIN;*/
+
+	/*if (!mas->mns_path)*/
+		/*return -EACCES;*/
+
+	outgoing = dbus_message_new_method_call("org.openobex.client",
+			mas->mns_path, "org.openobex.MNS", "SendEvent");
+
+	dbus_message_append_args(outgoing,
+			DBUS_TYPE_BYTE, &data->instance_id,
+			DBUS_TYPE_BYTE, &evt,
+			DBUS_TYPE_STRING, &data->handle,
+			DBUS_TYPE_STRING, &data->folder,
+			DBUS_TYPE_STRING, &data->old_folder,
+			DBUS_TYPE_BYTE, &msgtype,
+			DBUS_TYPE_INVALID);
+
+	dbus_connection_send_with_reply(mas->dbus, outgoing,
+			&mas->pending_event, -1);
+
+	dbus_message_unref(outgoing);
+
+	dbus_pending_call_set_notify(mas->pending_event,
+			messages_event_pcn, mas, NULL);
+
+	/*return 0;*/
+}
+
+static int set_notification_registration(struct mas_session *mas, int state)
+{
+	if (state == 1)
+		mns_start_session(mas);
+	else if (state == 0)
+		mns_stop_session(mas);
+	else
+		return -EBADR;
+
+	return 0;
+}
+
+static gboolean ugly_workaround_because_pts_is_broken_cb(gpointer data)
+{
+	struct mas_session *mas = data;
+
+	set_notification_registration((struct mas_session *)data,
+			mas->mns_enabled ? 1 : 0);
+	return FALSE;
+}
+
+static int ugly_workaround_because_pts_is_broken(struct mas_session *mas,
+		int state)
+{
+	DBG("Doing nasty things");
+
+	if (state == 1)
+		mas->mns_enabled = TRUE;
+	else if (state == 0)
+		mas->mns_enabled = FALSE;
+	else
+		return -EBADR;
+
+	g_timeout_add_seconds(3, ugly_workaround_because_pts_is_broken_cb, mas);
+
+	return 0;
+}
 static int get_params(struct obex_session *os, obex_object_t *obj,
 					struct mas_session *mas)
 {
@@ -597,6 +877,7 @@ static void mas_clean(struct mas_session *mas)
 static void *mas_connect(struct obex_session *os, int *err)
 {
 	struct mas_session *mas;
+	char *sep = NULL;
 
 	DBG("");
 
@@ -605,6 +886,13 @@ static void *mas_connect(struct obex_session *os, int *err)
 	*err = messages_connect(&mas->backend_data);
 	if (*err < 0)
 		goto failed;
+
+	/* This gets bluetooth remote party address and port */
+	mas->remote_addr = obex_get_id(os);
+	if (mas->remote_addr)
+		sep = strchr(mas->remote_addr, '+');
+	if (sep)
+		*sep = 0;
 
 	manager_register_session(os);
 
@@ -625,7 +913,12 @@ static void mas_disconnect(struct obex_session *os, void *user_data)
 	manager_unregister_session(os);
 	messages_disconnect(mas->backend_data);
 
-	mas_clean(mas);
+	mas->disconnected = TRUE;
+
+	if (mas->mns_enabled || mas->pending_event || mas->pending_session)
+		set_notification_registration(mas, 0);
+	else
+		mas_clean(mas);
 }
 
 static int mas_get(struct obex_session *os, obex_object_t *obj, void *user_data)
@@ -1069,6 +1362,50 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 		return mas;
 }
 
+static void *notification_registration_open(const char *name, int oflag, mode_t mode,
+				void *driver_data, size_t *size, int *err)
+{
+	uint8_t status;
+	struct mas_session *mas = driver_data;
+	int ret;
+
+	if (!(oflag & O_WRONLY)) {
+		DBG("Tried GET on a PUT-only type");
+		*err = -EBADR;
+		return NULL;
+	}
+
+	if (!aparams_read(mas->inparams, NOTIFICATIONSTATUS_TAG, &status)) {
+		DBG("Missing status parameter");
+		*err = -EBADR;
+		return NULL;
+	}
+
+	DBG("status: %d", status);
+
+#ifdef USING_PTS
+	ret = ugly_workaround_because_pts_is_broken(mas, status);
+#else
+	ret = set_notification_registration(mas, status);
+#endif
+	if (ret < 0) {
+		*err = ret;
+		return NULL;
+	}
+
+	if (status) {
+		messages_set_notification_registration(mas->backend_data,
+				my_messages_event_cb,
+				mas);
+	} else {
+		messages_set_notification_registration(mas->backend_data,
+				NULL,
+				NULL);
+	}
+	*err = 0;
+	return mas;
+}
+
 static void *any_open(const char *name, int oflag, mode_t mode,
 				void *driver_data, size_t *size, int *err)
 {
@@ -1196,7 +1533,7 @@ static struct obex_mime_type_driver mime_notification_registration = {
 	.target = MAS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/MAP-NotificationRegistration",
-	.open = any_open,
+	.open = notification_registration_open,
 	.close = any_close,
 	.read = any_read,
 	.write = any_write,
