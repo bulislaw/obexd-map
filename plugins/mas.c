@@ -25,8 +25,6 @@
 #include <config.h>
 #endif
 
-#define USING_PTS
-
 #include <errno.h>
 #include <string.h>
 #include <glib.h>
