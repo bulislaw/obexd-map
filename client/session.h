@@ -71,5 +71,7 @@ int obc_session_pull(struct obc_session *session,
 				session_callback_t function, void *user_data);
 const char *obc_session_register(struct obc_session *session,
 						GDBusDestroyFunction destroy);
-int obc_session_put(struct obc_session *session, char *buf,
-				const char *targetname);
+int obc_session_put(struct obc_session *session, const char *type,
+		const char *filename, const char *targetname,
+		const guint8 *apparam, gint apparam_size,
+		session_callback_t func, char *buf, void *user_data);

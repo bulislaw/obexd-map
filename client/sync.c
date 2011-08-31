@@ -146,7 +146,8 @@ static DBusMessage *sync_putphonebook(DBusConnection *connection,
 
 	buffer = g_strdup(buf);
 
-	if (obc_session_put(sync->session, buffer, sync->phonebook_path) < 0)
+	if (obc_session_put(sync->session, NULL, NULL, sync->phonebook_path,
+					NULL, 0, NULL, buffer, NULL) < 0)
 		return g_dbus_create_error(message,
 				ERROR_INF ".Failed", "Failed");
 
