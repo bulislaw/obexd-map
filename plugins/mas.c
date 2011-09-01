@@ -241,6 +241,8 @@ static void get_messages_listing_cb(void *session, int err,
 		void *user_data)
 {
 	struct mas_session *mas = user_data;
+	uint32_t parametermask = 0xFFFF;
+	uint16_t max = 1024;
 
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
@@ -248,12 +250,14 @@ static void get_messages_listing_cb(void *session, int err,
 	}
 
 	if (!mas->nth_call) {
-		g_string_append(mas->buffer, ML_BODY_BEGIN);
+		if (max)
+			g_string_append(mas->buffer, ML_BODY_BEGIN);
 		mas->nth_call = TRUE;
 	}
 
 	if (!entry) {
-		g_string_append(mas->buffer, ML_BODY_END);
+		if (max)
+			g_string_append(mas->buffer, ML_BODY_END);
 		mas->finished = TRUE;
 
 		goto proceed;
@@ -264,74 +268,89 @@ static void get_messages_listing_cb(void *session, int err,
 	g_string_append_escaped_printf(mas->buffer, " handle=\"%s\"",
 								entry->handle);
 
-	if (entry->mask & PMASK_SUBJECT)
+	if (parametermask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT)
 		g_string_append_escaped_printf(mas->buffer, " subject=\"%s\"",
 				entry->subject);
 
-	if (entry->mask & PMASK_DATETIME)
+	if (parametermask & PMASK_DATETIME &&
+			entry->mask & PMASK_DATETIME)
 		g_string_append_escaped_printf(mas->buffer, " datetime=\"%s\"",
 				entry->datetime);
 
-	if (entry->mask & PMASK_SENDER_NAME)
+	if (parametermask & PMASK_SENDER_NAME &&
+			entry->mask & PMASK_SENDER_NAME)
 		g_string_append_escaped_printf(mas->buffer,
 						" sender_name=\"%s\"",
 						entry->sender_name);
 
-	if (entry->mask & PMASK_SENDER_ADDRESSING)
+	if (parametermask & PMASK_SENDER_ADDRESSING &&
+			entry->mask & PMASK_SENDER_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" sender_addressing=\"%s\"",
 						entry->sender_addressing);
 
-	if (entry->mask & PMASK_REPLYTO_ADDRESSING)
+	if (parametermask & PMASK_REPLYTO_ADDRESSING &&
+			entry->mask & PMASK_REPLYTO_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" replyto_addressing=\"%s\"",
 						entry->replyto_addressing);
 
-	if (entry->mask & PMASK_RECIPIENT_NAME)
+	if (parametermask & PMASK_RECIPIENT_NAME &&
+			entry->mask & PMASK_RECIPIENT_NAME)
 		g_string_append_escaped_printf(mas->buffer,
 						" recipient_name=\"%s\"",
 						entry->recipient_name);
 
-	if (entry->mask & PMASK_RECIPIENT_ADDRESSING)
+	if (parametermask & PMASK_RECIPIENT_ADDRESSING &&
+			entry->mask & PMASK_RECIPIENT_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" recipient_addressing=\"%s\"",
 						entry->recipient_addressing);
 
-	if (entry->mask & PMASK_TYPE)
+	if (parametermask & PMASK_TYPE &&
+			entry->mask & PMASK_TYPE)
 		g_string_append_escaped_printf(mas->buffer, " type=\"%s\"",
 				entry->type);
 
-	if (entry->mask & PMASK_RECEPTION_STATUS)
+	if (parametermask & PMASK_RECEPTION_STATUS &&
+			entry->mask & PMASK_RECEPTION_STATUS)
 		g_string_append_escaped_printf(mas->buffer,
 						" reception_status=\"%s\"",
 						entry->reception_status);
 
-	if (entry->mask & PMASK_SIZE)
+	if (parametermask & PMASK_SIZE &&
+			entry->mask & PMASK_SIZE)
 		g_string_append_escaped_printf(mas->buffer, " size=\"%s\"",
 				entry->size);
 
-	if (entry->mask & PMASK_ATTACHMENT_SIZE)
+	if (parametermask & PMASK_ATTACHMENT_SIZE &&
+			entry->mask & PMASK_ATTACHMENT_SIZE)
 		g_string_append_escaped_printf(mas->buffer,
 						" attachment_size=\"%s\"",
 						entry->attachment_size);
 
-	if (entry->mask & PMASK_TEXT)
+	if (parametermask & PMASK_TEXT &&
+			entry->mask & PMASK_TEXT)
 		g_string_append_escaped_printf(mas->buffer, " text=\"%s\"",
 				yesorno(entry->text));
 
-	if (entry->mask & PMASK_READ)
+	if (parametermask & PMASK_READ &&
+			entry->mask & PMASK_READ)
 		g_string_append_escaped_printf(mas->buffer, " read=\"%s\"",
 				yesorno(entry->read));
 
-	if (entry->mask & PMASK_SENT)
+	if (parametermask & PMASK_SENT &&
+			entry->mask & PMASK_SENT)
 		g_string_append_escaped_printf(mas->buffer, " sent=\"%s\"",
 				yesorno(entry->sent));
 
-	if (entry->mask & PMASK_PROTECTED)
+	if (parametermask & PMASK_PROTECTED &&
+			entry->mask & PMASK_PROTECTED)
 		g_string_append_escaped_printf(mas->buffer, " protected=\"%s\"",
 				yesorno(entry->protect));
 
-	if (entry->mask & PMASK_PRIORITY)
+	if (parametermask & PMASK_PRIORITY &&
+			entry->mask & PMASK_PRIORITY)
 		g_string_append_escaped_printf(mas->buffer, " priority=\"%s\"",
 				yesorno(entry->priority));
 
