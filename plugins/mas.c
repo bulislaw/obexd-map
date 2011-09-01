@@ -704,6 +704,8 @@ static void get_messages_listing_cb(void *session, int err,
 	uint32_t parametermask = 0xFFFF;
 	uint16_t max = 1024;
 
+//	aparams_read(mas->request->inparams, MAXLISTCOUNT_TAG, &max);
+
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
 		return;
@@ -722,6 +724,10 @@ static void get_messages_listing_cb(void *session, int err,
 
 		goto proceed;
 	}
+
+//	aparams_read(mas->request->inparams, PARAMETERMASK_TAG, &parametermask);
+	if (parametermask == 0)
+		parametermask = 0xFFFF;
 
 	g_string_append(mas->buffer, "<msg");
 
