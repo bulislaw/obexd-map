@@ -28,7 +28,9 @@
 #include <errno.h>
 #include <glib.h>
 #include <string.h>
+#include <gdbus.h>
 
+#include "log.h"
 #include "messages.h"
 
 struct message_folder {
@@ -49,6 +51,7 @@ struct session {
 };
 
 static struct message_folder *folder_tree = NULL;
+static DBusConnection *session_connection = NULL;
 
 static struct message_folder *get_folder(const char *folder)
 {
@@ -150,6 +153,12 @@ static void create_folder_tree()
 
 int messages_init(void)
 {
+	session_connection = dbus_bus_get(DBUS_BUS_SESSION, NULL);
+	if (session_connection == NULL) {
+		error("Unable to connect to the session bus");
+		return -1;
+	}
+
 	create_folder_tree();
 
 	return 0;
@@ -158,6 +167,8 @@ int messages_init(void)
 void messages_exit(void)
 {
 	destroy_folder_tree(folder_tree);
+
+	dbus_connection_unref(session_connection);
 }
 
 int messages_connect(void **s)
