@@ -868,6 +868,9 @@ static gboolean async_get_folder_listing(void *s) {
 	if (session->name && strchr(session->name, '/') != NULL)
 		goto done;
 
+	if (session->aborted)
+		goto aborted;
+
 	path = g_build_filename(session->cwd, session->name, NULL);
 
 	if (path == NULL || strlen(path) == 0)
@@ -894,11 +897,13 @@ static gboolean async_get_folder_listing(void *s) {
 					dir_data->name, session->user_data);
 	}
 
- done:
+done:
 	session->cb.folder_list(session, 0, folder_count, NULL,
 							session->user_data);
 
 	g_free(path);
+
+aborted:
 	g_free(session->name);
 
 	return FALSE;
@@ -915,6 +920,7 @@ int messages_get_folder_listing(void *s, const char *name,
 	session->offset = offset;
 	session->cb.folder_list = callback;
 	session->user_data = user_data;
+	session->aborted = FALSE;
 
 	g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, async_get_folder_listing,
 						session, NULL);
