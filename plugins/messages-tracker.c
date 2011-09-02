@@ -754,6 +754,7 @@ static void get_message_resp(const char **reply, void *s)
 	bmsg_destroy(bmsg);
 	g_free(folder);
 	g_free(final_bmsg);
+	g_free(msg_data);
 
 	request->count++;
 
