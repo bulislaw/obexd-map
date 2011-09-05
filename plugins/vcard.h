@@ -19,6 +19,9 @@
  *
  */
 
+#define FORMAT_VCARD21 0x00
+#define FORMAT_VCARD30 0x01
+
 enum phonebook_number_type {
 	TEL_TYPE_HOME,
 	TEL_TYPE_MOBILE,

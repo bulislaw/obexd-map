@@ -72,9 +72,6 @@
 #define FILTER_SORT_STRING (1 << 27)
 #define FILTER_X_IRMC_CALL_DATETIME (1 << 28)
 
-#define FORMAT_VCARD21 0x00
-#define FORMAT_VCARD30 0x01
-
 /* according to RFC 2425, the output string may need folding */
 static void vcard_printf(GString *str, const char *fmt, ...)
 {
@@ -537,14 +534,14 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 
 	vcard_printf_begin(vcards, format);
 
-	if (filter & FILTER_UID && *contact->uid)
+	if (filter & FILTER_UID && contact->uid != NULL && *contact->uid)
 		vcard_printf_tag(vcards, format, "UID", NULL, contact->uid);
 
 	if (filter & FILTER_N)
 		vcard_printf_name(vcards, contact);
 
-	if (filter & FILTER_FN && (*contact->fullname ||
-					format == FORMAT_VCARD30))
+	if (filter & FILTER_FN && contact->fullname != NULL &&
+			(*contact->fullname || format == FORMAT_VCARD30))
 		vcard_printf_fullname(vcards, contact->fullname);
 
 	if (filter & FILTER_TEL) {
@@ -582,11 +579,13 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		}
 	}
 
-	if (filter & FILTER_BDAY && *contact->birthday)
+	if (filter & FILTER_BDAY && contact->birthday != NULL &&
+							*contact->birthday)
 		vcard_printf_tag(vcards, format, "BDAY", NULL,
 						contact->birthday);
 
-	if (filter & FILTER_NICKNAME && *contact->nickname)
+	if (filter & FILTER_NICKNAME && contact->nickname != NULL &&
+							*contact->nickname)
 		vcard_printf_tag(vcards, format, "NICKNAME", NULL,
 							contact->nickname);
 
@@ -599,17 +598,17 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		}
 	}
 
-	if (filter & FILTER_PHOTO && *contact->photo)
+	if (filter & FILTER_PHOTO && contact->photo != NULL && *contact->photo)
 		vcard_printf_tag(vcards, format, "PHOTO", NULL,
 							contact->photo);
 
 	if (filter & FILTER_ORG)
 		vcard_printf_org(vcards, contact);
 
-	if (filter & FILTER_ROLE && *contact->role)
+	if (filter & FILTER_ROLE && contact->role != NULL && *contact->role)
 		vcard_printf_tag(vcards, format, "ROLE", NULL, contact->role);
 
-	if (filter & FILTER_TITLE && *contact->title)
+	if (filter & FILTER_TITLE && contact->title != NULL && *contact->title)
 		vcard_printf_tag(vcards, format, "TITLE", NULL, contact->title);
 
 	if (filter & FILTER_X_IRMC_CALL_DATETIME)
@@ -617,7 +616,6 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 
 	vcard_printf_end(vcards);
 }
-
 
 static void field_free(gpointer data)
 {

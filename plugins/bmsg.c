@@ -22,70 +22,24 @@
 
 #include "bmsg.h"
 
-static GString *parse_vcard(struct bmsg_vcard *vcard)
+static void free_glist_contact(void *item, void *user_data)
 {
-	GString *buf;
+	struct phonebook_contact *tmp = item;
 
-	if (vcard == NULL)
-		return NULL;
-
-	if (vcard->version == NULL)
-		return NULL;
-
-	if (vcard->n == NULL)
-		return NULL;
-
-	buf = g_string_new("");
-
-	g_string_append_printf(buf, "BEGIN:VCARD\r\n");
-	g_string_append_printf(buf, "VERSION:%s\r\n", vcard->version);
-
-	if (vcard->n != NULL)
-		g_string_append_printf(buf, "N:%s\r\n", vcard->n);
-
-	if (vcard->fn != NULL)
-		g_string_append_printf(buf, "FN:%s\r\n", vcard->fn);
-
-	if (vcard->tel != NULL)
-		g_string_append_printf(buf, "TEL:%s\r\n", vcard->tel);
-
-	if (vcard->email != NULL)
-		g_string_append_printf(buf, "EMAIL:%s\r\n", vcard->email);
-
-	g_string_append_printf(buf, "END:VCARD\r\n");
-
-	return buf;
-}
-
-static void free_glist_vcard(void *item, void *user_data)
-{
-	struct bmsg_vcard *tmp = item;
-
-	if (tmp == NULL)
-		return;
-
-	g_free(tmp->version);
-	g_free(tmp->n);
-	g_free(tmp->fn);
-	g_free(tmp->tel);
-	g_free(tmp->email);
-	g_free(item);
+	phonebook_contact_free(tmp);
 }
 
 static void string_append_glist_vcard(void *list_item, void *list)
 {
 	GString *buf = list;
-	GString *item = parse_vcard(list_item);
 
-	g_string_append(buf, item->str);
-
-	g_string_free(item, TRUE);
+	phonebook_add_contact(buf, list_item, 0, FORMAT_VCARD30);
 }
 
 static void envelope_destroy(struct bmsg_envelope *env)
 {
 	if (env->recipients) {
-		g_list_foreach(env->recipients, free_glist_vcard, NULL);
+		g_list_foreach(env->recipients, free_glist_contact, NULL);
 		g_list_free(env->recipients);
 	}
 
@@ -121,7 +75,7 @@ void bmsg_destroy(struct bmsg *msg)
 	g_free(msg->folder);
 
 	if (msg->originators) {
-		g_list_foreach(msg->originators, free_glist_vcard, NULL);
+		g_list_foreach(msg->originators, free_glist_contact, NULL);
 		g_list_free(msg->originators);
 	}
 
@@ -141,28 +95,9 @@ void bmsg_destroy(struct bmsg *msg)
 	g_free(msg);
 }
 
-static struct bmsg_vcard *make_vcard(const char *version, const char *name,
-					const char *fullname, const char *tel,
-					const char *email)
+void bmsg_add_originator(struct bmsg *msg, struct phonebook_contact *contact)
 {
-	struct bmsg_vcard *vcard = g_new0(struct bmsg_vcard, 1);
-
-	vcard->version = g_strdup(version);
-	vcard->n = g_strdup(name);
-	vcard->fn = g_strdup(fullname);
-	vcard->tel = g_strdup(tel);
-	vcard->email = g_strdup(email);
-
-	return vcard;
-}
-
-void bmsg_add_originator(struct bmsg *msg, const char *version,
-				 const char *name, const char *fullname,
-				 const char *tel, const char *email)
-{
-	struct bmsg_vcard *buf = make_vcard(version, name, fullname, tel,
-									email);
-	msg->originators = g_list_append(msg->originators, buf);
+	msg->originators = g_list_append(msg->originators, contact);
 }
 
 gboolean bmsg_add_envelope(struct bmsg *msg)

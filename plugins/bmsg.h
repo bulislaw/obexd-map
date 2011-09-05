@@ -23,6 +23,9 @@
 #include <stdio.h>
 #include <glib.h>
 #include <string.h>
+#include <stdint.h>
+
+#include "vcard.h"
 
 #define MAX_ENVELOPES_NUM 3
 
@@ -76,9 +79,7 @@ struct bmsg {
 void bmsg_init(struct bmsg *msg, const char *version, const char *status,
 					const char *type, const char *folder);
 void bmsg_destroy(struct bmsg *msg);
-void bmsg_add_originator(struct bmsg *msg, const char *version,
-				const char *name, const char *fullname,
-				const char *tel, const char *email);
+void bmsg_add_originator(struct bmsg *msg, struct phonebook_contact *contact);
 gboolean bmsg_add_envelope(struct bmsg *msg);
 gboolean bmsg_add_content(struct bmsg *msg, gint32 part_id, char *encoding,
 			char *charset, char *lang, const char* content);
