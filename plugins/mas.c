@@ -983,6 +983,21 @@ static const char *yesorno(gboolean a)
 	return "no";
 }
 
+static char *trim_utf8(char *s, size_t len)
+{
+	char *end;
+	size_t l;
+
+	l = strlen(s);
+	if (l > len)
+		l = len;
+
+	g_utf8_validate(s, len, (const gchar **)&end);
+	*end = '\0';
+
+	return s;
+}
+
 static void get_messages_listing_cb(void *session, int err,
 		uint16_t size, gboolean newmsg,
 		const struct messages_message *entry,
@@ -1034,9 +1049,19 @@ static void get_messages_listing_cb(void *session, int err,
 	g_string_append_escaped_printf(mas->buffer, " handle=\"%s\"",
 								entry->handle);
 
-	if (parametermask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT)
+	if (parametermask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT) {
+		char *subject;
+		uint8_t limit = 255;
+
+		subject	= g_strdup(entry->subject);
+		aparams_read(mas->inparams, SUBJECTLENGTH_TAG, &limit);
+		trim_utf8(subject, limit);
+
 		g_string_append_escaped_printf(mas->buffer, " subject=\"%s\"",
-				entry->subject);
+				subject);
+
+		g_free(subject);
+	}
 
 	if (parametermask & PMASK_DATETIME &&
 			entry->mask & PMASK_DATETIME)
