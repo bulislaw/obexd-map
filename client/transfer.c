@@ -533,8 +533,8 @@ done:
 	size = transfer->size < UINT32_MAX ? transfer->size : 0;
 	transfer->xfer = gw_obex_put_async_with_apparam(obex, transfer->name,
 						transfer->type,
-						transfer->params->data,
-						transfer->params->size,
+						transfer->params ? transfer->params->data : NULL,
+						transfer->params ? transfer->params->size : 0,
 						size,
 						-1, NULL);
 	if (transfer->xfer == NULL)
