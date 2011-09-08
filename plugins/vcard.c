@@ -267,40 +267,42 @@ static void vcard_printf_number(GString *vcards, uint8_t format,
 	switch (category) {
 	case TEL_TYPE_HOME:
 		if (format == FORMAT_VCARD21)
-			category_string = "HOME;VOICE";
+			category_string = ";HOME;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=HOME;TYPE=VOICE";
+			category_string = ";TYPE=HOME;TYPE=VOICE";
 		break;
 	case TEL_TYPE_MOBILE:
 		if (format == FORMAT_VCARD21)
-			category_string = "CELL;VOICE";
+			category_string = ";CELL;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=CELL;TYPE=VOICE";
+			category_string = ";TYPE=CELL;TYPE=VOICE";
 		break;
 	case TEL_TYPE_FAX:
 		if (format == FORMAT_VCARD21)
-			category_string = "FAX";
+			category_string = ";FAX";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=FAX";
+			category_string = ";TYPE=FAX";
 		break;
 	case TEL_TYPE_WORK:
 		if (format == FORMAT_VCARD21)
-			category_string = "WORK;VOICE";
+			category_string = ";WORK;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=WORK;TYPE=VOICE";
+			category_string = ";TYPE=WORK;TYPE=VOICE";
 		break;
 	case TEL_TYPE_OTHER:
 		if (format == FORMAT_VCARD21)
-			category_string = "OTHER;VOICE";
+			category_string = ";OTHER;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=OTHER;TYPE=VOICE";
+			category_string = ";TYPE=OTHER;TYPE=VOICE";
 		break;
+	case TEL_TYPE_NONE:
+		category_string = "";
 	}
 
 	if ((type == TYPE_INTERNATIONAL) && (number[0] != '+'))
 		intl = "+";
 
-	snprintf(buf, sizeof(buf), "TEL;%s:%s\%s", category_string,
+	snprintf(buf, sizeof(buf), "TEL%s:%s\%s", category_string,
 								intl, number);
 
 	vcard_printf(vcards, buf, number);

@@ -28,6 +28,7 @@ enum phonebook_number_type {
 	TEL_TYPE_FAX,
 	TEL_TYPE_WORK,
 	TEL_TYPE_OTHER,
+	TEL_TYPE_NONE,
 };
 
 enum phonebook_field_type {

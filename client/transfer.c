@@ -531,8 +531,11 @@ int obc_transfer_put(struct obc_transfer *transfer, transfer_callback_t func,
 done:
 	obex = obc_session_get_obex(session);
 	size = transfer->size < UINT32_MAX ? transfer->size : 0;
-	transfer->xfer = gw_obex_put_async(obex, transfer->name,
-						transfer->type, size,
+	transfer->xfer = gw_obex_put_async_with_apparam(obex, transfer->name,
+						transfer->type,
+						transfer->params->data,
+						transfer->params->size,
+						size,
 						-1, NULL);
 	if (transfer->xfer == NULL)
 		return -ENOTCONN;

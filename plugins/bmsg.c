@@ -75,7 +75,6 @@ void bmsg_destroy(struct bmsg *msg)
 	g_free(msg->folder);
 
 	if (msg->originators) {
-		g_list_foreach(msg->originators, free_glist_contact, NULL);
 		g_list_free(msg->originators);
 	}
 

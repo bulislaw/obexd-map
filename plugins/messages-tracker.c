@@ -44,6 +44,8 @@
 
 #define SMS_DEFAULT_CHARSET "UTF-8"
 
+#define STATUS_NOT_SET 0xFF
+
 #define MESSAGES_FILTER_BY_HANDLE "FILTER (xsd:string(?msg) = \"message:%s\" ) ."
 
 #define MESSAGE_HANDLE 0
@@ -137,10 +139,10 @@ struct request {
 	void *user_data;
 	gboolean count;
 	gboolean new_message;
-	gboolean aborted;
 	reply_list_foreach_cb generate_response;
 	struct messages_filter *filter;
 	unsigned long flags;
+	gboolean deleted;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
@@ -148,16 +150,25 @@ struct request {
 	} cb;
 };
 
+struct message_status {
+	uint8_t read;
+	uint8_t deleted;
+};
+
 struct session {
 	char *cwd;
 	struct message_folder *folder;
 	gboolean aborted;
 	void *event_user_data;
+	messages_event_cb event_cb;
 	struct request *request;
+	GHashTable *msg_stat;
 };
 
 static struct message_folder *folder_tree = NULL;
 static DBusConnection *session_connection = NULL;
+static GSList *mns_srv;
+static gint event_watch_id;
 
 static gboolean trace_call(void *data)
 {
@@ -193,6 +204,16 @@ static void free_msg_data(struct messages_message *msg)
 	g_free(msg->attachment_size);
 
 	g_free(msg);
+}
+
+static void free_event_data(struct messages_event *event)
+{
+	g_free(event->handle);
+	g_free(event->folder);
+	g_free(event->old_folder);
+	g_free(event->msg_type);
+
+	g_free(event);
 }
 
 static struct messages_filter *copy_messages_filter(
@@ -453,7 +474,7 @@ static void create_folder_tree()
 				"nmo:isSent \"true\" . ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 
-	child = create_folder("deleted", "?msg nmo:isDeleted \"true\" . ");
+	child = create_folder("deleted", " ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 }
 
@@ -506,26 +527,6 @@ static char *path2query(const char *folder, const char *query,
 		return g_strdup_printf(query, "", user_rule);
 
 	return NULL;
-}
-
-static DBusConnection *dbus_get_connection(DBusBusType type)
-{
-	DBusError err;
-	DBusConnection *tmp;
-
-	dbus_error_init(&err);
-
-	tmp = dbus_bus_get(type, &err);
-
-	if (dbus_error_is_set(&err))
-		error("Connection Error (%s)", err.message);
-
-	if (!tmp)
-		error("Error when getting on bus");
-
-	dbus_error_free(&err);
-
-	return tmp;
 }
 
 static gboolean filter_message(struct messages_message *message,
@@ -606,6 +607,7 @@ static gboolean filter_message(struct messages_message *message,
 static struct phonebook_contact *pull_message_contact(const char **reply)
 {
 	struct phonebook_contact *contact;
+	struct phonebook_field *number;
 
 	contact = g_new0(struct phonebook_contact, 1);
 
@@ -616,6 +618,11 @@ static struct phonebook_contact *pull_message_contact(const char **reply)
 	contact->prefix = g_strdup(reply[MESSAGE_FROM_PREFIX]);
 	contact->suffix = g_strdup(reply[MESSAGE_FROM_SUFFIX]);
 
+	number = g_new0(struct phonebook_field, 1);
+	number->text = g_strdup(reply[MESSAGE_FROM_PHONE]);
+	number->type = TEL_TYPE_NONE;
+	contact->numbers = g_slist_append(contact->numbers, number);
+
 	return contact;
 }
 
@@ -623,8 +630,8 @@ static struct messages_message *pull_message_data(const char **reply)
 {
 	struct messages_message *data = g_new0(struct messages_message, 1);
 
-	data->handle = g_strdup(reply[MESSAGE_HANDLE]
-						+ MESSAGE_HANDLE_PREFIX_LEN);
+	data->handle = g_strdup(reply[MESSAGE_HANDLE] +
+						MESSAGE_HANDLE_PREFIX_LEN);
 
 	if (strlen(reply[MESSAGE_SUBJECT]) != 0)
 		data->subject = g_strdup(reply[MESSAGE_SUBJECT]);
@@ -699,26 +706,41 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	struct session *session = user_data;
 	struct request *request = session->request;
 	struct messages_message *msg_data;
+	struct message_status *stat;
 
 	DBG("reply %p", reply);
 
 	if (reply == NULL)
-		goto done;
+		goto end;
 
 	if (session->aborted)
 		goto aborted;
 
 	msg_data = pull_message_data(reply);
 
+	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
+	if (stat == NULL) {
+		stat = g_new0(struct message_status, 1);
+		stat->read = msg_data->read;
+
+		g_hash_table_insert(session->msg_stat,
+					g_strdup(msg_data->handle), stat);
+	} else if (stat != NULL && stat->read != STATUS_NOT_SET)
+		msg_data->read = stat->read;
+
+	if (request->deleted && (stat == NULL || !stat->deleted))
+		goto done;
+
+	if (!request->deleted && (stat != NULL && stat->deleted))
+		goto done;
+
 	request->size++;
 
 	if (!msg_data->read)
-			request->new_message = TRUE;
+		request->new_message = TRUE;
 
-	if (request->count == TRUE) {
-		free_msg_data(msg_data);
-		return;
-	}
+	if (request->count == TRUE)
+		goto done;
 
 	if (request->size > request->offset && filter_message(msg_data,
 							request->filter))
@@ -726,14 +748,14 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 						request->new_message, msg_data,
 						request->user_data);
 
+done:
 	free_msg_data(msg_data);
 	return;
 
-done:
+end:
 	request->cb.messages_list(session, 0, request->size,
 						request->new_message, NULL,
 						request->user_data);
-
 aborted:
 	g_free(request->filter->period_begin);
 	g_free(request->filter->period_end);
@@ -752,6 +774,7 @@ static void get_message_resp(const char **reply, void *s)
 	struct bmsg *bmsg;
 	char *final_bmsg, *status, *folder, *handle;
 	struct phonebook_contact *contact;
+	struct message_status *stat;
 	int err;
 
 	DBG("reply %p", reply);
@@ -768,6 +791,10 @@ static void get_message_resp(const char **reply, void *s)
 	msg_data->handle = handle;
 
 	contact = pull_message_contact(reply);
+
+	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
+	if (stat != NULL && stat->read != STATUS_NOT_SET)
+		msg_data->read = stat->read;
 
 	status = msg_data->read ? "READ" : "UNREAD";
 
@@ -789,6 +816,7 @@ static void get_message_resp(const char **reply, void *s)
 	g_free(folder);
 	g_free(final_bmsg);
 	free_msg_data(msg_data);
+	phonebook_contact_free(contact);
 
 	request->count++;
 
@@ -807,16 +835,74 @@ aborted:
 	g_free(request);
 }
 
+static void notify_new_sms(const char *handle)
+{
+	struct messages_event *data;
+	GSList *next;
+
+	data = g_new0(struct messages_event, 1);
+	data->folder = g_strdup("telecom/msg/inbox");
+	data->type = MET_NEW_MESSAGE;
+	data->msg_type = g_strdup("SMS_GSM");
+	data->old_folder = g_strdup("");
+	data->handle = fill_handle(handle);
+
+	next = mns_srv;
+	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
+		struct session *session = next->data;
+
+		session->event_cb(session, data, session->event_user_data);
+	}
+
+	free_event_data(data);
+}
+
+static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
+							void *user_data)
+{
+	DBusMessageIter arg, inner_arg, struct_arg;
+	unsigned ihandle = 0;
+	char *handle;
+
+	DBG("");
+
+	if (!dbus_message_iter_init(msg, &arg))
+		return TRUE;
+
+	if (dbus_message_iter_get_arg_type(&arg) != DBUS_TYPE_ARRAY)
+		return TRUE;
+
+	dbus_message_iter_recurse(&arg, &inner_arg);
+
+	if (dbus_message_iter_get_arg_type(&inner_arg) != DBUS_TYPE_STRUCT)
+		return TRUE;
+
+	dbus_message_iter_recurse(&inner_arg, &struct_arg);
+
+	if (dbus_message_iter_get_arg_type(&struct_arg) != DBUS_TYPE_INT32)
+		return TRUE;
+
+	dbus_message_iter_get_basic(&struct_arg, &ihandle);
+
+	handle = g_strdup_printf("%d", ihandle);
+
+	DBG("new message: %s", handle);
+
+	notify_new_sms(handle);
+
+	g_free(handle);
+
+	return TRUE;
+}
+
 int messages_init(void)
 {
-	DBusError err;
-	dbus_error_init(&err);
+	session_connection = dbus_bus_get(DBUS_BUS_SESSION, NULL);
+	if (session_connection == NULL) {
+		error("Unable to connect to the session bus.");
 
-	if (session_connection == NULL)
-		session_connection = dbus_get_connection(DBUS_BUS_SESSION);
-
-	if (!session_connection)
 		return -1;
+	}
 
 	create_folder_tree();
 
@@ -826,6 +912,8 @@ int messages_init(void)
 void messages_exit(void)
 {
 	destroy_folder_tree(folder_tree);
+
+	dbus_connection_unref(session_connection);
 }
 
 int messages_connect(void **s)
@@ -834,6 +922,9 @@ int messages_connect(void **s)
 
 	session->cwd = g_strdup("/");
 	session->folder = folder_tree;
+
+	session->msg_stat = g_hash_table_new_full(g_str_hash, g_str_equal,
+							g_free, g_free);
 
 	*s = session;
 
@@ -844,16 +935,41 @@ void messages_disconnect(void *s)
 {
 	struct session *session = s;
 
+	if (session->msg_stat)
+		g_hash_table_destroy(session->msg_stat);
 	g_free(session->cwd);
 	g_free(session);
 }
 
-int messages_set_notification_registration(void *session,
-		void (*send_event)(void *session,
-			const struct messages_event *event, void *user_data),
-		void *user_data)
+int messages_set_notification_registration(void *s, messages_event_cb cb,
+							void *user_data)
 {
-	return -EINVAL;
+	struct session *session = s;
+
+	if (cb != NULL) {
+		if (g_slist_length(mns_srv) == 0)
+			event_watch_id = g_dbus_add_signal_watch(
+							session_connection,
+							NULL, NULL,
+							"com.nokia.commhistory",
+							"eventsAdded",
+							handle_new_sms,
+							NULL, NULL);
+		if (event_watch_id == 0)
+			return -EIO;
+
+		session->event_user_data = user_data;
+		session->event_cb = cb;
+
+		mns_srv = g_slist_prepend(mns_srv, session);
+	} else {
+		mns_srv = g_slist_remove(mns_srv, session);
+
+		if (g_slist_length(mns_srv) == 0)
+			g_dbus_remove_watch(session_connection, event_watch_id);
+	}
+
+	return 0;
 }
 
 int messages_set_folder(void *s, const char *name, gboolean cdup)
@@ -1013,7 +1129,7 @@ int messages_get_messages_listing(void *s, const char *name,
 	g_free(path);
 
 	if (folder == NULL)
-		return -ENOENT;
+		return -EBADR;
 
 	query = folder2query(folder, LIST_MESSAGES_QUERY);
 	if (query == NULL)
@@ -1027,6 +1143,7 @@ int messages_get_messages_listing(void *s, const char *name,
 	request->offset = offset;
 	request->max = max;
 	request->user_data = user_data;
+	request->deleted = g_strcmp0(folder->name, "deleted") ? FALSE : TRUE;
 
 	session->aborted = FALSE;
 	session->request = request;
@@ -1087,10 +1204,38 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 
 failed:
 	g_free(query_handle);
-	g_free(query);
 	g_free(handle);
+	g_free(query);
 
 	return err;
+}
+
+int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
+								uint8_t value)
+{
+	struct session *session = s;
+	struct message_status *stat = NULL;
+
+	stat = g_hash_table_lookup(session->msg_stat, handle);
+	if (stat == NULL) {
+		stat = g_new0(struct message_status, 1);
+		stat->read = STATUS_NOT_SET;
+
+		g_hash_table_insert(session->msg_stat, g_strdup(handle), stat);
+	}
+
+	switch (indicator) {
+		case 0x0:
+			stat->read = value;
+			break;
+		case 0x1:
+			stat->deleted = value;
+			break;
+		default:
+			return -EBADR;
+	}
+
+	return 0;
 }
 
 void messages_abort(void *s)
