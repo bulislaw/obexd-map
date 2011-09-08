@@ -37,15 +37,21 @@ struct message_folder {
 	char *query;
 };
 
-struct session {
-	char *cwd;
-	struct message_folder *folder;
+struct request {
 	char *name;
 	uint16_t max;
 	uint16_t offset;
 	void *user_data;
-	void (*folder_list_cb)(void *session, int err, uint16_t size,
-					const char *name, void *user_data);
+	union {
+		messages_folder_listing_cb folder_list;
+	} cb;
+};
+
+struct session {
+	char *cwd;
+	struct message_folder *folder;
+	gboolean aborted;
+	struct request *request;
 };
 
 static struct message_folder *folder_tree = NULL;
@@ -237,18 +243,23 @@ int messages_set_folder(void *s, const char *name, gboolean cdup)
 	return 0;
 }
 
-static gboolean async_get_folder_listing(void *s) {
+static gboolean async_get_folder_listing(void *s)
+{
 	struct session *session = s;
+	struct request *request = session->request;
 	gboolean count = FALSE;
 	int folder_count = 0;
 	char *path = NULL;
 	struct message_folder *folder;
 	GSList *dir;
 
-	if (session->name && strchr(session->name, '/') != NULL)
+	if (session->aborted)
+		goto aborted;
+
+	if (request->name && strchr(request->name, '/') != NULL)
 		goto done;
 
-	path = g_build_filename(session->cwd, session->name, NULL);
+	path = g_build_filename(session->cwd, request->name, NULL);
 
 	if (path == NULL || strlen(path) == 0)
 		goto done;
@@ -258,28 +269,32 @@ static gboolean async_get_folder_listing(void *s) {
 	if (folder == NULL)
 		goto done;
 
-	if (session->max == 0) {
-		session->max = 0xffff;
-		session->offset = 0;
+	if (request->max == 0) {
+		request->max = 0xffff;
+		request->offset = 0;
 		count = TRUE;
 	}
 
 	for (dir = folder->subfolders; dir &&
-				(folder_count - session->offset) < session->max;
+				(folder_count - request->offset) < request->max;
 				folder_count++, dir = g_slist_next(dir)) {
 		struct message_folder *dir_data = dir->data;
 
-		if (count == FALSE && session->offset <= folder_count)
-			session->folder_list_cb(session, -EAGAIN, 0,
-					dir_data->name, session->user_data);
+		if (count == FALSE && request->offset <= folder_count)
+			request->cb.folder_list(session, -EAGAIN, 1,
+							dir_data->name,
+							request->user_data);
 	}
 
- done:
-	session->folder_list_cb(session, 0, folder_count, NULL,
-							session->user_data);
+done:
+	request->cb.folder_list(session, 0, folder_count, NULL,
+							request->user_data);
 
 	g_free(path);
-	g_free(session->name);
+
+aborted:
+	g_free(request->name);
+	g_free(request);
 
 	return FALSE;
 }
@@ -290,11 +305,16 @@ int messages_get_folder_listing(void *s, const char *name,
 					void *user_data)
 {
 	struct session *session = s;
-	session->name = g_strdup(name);
-	session->max = max;
-	session->offset = offset;
-	session->folder_list_cb = callback;
-	session->user_data = user_data;
+	struct request *request = g_new0(struct request, 1);
+
+	request->name = g_strdup(name);
+	request->max = max;
+	request->offset = offset;
+	request->cb.folder_list = callback;
+	request->user_data = user_data;
+
+	session->aborted = FALSE;
+	session->request = request;
 
 	g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, async_get_folder_listing,
 						session, NULL);
@@ -321,6 +341,9 @@ int messages_get_message(void *session,
 	return -EINVAL;
 }
 
-void messages_abort(void *session)
+void messages_abort(void *s)
 {
+	struct session *session = s;
+
+	session->aborted = TRUE;
 }
