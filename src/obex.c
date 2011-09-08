@@ -1080,6 +1080,7 @@ static gboolean check_put(obex_t *obex, obex_object_t *obj)
 	case 0:
 		break;
 	case -EPERM:
+	case -EACCES:
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_FORBIDDEN, OBEX_RSP_FORBIDDEN);
 		return FALSE;
 	case -EBADR:
