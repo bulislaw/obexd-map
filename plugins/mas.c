@@ -40,6 +40,7 @@
 #include "dbus.h"
 
 #include "messages.h"
+#include "bmsg_parser.h"
 
 /* Channel number according to bluez doc/assigned-numbers.txt */
 #define MAS_CHANNEL	16
@@ -244,6 +245,16 @@ struct any_object {
 struct notification_registration {
 	struct any_object any;
 	uint8_t status;
+};
+
+struct message_put_request {
+	GString *buf;		/* FIXME: use mas_session.buffer instead */
+	const char *name;
+	struct bmsg_bmsg *bmsg;
+	struct bmsg_parser *parser;
+	unsigned long flags;
+	gboolean parsed;
+	size_t remaining;
 };
 
 static const uint8_t MAS_TARGET[TARGET_SIZE] = {
@@ -967,6 +978,7 @@ static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	if (ret < 0)
 		goto failed;
 
+
 	return 0;
 
 failed:
@@ -1346,10 +1358,61 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 		return mas;
 }
 
+static void push_message_cb(void *session, int err, const char *handle,
+								void *user_data)
+{
+	struct mas_session *mas = user_data;
+
+	if (handle == NULL) {
+		DBG("err: %d", err);
+		obex_object_set_io_flags(mas, G_IO_ERR, err);
+		mas->finished = TRUE;
+	} else {
+		DBG("handle: %s", handle);
+		obex_name_write(mas->obex_os, mas->obex_obj, handle);
+		obex_object_set_io_flags(mas, G_IO_OUT, 0);
+	}
+}
+
+static void message_put_free(gpointer data)
+{
+	struct message_put_request *request = data;
+
+	bmsg_parser_free(request->parser);
+	bmsg_free(request->bmsg);
+	g_string_free(request->buf, TRUE);
+	g_free(request);
+}
+
 static void message_put(struct mas_session *mas, const char *name, int *err)
 {
-	DBG("Message pushing not supported!");
-	*err = -EBADR;
+	struct message_put_request *request;
+	uint8_t value;
+
+	DBG("");
+
+	request = g_new0(struct message_put_request, 1);
+
+	mas->request = request;
+	mas->request_free = message_put_free;
+
+	aparams_read(mas->inparams, CHARSET_TAG, &value);
+	if (value & 0x01)
+		request->flags |= MESSAGES_UTF8;
+
+	aparams_read(mas->inparams, TRANSPARENT_TAG, &value);
+	if (value & 0x01)
+		request->flags |= MESSAGES_TRANSPARENT;
+
+	aparams_read(mas->inparams, RETRY_TAG, &value);
+	if (value & 0x01)
+		request->flags |= MESSAGES_RETRY;
+
+	request->parser = bmsg_parser_new();
+	request->buf = g_string_new("");
+	request->name = name;
+
+	*err = 0;
 }
 
 static void message_get(struct mas_session *mas, const char *name, int *err)
@@ -1392,6 +1455,104 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	else
 		return mas;
+}
+
+static ssize_t message_write_body(struct mas_session *mas, const void *buf,
+								size_t count)
+{
+	struct message_put_request *request = mas->request;
+	size_t n;
+	ssize_t ret;
+
+	if (request->remaining == 0) {
+		g_string_append_len(request->buf, buf, count);
+		return count;
+	}
+
+	if (request->remaining > count)
+		n = count;
+	else
+		n = request->remaining;
+
+	ret = messages_push_message_body(mas->backend_data, buf, n);
+	request->remaining -= ret;
+
+	return ret;
+}
+
+static ssize_t message_write_header(struct mas_session *mas, const void *buf,
+								size_t count)
+{
+	struct message_put_request *request = mas->request;
+	char *pos;
+	int ret;
+	ssize_t size;
+
+	DBG("");
+
+	g_string_append_len(request->buf, buf, count);
+	pos = request->buf->str;
+
+	ret = bmsg_parser_process(request->parser, &pos, count);
+	if (ret < 0)
+		return ret;
+
+	size = pos - request->buf->str;
+	g_string_erase(request->buf, 0, size);
+
+	if (ret > 0)
+		return count;
+
+	DBG("Parsing done");
+
+	request->bmsg = bmsg_parser_get_bmsg(request->parser);
+
+	bmsg_parser_free(request->parser);
+	request->parser = NULL;
+
+	request->parsed = TRUE;
+	request->remaining = request->bmsg->length;
+
+	g_string_set_size(request->buf, 0);
+
+	ret = messages_push_message(mas->backend_data, request->bmsg,
+			request->name, MESSAGES_UTF8, push_message_cb, mas);
+	if (ret < 0)
+		return ret;
+
+	return size;
+}
+
+static ssize_t message_write(void *object, const void *buf, size_t count)
+{
+	struct mas_session *mas = object;
+	struct message_put_request *request = mas->request;
+
+	if (request->parsed)
+		return message_write_body(mas, buf, count);
+	else
+		return message_write_header(mas, buf, count);
+
+}
+
+static int message_flush(void *obj)
+{
+	struct mas_session *mas = obj;
+	struct message_put_request *request = mas->request;
+
+	if (mas->finished)
+		return 0;
+
+	if (!bmsg_parser_tail_correct(request->bmsg, request->buf->str,
+						request->buf->len)) {
+		DBG("BMSG tail check failed!");
+		return -1;
+	}
+
+	mas->finished = TRUE;
+	messages_push_message_body(mas->backend_data, NULL, 0);
+
+	return 1;
 }
 
 static void *notification_registration_open(const char *name, int oflag,
@@ -1597,7 +1758,8 @@ static struct obex_mime_type_driver mime_message = {
 	.open = message_open,
 	.close = any_close,
 	.read = any_read,
-	.write = any_write,
+	.write = message_write,
+	.flush = message_flush,
 };
 
 static struct obex_mime_type_driver mime_folder_listing = {
