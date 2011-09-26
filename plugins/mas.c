@@ -231,6 +231,8 @@ struct mas_session {
 	DBusPendingCall *pending_event;
 	char *mns_path;
 	gboolean disconnected;
+	struct obex_session *obex_os;
+	obex_object_t *obex_obj;
 };
 
 struct any_object {
@@ -877,6 +879,8 @@ static void *mas_connect(struct obex_session *os, int *err)
 	if (sep)
 		*sep = 0;
 
+	mas->obex_os = os;
+
 	manager_register_session(os);
 
 	return mas;
@@ -948,6 +952,8 @@ static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	ret = get_params(os, obj, mas);
 	if (ret < 0)
 		goto failed;
+
+	mas->obex_obj = obj;
 
 	ret = obex_put_stream_start(os, name);
 	if (ret < 0)
