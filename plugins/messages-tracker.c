@@ -675,8 +675,7 @@ static struct messages_message *pull_message_data(const char **reply)
 	data->type = g_strdup("SMS_GSM");
 	data->mask |= PMASK_TYPE;
 
-	data->size = g_strdup_printf("%d", strlen(reply[MESSAGE_CONTENT]) +
-					BMESSAGE_BASE_LEN);
+	data->size = g_strdup_printf("%d", strlen(reply[MESSAGE_CONTENT]));
 	data->mask |= PMASK_SIZE;
 
 	data->text = TRUE;
