@@ -624,8 +624,7 @@ write:
 	}
 
 	/* Flush on EOS */
-	if (os->size != OBJECT_SIZE_UNKNOWN && os->size == os->offset &&
-							os->driver->flush)
+	if (os->driver->flush)
 		return os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
 
 	return 0;
