@@ -29,10 +29,12 @@
 #include <glib.h>
 #include <string.h>
 #include <gdbus.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "messages.h"
 #include "bmsg.h"
+#include "bmsg_parser.h"
 
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
@@ -123,12 +125,29 @@
 	"} "								\
 "} ORDER BY DESC(nmo:sentDate(?msg)) "
 
+#define HANDLE_BY_UUID_QUERY		\
+"SELECT ?msg { "			\
+	"?msg a nmo:SMSMessage "	\
+	"; nmo:messageId \"%s\" "	\
+"}"
+
 typedef void (*reply_list_foreach_cb)(const char **reply, void *user_data);
 
 struct message_folder {
 	char *name;
 	GSList *subfolders;
 	char *query;
+};
+
+struct push_message_request {
+	GString *body;
+	messages_push_message_cb cb;
+	struct bmsg_bmsg *bmsg;
+	void *user_data;
+	char *uuid;
+	guint watch;
+	gboolean retry;
+	DBusPendingCall *send_sms, *get_handle;
 };
 
 struct request {
@@ -1300,16 +1319,411 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 	return 0;
 }
 
-int messages_push_message(void *session, struct bmsg_bmsg *bmsg,
-				const char *name, unsigned long flags,
-				messages_push_message_cb cb, void *user_data)
+static void push_message_abort(gpointer r)
 {
-	return -EINVAL;
+	struct push_message_request *request = r;
+
+	DBG("");
+
+	if (request == NULL)
+		return;
+
+	if (request->send_sms != NULL) {
+		dbus_pending_call_cancel(request->send_sms);
+		dbus_pending_call_unref(request->send_sms);
+	}
+
+	if (request->get_handle != NULL) {
+		DBG("Cancelled get_handle");
+		dbus_pending_call_cancel(request->get_handle);
+		dbus_pending_call_unref(request->get_handle);
+	}
+
+	g_dbus_remove_watch(session_connection, request->watch);
+	g_string_free(request->body, TRUE);
+	g_free(request->uuid);
+	g_free(request);
 }
 
-int messages_push_message_body(void *session, const char *body, size_t len)
+static void send_sms_finalize(struct session *session, const char *uri)
 {
-	return -EINVAL;
+	struct push_message_request *request = session->request_data;
+	char handle[17]; /* 16 digits and \0 */
+	unsigned long uri_no;
+
+	session->abort_request = NULL;
+	session->request_data = NULL;
+
+	if (sscanf(uri, "message:%lu", &uri_no) != 1)
+		request->cb(session, -EIO, NULL, request->user_data);
+	else {
+		snprintf(handle, 17, "%016lu", uri_no);
+		request->cb(session, 0, handle, request->user_data);
+	}
+
+	g_dbus_remove_watch(session_connection, request->watch);
+	g_free(request->uuid);
+	g_free(request);
+}
+
+static int get_uri_by_uuid(void *s, const char *id);
+
+static void get_uri_by_uuid_pc(DBusPendingCall *pc, void *user_data)
+{
+	struct session *session = user_data;
+	struct push_message_request *request = session->request_data;
+	DBusMessage *reply;
+	DBusError error;
+	DBusMessageIter iargs, irows, icols;
+	char *uri;
+
+	reply = dbus_pending_call_steal_reply(pc);
+	dbus_error_init(&error);
+
+	if (dbus_set_error_from_message(&error, reply)) {
+		DBG("%s: %s", error.name, error.message);
+		dbus_error_free(&error);
+
+		goto cont;
+	}
+
+	if (!dbus_message_has_signature(reply, "aas")) {
+		DBG("Unexpected signature: %s",
+					dbus_message_get_signature(reply));
+
+		goto cont;
+	}
+
+	dbus_message_iter_init(reply, &iargs);
+	dbus_message_iter_recurse(&iargs, &irows);
+
+	if (dbus_message_iter_get_arg_type(&irows) != DBUS_TYPE_ARRAY) {
+		DBG("Message not yet in Tracker");
+		goto cont;
+	}
+
+	dbus_message_iter_recurse(&irows, &icols);
+	dbus_message_iter_get_basic(&icols, &uri);
+	DBG("URI: %s", uri);
+	dbus_pending_call_unref(pc);
+	dbus_message_unref(reply);
+	send_sms_finalize(session, uri);
+
+	return;
+
+cont:
+	dbus_message_unref(reply);
+	dbus_pending_call_unref(request->get_handle);
+	request->get_handle = NULL;
+
+	if (request->retry) {
+		request->retry = FALSE;
+		get_uri_by_uuid(session, request->uuid);
+	}
+}
+
+static int get_uri_by_uuid(void *s, const char *id)
+{
+	struct session *session = s;
+	struct push_message_request *request = session->request_data;
+	DBusMessage *msg;
+	DBusPendingCall *pc;
+	char *query;
+
+	if (request->get_handle != NULL) {
+		request->retry = TRUE;
+		return 0;
+	}
+
+	msg = dbus_message_new_method_call(TRACKER_SERVICE,
+						TRACKER_RESOURCES_PATH,
+						TRACKER_RESOURCES_INTERFACE,
+						"SparqlQuery");
+	if (msg == NULL)
+		goto failed;
+
+	query = g_strdup_printf(HANDLE_BY_UUID_QUERY, id);
+	if (!dbus_message_append_args(msg, DBUS_TYPE_STRING, &query,
+							DBUS_TYPE_INVALID)) {
+		g_free(query);
+		goto failed;
+	}
+	g_free(query);
+
+	if (!dbus_connection_send_with_reply(session_connection, msg, &pc, -1))
+		goto failed;
+
+	if (!dbus_pending_call_set_notify(pc, get_uri_by_uuid_pc, session,
+									NULL)) {
+		dbus_pending_call_cancel(pc);
+		goto failed;
+	}
+
+	dbus_message_unref(msg);
+	request->get_handle = pc;
+
+	return 0;
+
+failed:
+	if (pc != NULL)
+		dbus_pending_call_unref(pc);
+
+	if (msg != NULL)
+		dbus_message_unref(msg);
+
+	return -ENOMEM;
+}
+
+static gboolean send_sms_graph_updated(DBusConnection *connection,
+					DBusMessage *msg, void *user_data)
+{
+	struct session *session = user_data;
+	struct push_message_request *request = session->request_data;
+	DBusMessageIter iargs, irows, icols;
+	char *class;
+	dbus_uint32_t predicate;
+
+	dbus_message_iter_init(msg, &iargs);
+	if (dbus_message_iter_get_arg_type(&iargs) != DBUS_TYPE_STRING)
+		return TRUE;
+
+	dbus_message_iter_get_basic(&iargs, &class);
+	if (g_strcmp0("http://www.semanticdesktop.org/ontologies"
+					"/2007/03/22/nmo#Message", class) != 0)
+		return TRUE;
+
+	dbus_message_iter_next(&iargs);
+	if (dbus_message_iter_get_arg_type(&iargs) != DBUS_TYPE_ARRAY)
+		return TRUE;
+
+	dbus_message_iter_recurse(&iargs, &irows);
+
+	while (dbus_message_iter_get_arg_type(&irows) == DBUS_TYPE_STRUCT) {
+		dbus_message_iter_recurse(&irows, &icols);
+		dbus_message_iter_next(&icols);
+		dbus_message_iter_next(&icols);
+		dbus_message_iter_get_basic(&icols, &predicate);
+		if (predicate == message_id_tracker_id) {
+			DBG("Predicate hit!");
+			get_uri_by_uuid(session, request->uuid);
+		}
+		dbus_message_iter_next(&irows);
+	}
+
+	return TRUE;
+}
+
+static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
+{
+	struct session *session = user_data;
+	struct push_message_request *request = session->request_data;
+	DBusMessage *reply;
+	DBusError error;
+	char *uuid;
+
+	DBG("");
+
+	reply = dbus_pending_call_steal_reply(pc);
+	dbus_error_init(&error);
+
+	if (dbus_set_error_from_message(&error, reply)) {
+		DBG("%s: %s", error.name, error.message);
+		dbus_error_free(&error);
+
+		goto failed;
+	}
+
+	if (!dbus_message_has_signature(reply, DBUS_TYPE_STRING_AS_STRING)) {
+		DBG("Unexpected signature: %s",
+					dbus_message_get_signature(reply));
+
+		goto failed;
+	}
+
+	dbus_message_get_args(reply, NULL, DBUS_TYPE_STRING, &uuid,
+							DBUS_TYPE_INVALID);
+	DBG("Message UUID: %s", uuid);
+	request->uuid = g_strdup(uuid);
+
+	request->watch = g_dbus_add_signal_watch(session_connection,
+					NULL, NULL,
+					"org.freedesktop.Tracker1.Resources",
+					"GraphUpdated",
+					send_sms_graph_updated,
+					session, NULL);
+	get_uri_by_uuid(session, uuid);
+
+	dbus_message_unref(reply);
+	dbus_pending_call_unref(request->send_sms);
+	request->send_sms = NULL;
+
+	return;
+
+failed:
+	request->cb(session, -EIO, NULL, request->user_data);
+	push_message_abort(request);
+	dbus_message_unref(reply);
+}
+
+static int send_sms(struct session *session, const char *recipient,
+					const char *body, gboolean store)
+{
+	struct push_message_request *request = session->request_data;
+	DBusMessage *msg = NULL;
+	DBusPendingCall *pc = NULL;
+
+	msg = dbus_message_new_method_call("com.nokia.Messaging", "/",
+					"com.nokia.MessagingIf", "sendSMS");
+	if (msg == NULL)
+		goto failed;
+
+	if (!dbus_message_append_args(msg, DBUS_TYPE_STRING, &recipient,
+						DBUS_TYPE_STRING, &body,
+						DBUS_TYPE_BOOLEAN, &store,
+						DBUS_TYPE_INVALID))
+		goto failed;
+
+	if (!dbus_connection_send_with_reply(session_connection, msg,
+							&pc, -1))
+		goto failed;
+
+	if (!dbus_pending_call_set_notify(pc, send_sms_messaging_pc,
+							session, NULL)) {
+		/* XXX: Now, that's kind of a problem */
+		dbus_pending_call_cancel(pc);
+		goto failed;
+	}
+
+	dbus_message_unref(msg);
+	request->send_sms = pc;
+
+	return 0;
+
+failed:
+	if (pc != NULL)
+		dbus_pending_call_unref(pc);
+	if (msg != NULL)
+		dbus_message_unref(msg);
+
+	return -ENOMEM;
+}
+
+int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
+						unsigned long flags,
+						messages_push_message_cb cb,
+						void *user_data)
+{
+	struct session *session = s;
+	struct push_message_request *request;
+	char *path;
+
+	path = g_build_filename(session->cwd, name, NULL);
+	DBG("Push destination: %s", path);
+
+	if (g_strcmp0(path, "/telecom/msg/outbox") != 0) {
+		g_free(path);
+		return -EACCES;
+	}
+
+	g_free(path);
+
+	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
+		DBG("Tried to push non-utf message");
+		return -EINVAL;
+	}
+
+	if ((flags & MESSAGES_TRANSPARENT) == MESSAGES_TRANSPARENT)
+		DBG("Warning! Transparent flag is ignored");
+
+	if ((flags & MESSAGES_RETRY) != MESSAGES_RETRY)
+		DBG("Warning! Retry flag is ignored.");
+
+	if (bmsg->type != BMSG_T_SMS_GSM ||
+					bmsg->charset != BMSG_C_UTF8 ||
+					bmsg->part_id != -1 ||
+					bmsg->nenvelopes < 1) {
+		DBG("Incorrect BMSG format!");
+		return -EBADR;
+	}
+
+	request = g_new0(struct push_message_request, 1);
+	request->bmsg = bmsg;
+	request->cb = cb;
+	request->body = g_string_new("");
+	request->user_data = user_data;
+
+	session->request_data = request;
+	session->abort_request = push_message_abort;
+
+	return 0;
+}
+
+static int prepare_body(GString *body)
+{
+	if (body->len < MSG_BLOCK_OVERHEAD)
+		return -EBADR;
+
+	if (!g_str_has_prefix(body->str, "BEGIN:MSG\r\n"))
+		return -EBADR;
+
+	if (!g_str_has_prefix(body->str + body->len - 11, "\r\nEND:MSG\r\n"))
+		return -EBADR;
+
+	g_string_erase(body, 0, 11);
+	g_string_set_size(body, body->len - 10);
+	body->str[body->len - 1] = '\0';
+
+	return 0;
+}
+
+int messages_push_message_body(void *s, const char *body, size_t len)
+{
+	struct session *session = s;
+	struct push_message_request *request = session->request_data;
+	struct bmsg_bmsg_vcard *vcard;
+	int env, ret;
+
+	if (len > 0) {
+		g_string_append_len(request->body, body, len);
+		return len;
+	}
+
+	env = request->bmsg->nenvelopes - 1;
+	if (env < 0 || request->bmsg->recipients[env] == NULL)
+	{
+		ret = -EBADR;
+		goto failed;
+	}
+
+	if (request->bmsg->recipients[env]->next != NULL)
+	{
+		ret = -EINVAL;
+		goto failed;
+	}
+
+	vcard = request->bmsg->recipients[request->bmsg->nenvelopes - 1]->data;
+	if (vcard->tel == NULL) {
+		ret = -EBADR;
+		goto failed;
+	}
+
+	ret = prepare_body(request->body);
+	if (ret < 0)
+		goto failed;
+
+	ret = send_sms(session, vcard->tel, request->body->str, TRUE);
+	if (ret < 0)
+		goto failed;
+
+	g_string_free(request->body, TRUE);
+	request->body = NULL;
+
+	return 0;
+
+failed:
+	push_message_abort(request);
+
+	return ret;
 }
 
 void messages_abort(void *s)
