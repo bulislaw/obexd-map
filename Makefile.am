@@ -61,7 +61,8 @@ builtin_sources += plugins/pbap.c plugins/phonebook.h \
 
 builtin_modules += mas
 builtin_sources += plugins/mas.c plugins/messages.h \
-			   plugins/bmsg.h plugins/bmsg.c
+			   plugins/bmsg.h plugins/bmsg.c \
+			   plugins/bmsg_parser.h plugins/bmsg_parser.c
 
 builtin_modules += irmc
 builtin_sources += plugins/irmc.c
