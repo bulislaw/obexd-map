@@ -766,8 +766,9 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	if (request->count == TRUE)
 		goto done;
 
-	if (request->size > request->offset && filter_message(msg_data,
-							request->filter))
+	if (request->size > request->offset &&
+			filter_message(msg_data, request->filter) &&
+			(request->size - request->offset) <= request->max)
 		request->cb.messages_list(session, -EAGAIN, 1,
 						request->new_message, msg_data,
 						request->user_data);
@@ -777,7 +778,7 @@ done:
 	return;
 
 end:
-	request->cb.messages_list(session, 0, request->size,
+	request->cb.messages_list(session, 0, request->size - request->offset,
 						request->new_message, NULL,
 						request->user_data);
 aborted:
