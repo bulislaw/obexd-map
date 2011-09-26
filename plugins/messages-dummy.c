@@ -368,6 +368,18 @@ int messages_set_message_status(void *session, const char *handle,
 	return -EINVAL;
 }
 
+int messages_push_message(void *session, struct bmsg_bmsg *bmsg,
+				const char *name, unsigned long flags,
+				messages_push_message_cb cb, void *user_data)
+{
+	return -EINVAL;
+}
+
+int messages_push_message_body(void *session, const char *body, size_t len)
+{
+	return -EINVAL;
+}
+
 void messages_abort(void *s)
 {
 	struct session *session = s;

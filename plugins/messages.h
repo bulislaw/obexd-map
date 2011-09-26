@@ -24,6 +24,8 @@
 #include <glib.h>
 #include <stdint.h>
 
+#include "bmsg_parser.h"
+
 /* Those are used by backend to notify transport plugin which properties did it
  * send.
  */
@@ -242,6 +244,9 @@ int messages_get_messages_listing(void *session,
 #define MESSAGES_UTF8		(1 << 1)
 #define MESSAGES_FRACTION	(1 << 2)
 #define MESSAGES_NEXT		(1 << 3)
+#define MESSAGES_TRANSPARENT	(1 << 4)
+#define MESSAGES_RETRY		(1 << 5)
+
 
 /* Retrieves bMessage object (see MAP specification, ch. 3.1.3) of a given
  * message.
@@ -273,6 +278,15 @@ int messages_get_message(void *session,
 
 int messages_set_message_status(void *session, const char *handle,
 		uint8_t indicator, uint8_t value);
+
+typedef void(*messages_push_message_cb)(void *session, int err,
+					const char *handle, void *user_data);
+
+int messages_push_message(void *session, struct bmsg_bmsg *bmsg,
+				const char *name, unsigned long flags,
+				messages_push_message_cb cb, void *user_data);
+
+int messages_push_message_body(void *session, const char *body, size_t len);
 
 /* Aborts currently pending request.
  *
