@@ -163,6 +163,8 @@ struct session {
 	messages_event_cb event_cb;
 	struct request *request;
 	GHashTable *msg_stat;
+	GDestroyNotify abort_request;
+	void *request_data;
 };
 
 static struct message_folder *folder_tree = NULL;
@@ -1254,5 +1256,12 @@ void messages_abort(void *s)
 {
 	struct session *session = s;
 
+	DBG("");
+
+	if (session->abort_request != NULL)
+		session->abort_request(session->request_data);
+
 	session->aborted = TRUE;
+	session->abort_request = NULL;
+	session->request_data = NULL;
 }
