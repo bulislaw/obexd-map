@@ -70,6 +70,8 @@ int obex_aparam_write(struct obex_session *os, obex_object_t *obj,
 
 const char *obex_option_root_folder(void);
 gboolean obex_option_symlinks(void);
+int obex_name_write(struct obex_session *os,
+		obex_object_t *obj, const char *name);
 
 /* Just a thin wrapper around memcmp to deal with NULL values */
 int memncmp0(const void *a, size_t na, const void *b, size_t nb);

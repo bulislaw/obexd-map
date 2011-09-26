@@ -1600,6 +1600,31 @@ int obex_aparam_write(struct obex_session *os,
 			OBEX_HDR_APPARAM, hd, size, 0);
 }
 
+int obex_name_write(struct obex_session *os,
+		obex_object_t *obj, const char *name)
+{
+	obex_headerdata_t hd;
+	char *name16be;
+	gsize written;
+	int ret;
+
+	name16be = g_convert(name, strlen(name),
+			"UTF16BE", "UTF8", NULL, &written, NULL);
+
+	if (!name16be)
+		return -1;
+
+	hd.bs = (uint8_t *)name16be;
+
+	ret = OBEX_ObjectAddHeader(os->obex, obj, OBEX_HDR_NAME, hd,
+			written + 2, /* FIXME: Isn't it too optimistic? */
+			0);
+
+	g_free(name16be);
+
+	return ret;
+}
+
 int memncmp0(const void *a, size_t na, const void *b, size_t nb)
 {
 	if (na != nb)
