@@ -658,14 +658,16 @@ static struct messages_message *pull_message_data(const char **reply)
 
 	data->sender_name = merge_names(reply[MESSAGE_FROM_GIVEN],
 					reply[MESSAGE_FROM_FAMILY]);
-	data->mask |= PMASK_SENDER_NAME;
+	if (data->sender_name[0] != '\0')
+		data->mask |= PMASK_SENDER_NAME;
 
 	data->sender_addressing = g_strdup(reply[MESSAGE_FROM_PHONE]);
 	data->mask |= PMASK_SENDER_ADDRESSING;
 
 	data->recipient_name = merge_names(reply[MESSAGE_TO_GIVEN],
 						reply[MESSAGE_TO_FAMILY]);
-	data->mask |= PMASK_RECIPIENT_NAME;
+	if (data->recipient_name[0] != '\0')
+		data->mask |= PMASK_RECIPIENT_NAME;
 
 	data->recipient_addressing = g_strdup(reply[MESSAGE_TO_PHONE]);
 	data->mask |= PMASK_RECIPIENT_ADDRESSING;
