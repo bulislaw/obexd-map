@@ -233,6 +233,8 @@ struct mas_session {
 	gboolean disconnected;
 	struct obex_session *obex_os;
 	obex_object_t *obex_obj;
+	void *request;
+	GDestroyNotify request_free;
 };
 
 struct any_object {
@@ -843,6 +845,9 @@ static void reset_request(struct mas_session *mas)
 		mas->apbuf = NULL;
 	}
 
+	if (mas->request_free != NULL)
+		mas->request_free(mas->request);
+
 	aparams_free(mas->inparams);
 	mas->inparams = NULL;
 	aparams_free(mas->outparams);
@@ -850,6 +855,8 @@ static void reset_request(struct mas_session *mas)
 	mas->ap_sent = FALSE;
 	mas->nth_call = FALSE;
 	mas->finished = FALSE;
+	mas->request_free = NULL;
+	mas->request = NULL;
 }
 
 static void mas_clean(struct mas_session *mas)
