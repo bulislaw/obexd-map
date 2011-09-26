@@ -496,6 +496,9 @@ static void create_folder_tree()
 				"nmo:isSent \"true\" . ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 
+	child = create_folder("outbox", " FILTER (!BOUND(?msg)) ");
+	parent->subfolders = g_slist_append(parent->subfolders, child);
+
 	child = create_folder("deleted", " ");
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 }
