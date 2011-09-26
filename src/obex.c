@@ -973,7 +973,16 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 	if (os->pending == 0)
 		return 0;
 
-	return obex_read_stream(os, os->obex, NULL);
+	err = obex_read_stream(os, os->obex, os->obj);
+	if (err == -EAGAIN) {
+		OBEX_SuspendRequest(os->obex, os->obj);
+		os->driver->set_io_watch(os->object, handle_async_io,
+								os);
+
+		return 0;
+	}
+
+	return err;
 }
 
 static gboolean check_put(obex_t *obex, obex_object_t *obj)
