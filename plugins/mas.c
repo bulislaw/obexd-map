@@ -1346,22 +1346,19 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 		return mas;
 }
 
-static void *message_open(const char *name, int oflag, mode_t mode,
-				void *driver_data, size_t *size, int *err)
+static void message_put(struct mas_session *mas, const char *name, int *err)
 {
-	struct mas_session *mas = driver_data;
+	DBG("Message pushing not supported!");
+	*err = -EBADR;
+}
+
+static void message_get(struct mas_session *mas, const char *name, int *err)
+{
 	unsigned long flags;
 	uint8_t freq;
 	uint8_t charset = 0;
 
 	DBG("");
-
-	if (oflag != O_RDONLY) {
-		DBG("Message pushing unsupported");
-		*err = -EINVAL;
-
-		return NULL;
-	}
 
 	if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, &freq)) {
 		flags |= MESSAGES_FRACTION;
@@ -1377,6 +1374,19 @@ static void *message_open(const char *name, int oflag, mode_t mode,
 			get_message_cb, mas);
 
 	mas->buffer = g_string_new("");
+}
+
+static void *message_open(const char *name, int oflag, mode_t mode,
+				void *driver_data, size_t *size, int *err)
+{
+	struct mas_session *mas = driver_data;
+
+	DBG("");
+
+	if (oflag == O_RDONLY)
+		message_get(mas, name, err);
+	else
+		message_put(mas, name, err);
 
 	if (*err < 0)
 		return NULL;
