@@ -445,6 +445,7 @@ static GHashTable *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 
 		switch (aparam_defs[tago].type) {
 		case APT_STR:
+			/* FIXME: mem leak? */
 			entry.valstr = g_try_malloc0(hdr->len + 1);
 			if (entry.valstr)
 				memcpy(entry.valstr, hdr->val, hdr->len);
