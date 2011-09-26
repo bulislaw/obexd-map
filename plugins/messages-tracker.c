@@ -169,6 +169,7 @@ struct session {
 
 static struct message_folder *folder_tree = NULL;
 static DBusConnection *session_connection = NULL;
+static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
 static gint event_watch_id;
 
@@ -896,6 +897,63 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 	return TRUE;
 }
 
+static int retrieve_message_id_tracker_id(void)
+{
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter iargs, irows, icols;
+	char *id;
+	char *query = "SELECT tracker:id(nmo:messageId) {}";
+
+	msg = dbus_message_new_method_call(TRACKER_SERVICE,
+						TRACKER_RESOURCES_PATH,
+						TRACKER_RESOURCES_INTERFACE,
+						"SparqlQuery");
+	if (msg == NULL)
+		goto failed;
+
+	if (!dbus_message_append_args(msg, DBUS_TYPE_STRING,
+					&query,
+					DBUS_TYPE_INVALID))
+		goto failed;
+
+	reply = dbus_connection_send_with_reply_and_block(session_connection,
+								msg, -1, NULL);
+	if (reply == NULL)
+		goto failed;
+
+	if (!dbus_message_iter_init(reply, &iargs))
+		goto failed;
+
+	if (dbus_message_iter_get_arg_type(&iargs) != DBUS_TYPE_ARRAY)
+		goto failed;
+
+	dbus_message_iter_recurse(&iargs, &irows);
+	if (dbus_message_iter_get_arg_type(&irows) == DBUS_TYPE_ARRAY) {
+		dbus_message_iter_recurse(&irows, &icols);
+		dbus_message_iter_get_basic(&icols, &id);
+		message_id_tracker_id = strtoul(id, NULL, 10);
+		DBG("tracker:id(nmo:messageId): %lu", message_id_tracker_id);
+	} else {
+		goto failed;
+	}
+
+	dbus_message_unref(reply);
+	dbus_message_unref(msg);
+
+	return 0;
+
+failed:
+	DBG("Unable to get tracker.id(nmo:messageId)!");
+
+	if (reply != NULL)
+		dbus_message_unref(reply);
+	if (msg != NULL)
+		dbus_message_unref(msg);
+
+	return -ENOENT;
+}
+
 int messages_init(void)
 {
 	session_connection = dbus_bus_get(DBUS_BUS_SESSION, NULL);
@@ -904,6 +962,9 @@ int messages_init(void)
 
 		return -1;
 	}
+
+	if (retrieve_message_id_tracker_id() < 0)
+		return -1;
 
 	create_folder_tree();
 
