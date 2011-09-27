@@ -1556,7 +1556,13 @@ static int message_flush(void *obj)
 	tail = request->buf->str + request->buf->len - len;
 	if (!bmsg_parser_tail_correct(request->bmsg, tail, len)) {
 		DBG("BMSG tail check failed!");
-		return -1;
+		DBG("!!! Falling back to hopelessly broken PTS strategy !!!");
+		g_string_append(request->buf, "\r\n");
+		tail += 2;
+		if (!bmsg_parser_tail_correct(request->bmsg, tail, len)) {
+			DBG("This doesn't help either!");
+			return -1;
+		}
 	}
 
 	if (request->buf->len > len) {
