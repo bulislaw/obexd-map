@@ -25,11 +25,15 @@
 #include <config.h>
 #endif
 
+#define _XOPEN_SOURCE
+#define _BSD_SOURCE
+
 #include <errno.h>
 #include <glib.h>
 #include <string.h>
 #include <gdbus.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "log.h"
 #include "messages.h"
@@ -39,6 +43,8 @@
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
 #define TRACKER_RESOURCES_INTERFACE "org.freedesktop.Tracker1.Resources"
+
+#define TRACKER_MESSAGE_TSTAMP_FORMAT "%Y-%m-%dT%TZ"
 
 #define QUERY_RESPONSE_SIZE 21
 #define MESSAGE_HANDLE_SIZE 16
@@ -651,6 +657,24 @@ static struct phonebook_contact *pull_message_contact(const char **reply)
 	return contact;
 }
 
+static char *format_tstamp(const char *stamp, const char *format)
+{
+	struct tm tm;
+	time_t time;
+	char *local_time = g_new0(char, 16); /* format: "YYYYMMDDTHHMMSS\0" */
+
+	if (strptime(stamp, format, &tm) == NULL)
+		return NULL;
+
+	time = timegm(&tm);
+
+	localtime_r(&time, &tm);
+
+	strftime(local_time, 16, "%Y%m%dT%H%M%S", &tm);
+
+	return local_time;
+}
+
 static struct messages_message *pull_message_data(const char **reply)
 {
 	struct messages_message *data = g_new0(struct messages_message, 1);
@@ -665,19 +689,14 @@ static struct messages_message *pull_message_data(const char **reply)
 
 	data->mask |= PMASK_SUBJECT;
 
-	if (strlen(reply[MESSAGE_SDATE]) != 0) {
-		char **date = g_strsplit_set(reply[MESSAGE_SDATE], ":-Z", -1);
-
-		data->datetime = g_strjoinv(NULL, date);
-		g_strfreev(date);
-	} else if (strlen(reply[MESSAGE_RDATE]) != 0) {
-		char **date = g_strsplit_set(reply[MESSAGE_RDATE], ":-Z", -1);
-
-		data->datetime = g_strjoinv(NULL, date);
-		g_strfreev(date);
-	} else {
+	if (strlen(reply[MESSAGE_SDATE]) != 0)
+		data->datetime = format_tstamp(reply[MESSAGE_SDATE],
+						TRACKER_MESSAGE_TSTAMP_FORMAT);
+	else if (strlen(reply[MESSAGE_RDATE]) != 0)
+		data->datetime = format_tstamp(reply[MESSAGE_RDATE],
+						TRACKER_MESSAGE_TSTAMP_FORMAT);
+	else
 		data->datetime = g_strdup("");
-	}
 
 	data->mask |= PMASK_DATETIME;
 
