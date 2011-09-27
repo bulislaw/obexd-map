@@ -1539,6 +1539,7 @@ static int message_flush(void *obj)
 {
 	struct mas_session *mas = obj;
 	struct message_put_request *request = mas->request;
+	int ret;
 
 	if (mas->finished)
 		return 0;
@@ -1549,8 +1550,11 @@ static int message_flush(void *obj)
 		return -1;
 	}
 
+	ret = messages_push_message_body(mas->backend_data, NULL, 0);
+	if (ret < 0)
+		return ret;
+
 	mas->finished = TRUE;
-	messages_push_message_body(mas->backend_data, NULL, 0);
 
 	return 1;
 }
