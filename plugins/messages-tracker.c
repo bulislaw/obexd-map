@@ -30,15 +30,15 @@
 #include <string.h>
 #include <gdbus.h>
 
+#include "log.h"
 #include "messages.h"
 #include "bmsg.h"
-#include "log.h"
 
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
 #define TRACKER_RESOURCES_INTERFACE "org.freedesktop.Tracker1.Resources"
 
-#define QUERY_RESPONSE_SIZE 13
+#define QUERY_RESPONSE_SIZE 21
 #define MESSAGE_HANDLE_SIZE 16
 #define MESSAGE_HANDLE_PREFIX_LEN 8
 
@@ -52,15 +52,23 @@
 #define MESSAGE_SUBJECT 1
 #define MESSAGE_SDATE 2
 #define MESSAGE_RDATE 3
-#define MESSAGE_FROM_N 4
-#define MESSAGE_FROM_LASTN 5
-#define MESSAGE_FROM_PHONE 6
-#define MESSAGE_TO_N 7
-#define MESSAGE_TO_LASTN 8
-#define MESSAGE_TO_PHONE 9
-#define MESSAGE_READ 10
-#define MESSAGE_SENT 11
-#define MESSAGE_CONTENT 12
+#define MESSAGE_FROM_FN 4
+#define MESSAGE_FROM_GIVEN 5
+#define MESSAGE_FROM_FAMILY 6
+#define MESSAGE_FROM_ADDITIONAL 7
+#define MESSAGE_FROM_PREFIX 8
+#define MESSAGE_FROM_SUFFIX 9
+#define MESSAGE_FROM_PHONE 10
+#define MESSAGE_TO_FN 11
+#define MESSAGE_TO_GIVEN 12
+#define MESSAGE_TO_FAMILY 13
+#define MESSAGE_TO_ADDITIONAL 14
+#define MESSAGE_TO_PREFIX 15
+#define MESSAGE_TO_SUFFIX 16
+#define MESSAGE_TO_PHONE 17
+#define MESSAGE_READ 18
+#define MESSAGE_SENT 19
+#define MESSAGE_CONTENT 20
 
 #define LIST_MESSAGES_QUERY						\
 "SELECT "								\
@@ -68,11 +76,19 @@
 "nmo:messageSubject(?msg) "						\
 "nmo:sentDate(?msg) "							\
 "nmo:receivedDate(?msg) "						\
+"nco:fullname(?from_c) "						\
 "nco:nameGiven(?from_c) "						\
 "nco:nameFamily(?from_c) "						\
+"nco:nameAdditional(?from_c) "						\
+"nco:nameHonorificPrefix(?from_c) "					\
+"nco:nameHonorificSuffix(?from_c) "					\
 "nco:phoneNumber(?from_phone) "						\
+"nco:fullname(?to_c) "							\
 "nco:nameGiven(?to_c) "							\
 "nco:nameFamily(?to_c) "						\
+"nco:nameAdditional(?to_c) "						\
+"nco:nameHonorificPrefix(?to_c) "					\
+"nco:nameHonorificSuffix(?to_c) "					\
 "nco:phoneNumber(?to_phone) "						\
 "nmo:isRead(?msg) "							\
 "nmo:isSent(?msg) "							\
@@ -214,6 +230,26 @@ static struct messages_filter *copy_messages_filter(
 	filter->priority = orig->priority;
 
 	return filter;
+}
+
+static char *fill_handle(const char *handle)
+{
+	int fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
+	char *fill = g_strnfill(fill_size, '0');
+	char *ret = g_strdup_printf("%s%s", fill, handle);
+
+	g_free(fill);
+
+	return ret;
+}
+
+static char *strip_handle(const char *handle)
+{
+	const char *ptr_new = handle;
+
+	while (*ptr_new++ == '0') ;
+
+	return g_strdup(ptr_new - 1);
 }
 
 static char **string_array_from_iter(DBusMessageIter iter, int array_len)
@@ -442,26 +478,6 @@ static void create_folder_tree()
 	parent->subfolders = g_slist_append(parent->subfolders, child);
 }
 
-static char *fill_handle(const char *handle)
-{
-	int fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
-	char *fill = g_strnfill(fill_size, '0');
-	char *ret = g_strdup_printf("%s%s", fill, handle);
-
-	g_free(fill);
-
-	return ret;
-}
-
-static char *strip_handle(const char *handle)
-{
-	const char *ptr_new = handle;
-
-	while (*ptr_new++ == '0') ;
-
-	return g_strdup(ptr_new - 1);
-}
-
 static char *merge_names(const char *name, const char *lastname)
 {
 	char *tmp = NULL;
@@ -588,6 +604,28 @@ static gboolean filter_message(struct messages_message *message,
 	return TRUE;
 }
 
+static struct phonebook_contact *pull_message_contact(const char **reply)
+{
+	struct phonebook_contact *contact;
+	struct phonebook_field *number;
+
+	contact = g_new0(struct phonebook_contact, 1);
+
+	contact->fullname = g_strdup(reply[MESSAGE_FROM_FN]);
+	contact->given = g_strdup(reply[MESSAGE_FROM_GIVEN]);
+	contact->family = g_strdup(reply[MESSAGE_FROM_FAMILY]);
+	contact->additional = g_strdup(reply[MESSAGE_FROM_ADDITIONAL]);
+	contact->prefix = g_strdup(reply[MESSAGE_FROM_PREFIX]);
+	contact->suffix = g_strdup(reply[MESSAGE_FROM_SUFFIX]);
+
+	number = g_new0(struct phonebook_field, 1);
+	number->text = g_strdup(reply[MESSAGE_FROM_PHONE]);
+	number->type = TEL_TYPE_NONE;
+	contact->numbers = g_slist_append(contact->numbers, number);
+
+	return contact;
+}
+
 static struct messages_message *pull_message_data(const char **reply)
 {
 	struct messages_message *data = g_new0(struct messages_message, 1);
@@ -618,15 +656,15 @@ static struct messages_message *pull_message_data(const char **reply)
 
 	data->mask |= PMASK_DATETIME;
 
-	data->sender_name = merge_names(reply[MESSAGE_FROM_N],
-					reply[MESSAGE_FROM_LASTN]);
+	data->sender_name = merge_names(reply[MESSAGE_FROM_GIVEN],
+					reply[MESSAGE_FROM_FAMILY]);
 	data->mask |= PMASK_SENDER_NAME;
 
 	data->sender_addressing = g_strdup(reply[MESSAGE_FROM_PHONE]);
 	data->mask |= PMASK_SENDER_ADDRESSING;
 
-	data->recipient_name = merge_names(reply[MESSAGE_TO_N],
-						reply[MESSAGE_TO_LASTN]);
+	data->recipient_name = merge_names(reply[MESSAGE_TO_GIVEN],
+						reply[MESSAGE_TO_FAMILY]);
 	data->mask |= PMASK_RECIPIENT_NAME;
 
 	data->recipient_addressing = g_strdup(reply[MESSAGE_TO_PHONE]);
@@ -735,6 +773,7 @@ static void get_message_resp(const char **reply, void *s)
 	struct messages_message *msg_data;
 	struct bmsg *bmsg;
 	char *final_bmsg, *status, *folder, *handle;
+	struct phonebook_contact *contact;
 	struct message_status *stat;
 	int err;
 
@@ -751,6 +790,8 @@ static void get_message_resp(const char **reply, void *s)
 	g_free(msg_data->handle);
 	msg_data->handle = handle;
 
+	contact = pull_message_contact(reply);
+
 	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
 	if (stat != NULL && stat->read != STATUS_NOT_SET)
 		msg_data->read = stat->read;
@@ -761,9 +802,8 @@ static void get_message_resp(const char **reply, void *s)
 
 	bmsg = g_new0(struct bmsg, 1);
 	bmsg_init(bmsg, BMSG_VERSION_1_0, status, BMSG_SMS, folder);
-	bmsg_add_originator(bmsg, "2.1", reply[MESSAGE_FROM_LASTN],
-					msg_data->sender_name,
-					msg_data->sender_addressing, NULL);
+
+	bmsg_add_originator(bmsg, contact);
 	bmsg_add_envelope(bmsg);
 	bmsg_add_content(bmsg, -1, NULL, SMS_DEFAULT_CHARSET, NULL,
 						reply[MESSAGE_CONTENT]);
@@ -776,12 +816,13 @@ static void get_message_resp(const char **reply, void *s)
 	g_free(folder);
 	g_free(final_bmsg);
 	free_msg_data(msg_data);
+	phonebook_contact_free(contact);
 
 	request->count++;
 
 	return;
 
- done:
+done:
 	if (request->count == 0)
 		err = -ENOENT;
 	else
@@ -1022,7 +1063,7 @@ static gboolean async_get_folder_listing(void *s) {
 							request->user_data);
 	}
 
- done:
+done:
 	request->cb.folder_list(session, 0, folder_count, NULL,
 							request->user_data);
 

@@ -19,12 +19,16 @@
  *
  */
 
+#define FORMAT_VCARD21 0x00
+#define FORMAT_VCARD30 0x01
+
 enum phonebook_number_type {
 	TEL_TYPE_HOME,
 	TEL_TYPE_MOBILE,
 	TEL_TYPE_FAX,
 	TEL_TYPE_WORK,
 	TEL_TYPE_OTHER,
+	TEL_TYPE_NONE,
 };
 
 enum phonebook_field_type {

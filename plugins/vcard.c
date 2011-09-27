@@ -418,34 +418,36 @@ static void vcard_printf_number(GString *vcards, uint8_t format,
 	switch (category) {
 	case TEL_TYPE_HOME:
 		if (format == FORMAT_VCARD21)
-			category_string = "HOME;VOICE";
+			category_string = ";HOME;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=HOME;TYPE=VOICE";
+			category_string = ";TYPE=HOME;TYPE=VOICE";
 		break;
 	case TEL_TYPE_MOBILE:
 		if (format == FORMAT_VCARD21)
-			category_string = "CELL;VOICE";
+			category_string = ";CELL;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=CELL;TYPE=VOICE";
+			category_string = ";TYPE=CELL;TYPE=VOICE";
 		break;
 	case TEL_TYPE_FAX:
 		if (format == FORMAT_VCARD21)
-			category_string = "FAX";
+			category_string = ";FAX";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=FAX";
+			category_string = ";TYPE=FAX";
 		break;
 	case TEL_TYPE_WORK:
 		if (format == FORMAT_VCARD21)
-			category_string = "WORK;VOICE";
+			category_string = ";WORK;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=WORK;TYPE=VOICE";
+			category_string = ";TYPE=WORK;TYPE=VOICE";
 		break;
 	case TEL_TYPE_OTHER:
 		if (format == FORMAT_VCARD21)
-			category_string = "OTHER;VOICE";
+			category_string = ";OTHER;VOICE";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=OTHER;TYPE=VOICE";
+			category_string = ";TYPE=OTHER;TYPE=VOICE";
 		break;
+	case TEL_TYPE_NONE:
+		category_string = "";
 	}
 
 	if ((type == TYPE_INTERNATIONAL) && (number[0] != '+'))
@@ -458,7 +460,7 @@ static void vcard_printf_number(GString *vcards, uint8_t format,
 		return;
 	}
 
-	snprintf(buf, sizeof(buf), "TEL;%s:%s\%s", category_string,
+	snprintf(buf, sizeof(buf), "TEL%s:%s\%s", category_string,
 								intl, number);
 
 	vcard_printf(vcards, buf, number);
@@ -746,14 +748,14 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 
 	vcard_printf_begin(vcards, format);
 
-	if (filter & FILTER_UID && *contact->uid)
+	if (filter & FILTER_UID && contact->uid != NULL && *contact->uid)
 		vcard_printf_tag(vcards, format, "UID", NULL, contact->uid);
 
 	if (filter & FILTER_N)
 		vcard_printf_name(vcards, format, contact);
 
-	if (filter & FILTER_FN && (*contact->fullname ||
-					format == FORMAT_VCARD30))
+	if (filter & FILTER_FN && contact->fullname != NULL &&
+			(*contact->fullname || format == FORMAT_VCARD30))
 		vcard_printf_fullname(vcards, format, contact->fullname);
 
 	if (filter & FILTER_TEL) {
@@ -790,11 +792,13 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		}
 	}
 
-	if (filter & FILTER_BDAY && *contact->birthday)
+	if (filter & FILTER_BDAY && contact->birthday != NULL &&
+							*contact->birthday)
 		vcard_printf_tag(vcards, format, "BDAY", NULL,
 						contact->birthday);
 
-	if (filter & FILTER_NICKNAME && *contact->nickname)
+	if (filter & FILTER_NICKNAME && contact->nickname != NULL &&
+							*contact->nickname)
 		vcard_printf_tag(vcards, format, "NICKNAME", NULL,
 							contact->nickname);
 
@@ -807,17 +811,17 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		}
 	}
 
-	if (filter & FILTER_PHOTO && *contact->photo)
+	if (filter & FILTER_PHOTO && contact->photo != NULL && *contact->photo)
 		vcard_printf_tag(vcards, format, "PHOTO", NULL,
 							contact->photo);
 
 	if (filter & FILTER_ORG)
 		vcard_printf_org(vcards, format, contact);
 
-	if (filter & FILTER_ROLE && *contact->role)
+	if (filter & FILTER_ROLE && contact->role != NULL && *contact->role)
 		vcard_printf_tag(vcards, format, "ROLE", NULL, contact->role);
 
-	if (filter & FILTER_TITLE && *contact->title)
+	if (filter & FILTER_TITLE && contact->title != NULL && *contact->title)
 		vcard_printf_tag(vcards, format, "TITLE", NULL, contact->title);
 
 	if (filter & FILTER_X_IRMC_CALL_DATETIME)
@@ -825,7 +829,6 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 
 	vcard_printf_end(vcards);
 }
-
 
 static void field_free(gpointer data)
 {
