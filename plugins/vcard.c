@@ -19,6 +19,10 @@
  *
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +34,7 @@
 #include <gdbus.h>
 
 #include "vcard.h"
+#include "glib-helper.h"
 
 #define ADDR_FIELD_AMOUNT 7
 #define LEN_MAX 128
@@ -70,6 +75,14 @@
 #define FORMAT_VCARD21 0x00
 #define FORMAT_VCARD30 0x01
 
+#define QP_LINE_LEN 75
+#define QP_CHAR_LEN 3
+#define QP_CR 0x0D
+#define QP_LF 0x0A
+#define QP_ESC 0x5C
+#define QP_SOFT_LINE_BREAK "="
+#define QP_SELECT "\n!\"#$=@[\\]^`{|}~"
+
 /* according to RFC 2425, the output string may need folding */
 static void vcard_printf(GString *str, const char *fmt, ...)
 {
@@ -101,30 +114,73 @@ static void add_slash(char *dest, const char *src, int len_max, int len)
 {
 	int i, j;
 
-	for (i = 0, j = 0; i < len && j < len_max; i++, j++) {
+	for (i = 0, j = 0; i < len && j + 1 < len_max; i++, j++) {
+		/* filling dest buffer - last field need to be reserved
+		 * for '\0'*/
 		switch (src[i]) {
 		case '\n':
+			if (j + 2 >= len_max)
+				/* not enough space in the buffer to put char
+				 * preceded with escaping sequence (and '\0' in
+				 * the end) */
+				goto done;
+
 			dest[j++] = '\\';
 			dest[j] = 'n';
 			break;
 		case '\r':
+			if (j + 2 >= len_max)
+				goto done;
+
 			dest[j++] = '\\';
 			dest[j] = 'r';
 			break;
 		case '\\':
 		case ';':
 		case ',':
+			if (j + 2 >= len_max)
+				goto done;
+
 			dest[j++] = '\\';
 		default:
 			dest[j] = src[i];
 			break;
 		}
 	}
+
+done:
 	dest[j] = 0;
 	return;
 }
 
-static void get_escaped_fields(char **fields, ...)
+static void escape_semicolon(char *dest, const char *src, int len_max, int len)
+{
+	int i, j;
+
+	for (i = 0, j = 0; i < len && j + 1 < len_max; i++, j++) {
+		if (src[i] == ';') {
+			if (j + 2 >= len_max)
+				break;
+
+			dest[j++] = '\\';
+		}
+
+		dest[j] = src[i];
+	}
+
+	dest[j] = 0;
+}
+
+static void set_escape(uint8_t format, char *dest, const char *src,
+							int len_max, int len)
+{
+	if (format == FORMAT_VCARD30)
+		add_slash(dest, src, len_max, len);
+	else if (format == FORMAT_VCARD21)
+		escape_semicolon(dest, src, len_max, len);
+}
+
+static void get_escaped_fields(uint8_t format, char **fields, ...)
 {
 	va_list ap;
 	GString *line;
@@ -135,7 +191,7 @@ static void get_escaped_fields(char **fields, ...)
 	line = g_string_new("");
 
 	for (field = va_arg(ap, char *); field; ) {
-		add_slash(escaped, field, LEN_MAX, strlen(field));
+		set_escape(format, escaped, field, LEN_MAX, strlen(field));
 		g_string_append(line, escaped);
 
 		field = va_arg(ap, char *);
@@ -147,6 +203,120 @@ static void get_escaped_fields(char **fields, ...)
 	va_end(ap);
 
 	*fields = g_string_free(line, FALSE);
+}
+
+static gboolean set_qp_encoding(char c)
+{
+	unsigned char q = c;
+
+	if (strchr(QP_SELECT, q) != NULL)
+		return TRUE;
+
+	if (q < '!' || q > '~')
+		return TRUE;
+
+	return FALSE;
+}
+
+static void append_qp_break_line(GString *vcards, size_t *limit)
+{
+	/* Quoted Printable lines of text must be limited to less than 76
+	 * characters and terminated by Quoted Printable softline break
+	 * sequence of "=" (if some more characters left) */
+	g_string_append(vcards, QP_SOFT_LINE_BREAK);
+	g_string_append(vcards, "\r\n ");
+	*limit = QP_LINE_LEN - 1;
+}
+
+static void append_qp_ascii(GString *vcards, size_t *limit, char c)
+{
+	if (*limit == 0)
+		append_qp_break_line(vcards, limit);
+
+	g_string_append_c(vcards, c);
+	--*limit;
+}
+
+static void append_qp_hex(GString *vcards, size_t *limit, char c)
+{
+	if (*limit < QP_CHAR_LEN)
+		append_qp_break_line(vcards, limit);
+
+	g_string_append_printf(vcards, "=%2.2X", (unsigned char) c);
+	*limit -= QP_CHAR_LEN;
+}
+
+static void append_qp_new_line(GString *vcards, size_t *limit)
+{
+	/* Multiple lines of text are separated with a Quoted Printable CRLF
+	 * sequence of "=0D" followed by "=0A" followed by a Quoted Printable
+	 * softline break sequence of "=" */
+	append_qp_hex(vcards, limit, QP_CR);
+	append_qp_hex(vcards, limit, QP_LF);
+	append_qp_break_line(vcards, limit);
+}
+
+static void vcard_qp_print_encoded(GString *vcards, const char *desc, ...)
+{
+	size_t i, size, limit = QP_LINE_LEN;
+	char *field;
+	va_list ap;
+
+	vcard_printf(vcards, "%s;ENCODING=QUOTED-PRINTABLE:", desc);
+	g_string_truncate(vcards, vcards->len - 2);
+
+	va_start(ap, desc);
+
+	for (field = va_arg(ap, char *); field; ) {
+		size = strlen(field);
+		for (i = 0; i < size; ++i) {
+			if (set_qp_encoding(field[i])) {
+				if (field[i] == '\n') {
+					append_qp_new_line(vcards, &limit);
+					continue;
+				}
+
+				append_qp_hex(vcards, &limit, field[i]);
+			} else {
+				/* According to vCard 2.1 spec. semicolons in
+				 * property parameter value must be escaped */
+				if (field[i] == ';')
+					append_qp_hex(vcards, &limit, QP_ESC);
+
+				append_qp_ascii(vcards, &limit, field[i]);
+			}
+		}
+
+		field = va_arg(ap, char *);
+		if (field)
+			append_qp_ascii(vcards, &limit, ';');
+	}
+
+	va_end(ap);
+
+	g_string_append(vcards, "\r\n");
+}
+
+static gboolean select_qp_encoding(uint8_t format, ...)
+{
+	char *field;
+	va_list ap;
+
+	if (format == FORMAT_VCARD21) {
+		va_start(ap, format);
+		for (field = va_arg(ap, char *); field; ) {
+			if (strpbrk(field, QP_SELECT)) {
+				va_end(ap);
+				return TRUE;
+			}
+
+			field = va_arg(ap, char *);
+		}
+
+		va_end(ap);
+	}
+
+	return FALSE;
 }
 
 static void vcard_printf_begin(GString *vcards, uint8_t format)
@@ -181,25 +351,7 @@ static gboolean contact_fields_present(struct phonebook_contact * contact)
 	return FALSE;
 }
 
-gboolean address_fields_present(const char *address)
-{
-	gchar **fields = g_strsplit(address, ";", ADDR_FIELD_AMOUNT);
-	int i;
-
-	for (i = 0; i < ADDR_FIELD_AMOUNT; ++i) {
-
-		if (strlen(fields[i]) != 0) {
-			g_strfreev(fields);
-			return TRUE;
-		}
-	}
-
-	g_strfreev(fields);
-
-	return FALSE;
-}
-
-static void vcard_printf_name(GString *vcards,
+static void vcard_printf_name(GString *vcards, uint8_t format,
 					struct phonebook_contact *contact)
 {
 	char *fields;
@@ -216,8 +368,17 @@ static void vcard_printf_name(GString *vcards,
 		return;
 	}
 
+	if (select_qp_encoding(format, contact->family, contact->given,
+					contact->additional, contact->prefix,
+					contact->suffix, NULL)) {
+		vcard_qp_print_encoded(vcards, "N", contact->family,
+					contact->given, contact->additional,
+					contact->prefix, contact->suffix,
+					NULL);
+		return;
+	}
 
-	get_escaped_fields(&fields, contact->family,
+	get_escaped_fields(format, &fields, contact->family,
 				contact->given, contact->additional,
 				contact->prefix, contact->suffix,
 				NULL);
@@ -227,10 +388,17 @@ static void vcard_printf_name(GString *vcards,
 	g_free(fields);
 }
 
-static void vcard_printf_fullname(GString *vcards, const char *text)
+static void vcard_printf_fullname(GString *vcards, uint8_t format,
+							const char *text)
 {
 	char field[LEN_MAX];
-	add_slash(field, text, LEN_MAX, strlen(text));
+
+	if (select_qp_encoding(format, text, NULL)) {
+		vcard_qp_print_encoded(vcards, "FN", text, NULL);
+		return;
+	}
+
+	set_escape(format, field, text, LEN_MAX, strlen(text));
 	vcard_printf(vcards, "FN:%s", field);
 }
 
@@ -239,7 +407,7 @@ static void vcard_printf_number(GString *vcards, uint8_t format,
 					enum phonebook_number_type category)
 {
 	const char *intl = "", *category_string = "";
-	char buf[128];
+	char buf[128], field[LEN_MAX];
 
 	/* TEL is a mandatory field, include even if empty */
 	if (!number || !strlen(number) || !type) {
@@ -283,6 +451,13 @@ static void vcard_printf_number(GString *vcards, uint8_t format,
 	if ((type == TYPE_INTERNATIONAL) && (number[0] != '+'))
 		intl = "+";
 
+	if (select_qp_encoding(format, number, NULL)) {
+		snprintf(buf, sizeof(buf), "TEL;%s", category_string);
+		snprintf(field, sizeof(field), "%s%s", intl, number);
+		vcard_qp_print_encoded(vcards, buf, field, NULL);
+		return;
+	}
+
 	snprintf(buf, sizeof(buf), "TEL;%s:%s\%s", category_string,
 								intl, number);
 
@@ -315,7 +490,12 @@ static void vcard_printf_tag(GString *vcards, uint8_t format,
 
 	snprintf(buf, LEN_MAX, "%s%s%s%s", tag, separator, type, category);
 
-	add_slash(field, fld, LEN_MAX, len);
+	if (select_qp_encoding(format, fld, NULL)) {
+		vcard_qp_print_encoded(vcards, buf, fld, NULL);
+		return;
+	}
+
+	set_escape(format, field, fld, LEN_MAX, len);
 	vcard_printf(vcards, "%s:%s", buf, field);
 }
 
@@ -324,7 +504,7 @@ static void vcard_printf_email(GString *vcards, uint8_t format,
 					enum phonebook_field_type category)
 {
 	const char *category_string = "";
-	char field[LEN_MAX];
+	char buf[LEN_MAX], field[LEN_MAX];
 	int len = 0;
 
 	if (!address || !(len = strlen(address))) {
@@ -348,10 +528,16 @@ static void vcard_printf_email(GString *vcards, uint8_t format,
 		if (format == FORMAT_VCARD21)
 			category_string = "INTERNET";
 		else if (format == FORMAT_VCARD30)
-			category_string = "TYPE=INTERNET";
+			category_string = "TYPE=INTERNET;TYPE=OTHER";
 	}
 
-	add_slash(field, address, LEN_MAX, len);
+	if (select_qp_encoding(format, address, NULL)) {
+		snprintf(buf, sizeof(buf), "EMAIL;%s", category_string);
+		vcard_qp_print_encoded(vcards, buf, address, NULL);
+		return;
+	}
+
+	set_escape(format, field, address, LEN_MAX, len);
 	vcard_printf(vcards, "EMAIL;%s:%s", category_string, field);
 }
 
@@ -360,7 +546,7 @@ static void vcard_printf_url(GString *vcards, uint8_t format,
 					enum phonebook_field_type category)
 {
 	const char *category_string = "";
-	char field[LEN_MAX];
+	char buf[LEN_MAX], field[LEN_MAX];
 
 	if (!url || strlen(url) == 0) {
 		vcard_printf(vcards, "URL:");
@@ -388,7 +574,13 @@ static void vcard_printf_url(GString *vcards, uint8_t format,
 		break;
 	}
 
-	add_slash(field, url, LEN_MAX, strlen(url));
+	if (select_qp_encoding(format, url, NULL)) {
+		snprintf(buf, sizeof(buf), "URL;%s", category_string);
+		vcard_qp_print_encoded(vcards, buf, url, NULL);
+		return;
+	}
+
+	set_escape(format, field, url, LEN_MAX, strlen(url));
 	vcard_printf(vcards, "URL;%s:%s", category_string, field);
 }
 
@@ -403,7 +595,7 @@ static gboolean org_fields_present(struct phonebook_contact *contact)
 	return FALSE;
 }
 
-static void vcard_printf_org(GString *vcards,
+static void vcard_printf_org(GString *vcards, uint8_t format,
 					struct phonebook_contact *contact)
 {
 	char *fields;
@@ -411,7 +603,14 @@ static void vcard_printf_org(GString *vcards,
 	if (org_fields_present(contact) == FALSE)
 		return;
 
-	get_escaped_fields(&fields, contact->company,
+	if (select_qp_encoding(format, contact->company,
+						contact->department, NULL)) {
+		vcard_qp_print_encoded(vcards, "ORG", contact->company,
+						contact->department, NULL);
+		return;
+	}
+
+	get_escaped_fields(format, &fields, contact->company,
 					contact->department, NULL);
 
 	vcard_printf(vcards, "ORG:%s", fields);
@@ -420,21 +619,21 @@ static void vcard_printf_org(GString *vcards,
 }
 
 static void vcard_printf_address(GString *vcards, uint8_t format,
-					const char *address,
-					enum phonebook_field_type category)
+					struct phonebook_addr *address)
 {
-	char buf[LEN_MAX];
-	char field[ADDR_FIELD_AMOUNT][LEN_MAX];
+	char *fields, field_esc[LEN_MAX];
 	const char *category_string = "";
-	int len, i;
-	gchar **address_fields;
+	char buf[LEN_MAX], *address_fields[ADDR_FIELD_AMOUNT];
+	int i;
+	size_t len;
+	GSList *l;
 
-	if (!address || address_fields_present(address) == FALSE) {
+	if (!address) {
 		vcard_printf(vcards, "ADR:");
 		return;
 	}
 
-	switch (category) {
+	switch (address->type) {
 	case FIELD_TYPE_HOME:
 		if (format == FORMAT_VCARD21)
 			category_string = "HOME";
@@ -455,24 +654,48 @@ static void vcard_printf_address(GString *vcards, uint8_t format,
 		break;
 	}
 
-	address_fields = g_strsplit(address, ";", ADDR_FIELD_AMOUNT);
+	for (i = 0, l = address->fields; l; l = l->next)
+		address_fields[i++] = l->data;
 
-	for (i = 0; i < ADDR_FIELD_AMOUNT; ++i) {
-		len = strlen(address_fields[i]);
-		add_slash(field[i], address_fields[i], LEN_MAX, len);
+	if (select_qp_encoding(format, address_fields[0], address_fields[1],
+					address_fields[2], address_fields[3],
+					address_fields[4], address_fields[5],
+					address_fields[6], NULL)) {
+		snprintf(buf, sizeof(buf), "ADR;%s", category_string);
+		vcard_qp_print_encoded(vcards, buf,
+					address_fields[0], address_fields[1],
+					address_fields[2], address_fields[3],
+					address_fields[4], address_fields[5],
+					address_fields[6], NULL);
+		return;
 	}
 
-	snprintf(buf, LEN_MAX, "%s;%s;%s;%s;%s;%s;%s",
-	field[0], field[1], field[2], field[3], field[4], field[5], field[6]);
-	g_strfreev(address_fields);
+	/* allocate enough memory to insert address fields separated by ';'
+	 * and terminated by '\0' */
+	len = ADDR_FIELD_AMOUNT * LEN_MAX;
+	fields = g_malloc0(len);
 
-	vcard_printf(vcards,"ADR;%s:%s", category_string, buf);
+	for (l = address->fields; l; l = l->next) {
+		char *field = l->data;
+
+		set_escape(format, field_esc, field, LEN_MAX, strlen(field));
+		g_strlcat(fields, field_esc, len);
+
+		if (l->next)
+			/* not addding ';' after last addr field */
+			g_strlcat(fields, ";", len);
+	}
+
+	vcard_printf(vcards,"ADR;%s:%s", category_string, fields);
+
+	g_free(fields);
 }
 
-static void vcard_printf_datetime(GString *vcards,
+static void vcard_printf_datetime(GString *vcards, uint8_t format,
 					struct phonebook_contact *contact)
 {
 	const char *type;
+	char buf[LEN_MAX];
 
 	switch (contact->calltype) {
 	case CALL_TYPE_MISSED:
@@ -489,6 +712,12 @@ static void vcard_printf_datetime(GString *vcards,
 
 	case CALL_TYPE_NOT_A_CALL:
 	default:
+		return;
+	}
+
+	if (select_qp_encoding(format, contact->datetime, NULL)) {
+		snprintf(buf, sizeof(buf), "X-IRMC-CALL-DATETIME;%s", type);
+		vcard_qp_print_encoded(vcards, buf, contact->datetime, NULL);
 		return;
 	}
 
@@ -521,11 +750,11 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		vcard_printf_tag(vcards, format, "UID", NULL, contact->uid);
 
 	if (filter & FILTER_N)
-		vcard_printf_name(vcards, contact);
+		vcard_printf_name(vcards, format, contact);
 
 	if (filter & FILTER_FN && (*contact->fullname ||
 					format == FORMAT_VCARD30))
-		vcard_printf_fullname(vcards, contact->fullname);
+		vcard_printf_fullname(vcards, format, contact->fullname);
 
 	if (filter & FILTER_TEL) {
 		GSList *l = contact->numbers;
@@ -556,9 +785,8 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		GSList *l = contact->addresses;
 
 		for (; l; l = l->next) {
-			struct phonebook_field *addr = l->data;
-			vcard_printf_address(vcards, format, addr->text,
-								addr->type);
+			struct phonebook_addr *addr = l->data;
+			vcard_printf_address(vcards, format, addr);
 		}
 	}
 
@@ -584,7 +812,7 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 							contact->photo);
 
 	if (filter & FILTER_ORG)
-		vcard_printf_org(vcards, contact);
+		vcard_printf_org(vcards, format, contact);
 
 	if (filter & FILTER_ROLE && *contact->role)
 		vcard_printf_tag(vcards, format, "ROLE", NULL, contact->role);
@@ -593,13 +821,13 @@ void phonebook_add_contact(GString *vcards, struct phonebook_contact *contact,
 		vcard_printf_tag(vcards, format, "TITLE", NULL, contact->title);
 
 	if (filter & FILTER_X_IRMC_CALL_DATETIME)
-		vcard_printf_datetime(vcards, contact);
+		vcard_printf_datetime(vcards, format, contact);
 
 	vcard_printf_end(vcards);
 }
 
 
-static void field_free(gpointer data, gpointer user_data)
+static void field_free(gpointer data)
 {
 	struct phonebook_field *field = data;
 
@@ -607,22 +835,23 @@ static void field_free(gpointer data, gpointer user_data)
 	g_free(field);
 }
 
+void phonebook_addr_free(gpointer addr)
+{
+	struct phonebook_addr *address = addr;
+
+	g_slist_free_full(address->fields, g_free);
+	g_free(address);
+}
+
 void phonebook_contact_free(struct phonebook_contact *contact)
 {
 	if (contact == NULL)
 		return;
 
-	g_slist_foreach(contact->numbers, field_free, NULL);
-	g_slist_free(contact->numbers);
-
-	g_slist_foreach(contact->emails, field_free, NULL);
-	g_slist_free(contact->emails);
-
-	g_slist_foreach(contact->addresses, field_free, NULL);
-	g_slist_free(contact->addresses);
-
-	g_slist_foreach(contact->urls, field_free, NULL);
-	g_slist_free(contact->urls);
+	g_slist_free_full(contact->numbers, field_free);
+	g_slist_free_full(contact->emails, field_free);
+	g_slist_free_full(contact->addresses, phonebook_addr_free);
+	g_slist_free_full(contact->urls, field_free);
 
 	g_free(contact->uid);
 	g_free(contact->fullname);

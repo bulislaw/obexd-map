@@ -1,8 +1,8 @@
 /*
  *
- *  OBEX Server
+ *  BlueZ - Bluetooth protocol stack for Linux
  *
- *  Copyright (C) 2007-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2004-2010  Marcel Holtmann <marcel@holtmann.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -21,5 +21,10 @@
  *
  */
 
-ssize_t string_read(void *object, void *buf, size_t count);
-gboolean is_filename(const char *name);
+#ifdef NEED_G_SLIST_FREE_FULL
+static inline void g_slist_free_full(GSList *list, GDestroyNotify free_func)
+{
+	g_slist_foreach(list, (GFunc) free_func, NULL);
+	g_slist_free(list);
+}
+#endif

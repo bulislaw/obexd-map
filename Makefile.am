@@ -130,7 +130,7 @@ service_DATA = $(service_in_files:.service.in=.service)
 AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 			@GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @DBUS_CFLAGS@ \
 			@LIBICAL_CFLAGS@ -D_FILE_OFFSET_BITS=64 \
-			@TRACKER_CFLAGS@ \
+			@TRACKER_CFLAGS@ -DUSE_NICE_ABORT \
 			-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\"
 
 INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \

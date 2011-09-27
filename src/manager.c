@@ -407,13 +407,22 @@ static void emit_transfer_completed(uint32_t id, gboolean success)
 static void emit_transfer_progress(uint32_t id, uint32_t total,
 							uint32_t transfered)
 {
-	char *path = g_strdup_printf("/transfer%u", id);
+	gchar *path;
+	static time_t last_update = 0;
+	time_t now = time(NULL);
+
+	if (total != transfered && last_update == now)
+		return;
+
+	path = g_strdup_printf("/transfer%u", id);
 
 	g_dbus_emit_signal(connection, path,
 			TRANSFER_INTERFACE, "Progress",
 			DBUS_TYPE_INT32, &total,
 			DBUS_TYPE_INT32, &transfered,
 			DBUS_TYPE_INVALID);
+
+	last_update = now;
 
 	g_free(path);
 }

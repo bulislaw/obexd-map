@@ -51,6 +51,7 @@
 #include "mimetype.h"
 #include "service.h"
 #include "ftp.h"
+#include "filesystem.h"
 
 #define LST_TYPE "x-obex/folder-listing"
 #define CAP_TYPE "x-obex/capability"
@@ -182,6 +183,9 @@ static int get_by_type(struct ftp_session *ftp, const char *type)
 	if (g_strcmp0(type, CAP_TYPE) == 0)
 		return obex_get_stream_start(os, capability);
 
+	if (name != NULL && !is_filename(name))
+		return -EBADR;
+
 	path = g_build_filename(ftp->folder, name, NULL);
 	err = obex_get_stream_start(os, path);
 
@@ -263,6 +267,9 @@ int ftp_chkput(struct obex_session *os, void *user_data)
 	if (name == NULL)
 		return -EBADR;
 
+	if (!is_filename(name))
+		return -EBADR;
+
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE)
 		return 0;
 
@@ -287,6 +294,9 @@ int ftp_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		return -EPERM;
 
 	if (name == NULL)
+		return -EBADR;
+
+	if (!is_filename(name))
 		return -EBADR;
 
 	if (size == OBJECT_SIZE_DELETE)
@@ -344,7 +354,7 @@ int ftp_setpath(struct obex_session *os, obex_object_t *obj, void *user_data)
 	}
 
 	/* Check and set to name path */
-	if (strstr(name, "/") || strcmp(name, "..") == 0) {
+	if (!is_filename(name)) {
 		error("Set path failed: name incorrect!");
 		return -EPERM;
 	}
@@ -479,6 +489,8 @@ int ftp_action(struct obex_session *os, obex_object_t *obj, void *user_data)
 	struct ftp_session *ftp = user_data;
 	const char *name, *destname;
 	uint8_t action_id;
+
+	return -EINVAL;
 
 	name = obex_get_name(os);
 	destname = obex_get_destname(os);

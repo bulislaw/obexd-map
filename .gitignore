@@ -33,3 +33,4 @@ plugins/messages.c
 client/obex-client
 client/obex-client.service
 test/obex-test
+debian

@@ -38,6 +38,7 @@
 #include "phonebook.h"
 #include "dbus.h"
 #include "vcard.h"
+#include "glib-helper.h"
 
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
@@ -49,7 +50,6 @@
 #define ADDR_FIELD_AMOUNT 7
 #define PULL_QUERY_COL_AMOUNT 23
 #define COUNT_QUERY_COL_AMOUNT 1
-#define NEW_MISSED_CALLS_COL_AMOUNT 3
 
 #define COL_PHONE_AFF 0 /* work/home phone numbers */
 #define COL_FULL_NAME 1
@@ -82,6 +82,7 @@
 
 #define MAIN_DELIM "\30" /* Main delimiter between phones, addresses, emails*/
 #define SUB_DELIM "\31" /* Delimiter used in telephone number strings*/
+#define ADDR_DELIM "\37" /* Delimiter used for address data fields */
 #define MAX_FIELDS 100 /* Max amount of fields to be concatenated at once*/
 #define VCARDS_PART_COUNT 50 /* amount of vcards sent at once to PBAP core */
 #define QUERY_OFFSET_FORMAT "%s OFFSET %d"
@@ -100,12 +101,12 @@
 "nco:nameHonorificPrefix(?_contact) "					\
 "nco:nameHonorificSuffix(?_contact) "					\
 "(SELECT GROUP_CONCAT(fn:concat("					\
-"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \";\","			\
-"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \";\","	\
-"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \";\","		\
-"tracker:coalesce(nco:locality(?aff_addr), \"\"), \";\","		\
-"tracker:coalesce(nco:region(?aff_addr), \"\"), \";\","			\
-"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \";\","		\
+"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \"\37\","	\
+"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \"\37\","	\
+"tracker:coalesce(nco:locality(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:region(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \"\37\","		\
 "tracker:coalesce(nco:country(?aff_addr), \"\"), "			\
 "\"\31\", rdfs:label(?_role) ), "					\
 "\"\30\") "								\
@@ -128,7 +129,7 @@
 "nco:fullname(nco:org(?_role))"						\
 "nco:department(?_role) "						\
 "(SELECT GROUP_CONCAT(fn:concat(?emailaddress,\"\31\","			\
-	"rdfs:label(?_role)),"						\
+	"tracker:coalesce(rdfs:label(?_role), \"\")),"			\
 	"\"\30\") "							\
 	"WHERE { "							\
 	"?_role nco:hasEmailAddress "					\
@@ -139,7 +140,6 @@
 "WHERE {"								\
 "	?_contact a nco:PersonContact ."				\
 "	OPTIONAL {?_contact nco:hasAffiliation ?_role .}"		\
-"	FILTER (regex(str(?_contact), \"urn:uuid:\"))"			\
 "}"									\
 "ORDER BY tracker:id(?_contact)"
 
@@ -164,7 +164,7 @@
 	"?_unb_contact nco:hasPhoneNumber ?_cpn . "			\
 CONSTRAINT								\
 	"OPTIONAL { "							\
-		"{ SELECT ?_contact ?_cpn ?_role ?_number "		\
+		"{ SELECT ?_contact ?_no ?_role ?_number "		\
 			"count(?_contact) as ?cnt "			\
 		"WHERE { "						\
 			"?_contact a nco:PersonContact . "		\
@@ -175,9 +175,9 @@ CONSTRAINT								\
 				"?_contact nco:hasPhoneNumber ?_number" \
 			"} "						\
 			"?_number maemo:localPhoneNumber ?_no . "	\
-			"?_cpn maemo:localPhoneNumber ?_no . "		\
-		"} GROUP BY ?_cpn } "					\
+		"} GROUP BY ?_no } "					\
 		"FILTER(?cnt = 1) "					\
+		"?_cpn maemo:localPhoneNumber ?_no . "			\
 	"} "								\
 "} "
 
@@ -210,12 +210,12 @@ CALLS_CONSTRAINTS(CONSTRAINT)						\
 	"nco:nameHonorificPrefix(?_contact) "				\
 	"nco:nameHonorificSuffix(?_contact) "				\
 "(SELECT GROUP_CONCAT(fn:concat("					\
-	"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \";\","		\
-	"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \";\","\
-	"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \";\","	\
-	"tracker:coalesce(nco:locality(?aff_addr), \"\"), \";\","	\
-	"tracker:coalesce(nco:region(?aff_addr), \"\"), \";\","		\
-	"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \";\","	\
+	"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \"\37\","	\
+	"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \"\37\","\
+	"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \"\37\","\
+	"tracker:coalesce(nco:locality(?aff_addr), \"\"), \"\37\","	\
+	"tracker:coalesce(nco:region(?aff_addr), \"\"), \"\37\","	\
+	"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \"\37\","	\
 	"tracker:coalesce(nco:country(?aff_addr), \"\"), "		\
 	"\"\31\", rdfs:label(?c_role) ), "				\
 	"\"\30\") "							\
@@ -241,7 +241,7 @@ CALLS_CONSTRAINTS(CONSTRAINT)						\
 	"nco:fullname(nco:org(?_role)) "				\
 	"nco:department(?_role) "					\
 "(SELECT GROUP_CONCAT(fn:concat(?emailaddress,\"\31\","			\
-	"rdfs:label(?c_role)),"						\
+	"tracker:coalesce(rdfs:label(?c_role), \"\")),"			\
 	"\"\30\") "							\
 	"WHERE { "							\
 	"?_contact nco:hasAffiliation ?c_role . "			\
@@ -306,12 +306,12 @@ COMBINED_CONSTRAINT		\
 "nco:nameHonorificPrefix(<%s>) "					\
 "nco:nameHonorificSuffix(<%s>) "					\
 "(SELECT GROUP_CONCAT(fn:concat("					\
-"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \";\","			\
-"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \";\","	\
-"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \";\","		\
-"tracker:coalesce(nco:locality(?aff_addr), \"\"), \";\","		\
-"tracker:coalesce(nco:region(?aff_addr), \"\"), \";\","			\
-"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \";\","		\
+"tracker:coalesce(nco:pobox(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:extendedAddress(?aff_addr), \"\"), \"\37\","	\
+"tracker:coalesce(nco:streetAddress(?aff_addr), \"\"), \"\37\","	\
+"tracker:coalesce(nco:locality(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:region(?aff_addr), \"\"), \"\37\","		\
+"tracker:coalesce(nco:postalcode(?aff_addr), \"\"), \"\37\","		\
 "tracker:coalesce(nco:country(?aff_addr), \"\"), "			\
 "\"\31\", rdfs:label(?_role) ), "					\
 "\"\30\") "								\
@@ -334,7 +334,7 @@ COMBINED_CONSTRAINT		\
 "nco:fullname(nco:org(?_role))"						\
 "nco:department(?_role) "						\
 "(SELECT GROUP_CONCAT(fn:concat(?emailaddress,\"\31\","			\
-	"rdfs:label(?_role)),"						\
+	"tracker:coalesce(rdfs:label(?_role), \"\")),"			\
 	"\"\30\") "							\
 	"WHERE { "							\
 	"?_role nco:hasEmailAddress "					\
@@ -361,7 +361,6 @@ COMBINED_CONSTRAINT		\
 	"SELECT COUNT(?c) "						\
 	"WHERE {"							\
 		"?c a nco:PersonContact ."				\
-		"FILTER (regex(str(?c), \"urn:uuid:\"))"		\
 	"}"
 
 #define MISSED_CALLS_COUNT_QUERY					\
@@ -409,42 +408,16 @@ COMBINED_CONSTRAINT		\
 	"}"								\
 	"}"
 
-#define NEW_MISSED_CALLS_LIST						\
-	"SELECT ?c "							\
-	"nco:phoneNumber(?h) "						\
-	"nmo:isRead(?call) "						\
-	"WHERE { "							\
-	"{"								\
-		"?c a nco:Contact . "					\
-		"?c nco:hasPhoneNumber ?h . "				\
-		"?call a nmo:Call ; "					\
-		"nmo:from ?c ; "					\
-		"nmo:isSent false ; "					\
-		"nmo:isAnswered false ."				\
-	"}UNION{"							\
-		"?x a nco:Contact . "					\
-		"?x nco:hasPhoneNumber ?h . "				\
-		"?call a nmo:Call ; "					\
-		"nmo:from ?x ; "					\
-		"nmo:isSent false ; "					\
-		"nmo:isAnswered false ."				\
-		"?c a nco:PersonContact . "				\
-		"?c nco:hasPhoneNumber ?h . "				\
-	"} UNION { "							\
-		"?x a nco:Contact . "					\
-		"?x nco:hasPhoneNumber ?h . "				\
-		"?call a nmo:Call ; "					\
-		"nmo:from ?x ; "					\
-		"nmo:isSent false ; "					\
-		"nmo:isAnswered false ."				\
-		"?c a nco:PersonContact . "				\
-		"?c nco:hasAffiliation ?a . "				\
-		"?a nco:hasPhoneNumber ?no . "				\
-		"?h maemo:localPhoneNumber ?num . "			\
-		"?no maemo:localPhoneNumber ?num . "			\
-	"} "								\
-	"} GROUP BY ?call ORDER BY DESC(nmo:receivedDate(?call)) "	\
-	"LIMIT 40"
+#define NEW_MISSED_CALLS_COUNT_QUERY					\
+	"SELECT COUNT(?call) WHERE {"					\
+		"?c a nco:Contact ;"					\
+		"nco:hasPhoneNumber ?h ."				\
+		"?call a nmo:Call ;"					\
+		"nmo:isSent false ;"					\
+		"nmo:from ?c ;"						\
+		"nmo:isAnswered false ;"				\
+		"nmo:isRead false ."					\
+	"}"
 
 typedef int (*reply_list_foreach_t) (const char **reply, int num_fields,
 							void *user_data);
@@ -470,7 +443,6 @@ struct phonebook_data {
 	gboolean vcardentry;
 	const struct apparam_field *params;
 	GSList *contacts;
-	GSList *numbers;
 	phonebook_cache_ready_cb ready_cb;
 	phonebook_entry_cb entry_cb;
 	int newmissedcalls;
@@ -853,22 +825,76 @@ static void add_email(struct phonebook_contact *contact, const char *address,
 	contact->emails = g_slist_append(contact->emails, email);
 }
 
+static gboolean addr_matches(struct phonebook_addr *a, struct phonebook_addr *b)
+{
+	GSList *la, *lb;
+
+	if (a->type != b->type)
+		return FALSE;
+
+	for (la = a->fields, lb = b->fields; la && lb;
+						la = la->next, lb = lb->next) {
+		char *field_a = la->data;
+		char *field_b = lb->data;
+
+		if (g_strcmp0(field_a, field_b) != 0)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* generates phonebook_addr struct from tracker address data string. */
+static struct phonebook_addr *gen_addr(const char *address, int type)
+{
+	struct phonebook_addr *addr;
+	GSList *fields = NULL;
+	char **addr_parts;
+	int i;
+
+	/* This test handles cases when address points to empty string
+	 * (or address is NULL pointer) or string containing only six
+	 * separators. It indicates that none of address fields is present
+	 * and there is no sense to create dummy phonebook_addr struct */
+	if (address == NULL || strlen(address) < ADDR_FIELD_AMOUNT)
+		return NULL;
+
+	addr_parts = g_strsplit(address, ADDR_DELIM, ADDR_FIELD_AMOUNT);
+
+	for (i = 0; i < ADDR_FIELD_AMOUNT; ++i)
+		fields = g_slist_append(fields, g_strdup(addr_parts[i]));
+
+	g_strfreev(addr_parts);
+
+	addr = g_new0(struct phonebook_addr, 1);
+	addr->fields = fields;
+	addr->type = type;
+
+	return addr;
+}
+
 static void add_address(struct phonebook_contact *contact,
 					const char *address, int type)
 {
-	struct phonebook_field *addr;
+	struct phonebook_addr *addr;
+	GSList *l;
 
-	if (address == NULL || address_fields_present(address) == FALSE)
+	addr = gen_addr(address, type);
+	if (addr == NULL)
 		return;
 
-	/* Not adding address if there is already added with the same value */
-	if (find_field(contact->addresses, address, type))
-		return;
+	/* Not adding address if there is already added with the same value.
+	 * These type of checks have to be done because sometimes tracker
+	 * returns results for contact data in more than 1 row - then the same
+	 * address may be returned more than once in query results */
+	for (l = contact->addresses; l; l = l->next) {
+		struct phonebook_addr *tmp = l->data;
 
-	addr = g_new0(struct phonebook_field, 1);
-
-	addr->text = g_strdup(address);
-	addr->type = type;
+		if (addr_matches(tmp, addr)) {
+			phonebook_addr_free(addr);
+			return;
+		}
+	}
 
 	contact->addresses = g_slist_append(contact->addresses, addr);
 }
@@ -1429,31 +1455,6 @@ done:
 	return path;
 }
 
-static gboolean find_checked_number(GSList *numbers, const char *number)
-{
-	GSList *l;
-
-	for (l = numbers; l; l = l->next) {
-		GString *ph_num = l->data;
-		if (g_strcmp0(ph_num->str, number) == 0)
-			return TRUE;
-	}
-
-	return FALSE;
-}
-
-static void gstring_free_helper(gpointer data, gpointer user_data)
-{
-	g_string_free(data, TRUE);
-}
-
-static void free_data_numbers(struct phonebook_data *data)
-{
-	g_slist_foreach(data->numbers, gstring_free_helper, NULL);
-	g_slist_free(data->numbers);
-	data->numbers = NULL;
-}
-
 static int pull_newmissedcalls(const char **reply, int num_fields,
 							void *user_data)
 {
@@ -1461,29 +1462,21 @@ static int pull_newmissedcalls(const char **reply, int num_fields,
 	reply_list_foreach_t pull_cb;
 	int col_amount, err;
 	const char *query;
-
-	if (num_fields < 0 || reply == NULL)
-		goto done;
-
-	if (!find_checked_number(data->numbers, reply[1])) {
-		if (g_strcmp0(reply[2], "false") == 0)
-			data->newmissedcalls++;
-		else {
-			GString *number = g_string_new(reply[1]);
-			data->numbers = g_slist_prepend(data->numbers,
-								number);
-		}
-	}
-
-	return 0;
-
-done:
-	DBG("newmissedcalls %d", data->newmissedcalls);
-	free_data_numbers(data);
+	int nmissed;
 
 	if (num_fields < 0) {
 		data->cb(NULL, 0, num_fields, 0, TRUE, data->user_data);
+
 		return -EINTR;
+	}
+
+	if (reply != NULL) {
+		nmissed = atoi(reply[0]);
+		data->newmissedcalls =
+			nmissed <= UINT8_MAX ? nmissed : UINT8_MAX;
+		DBG("newmissedcalls %d", data->newmissedcalls);
+
+		return 0;
 	}
 
 	if (data->params->maxlistcount == 0) {
@@ -1521,7 +1514,6 @@ void phonebook_req_finalize(void *request)
 		g_object_unref(data->query_canc);
 	}
 
-	free_data_numbers(data);
 	free_data_contacts(data);
 	g_free(data->req_name);
 	g_free(data);
@@ -1565,8 +1557,8 @@ int phonebook_pull_read(void *request)
 		/* new missed calls amount should be counted only once - it
 		 * will be done during generating first part of results of
 		 * missed calls history */
-		query = NEW_MISSED_CALLS_LIST;
-		col_amount = NEW_MISSED_CALLS_COL_AMOUNT;
+		query = NEW_MISSED_CALLS_COUNT_QUERY;
+		col_amount = COUNT_QUERY_COL_AMOUNT;
 		pull_cb = pull_newmissedcalls;
 	} else if (data->params->maxlistcount == 0) {
 		query = name2count_query(data->req_name);
