@@ -84,10 +84,23 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
 			src/transport.h src/transport.c \
 			src/server.h src/server.c
 
+if MESSAGES_QT
+
+src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
+					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
+					@BLUEZ_LIBS@ @LIBICAL_LIBS@ \
+					@TRACKER_LIBS@ -ldl \
+					messages-qt/libmessages-qt.a \
+					@QTCORE_LIBS@ @COMMHISTORY_LIBS@
+
+else
+
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
 					@BLUEZ_LIBS@ @LIBICAL_LIBS@ \
 					@TRACKER_LIBS@ -ldl
+
+endif
 
 src_obexd_LDFLAGS = -Wl,--export-dynamic
 
@@ -152,7 +165,13 @@ EXTRA_DIST = src/genbuiltin $(doc_files) $(test_files) \
 			src/obexd.service.in client/obex-client.service.in \
 			plugins/phonebook-dummy.c plugins/phonebook-ebook.c \
 			plugins/phonebook-tracker.c \
-			plugins/messages-dummy.c plugins/messages-tracker.c
+			plugins/messages-dummy.c plugins/messages-tracker.c \
+			messages-qt/messages-qt.pro messages-qt/messages-qt.cpp \
+			messages-qt/Makefile
+
+if MESSAGES_QT
+SUBDIRS = messages-qt
+endif
 
 DISTCHECK_CONFIGURE_FLAGS = --enable-client --enable-server
 

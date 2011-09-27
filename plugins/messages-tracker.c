@@ -39,6 +39,7 @@
 #include "messages.h"
 #include "bmsg.h"
 #include "bmsg_parser.h"
+#include "messages-qt/messages-qt.h"
 
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
@@ -1019,6 +1020,8 @@ int messages_init(void)
 	if (retrieve_message_id_tracker_id() < 0)
 		return -1;
 
+	messages_qt_init();
+
 	create_folder_tree();
 
 	return 0;
@@ -1029,6 +1032,8 @@ void messages_exit(void)
 	destroy_folder_tree(folder_tree);
 
 	dbus_connection_unref(session_connection);
+
+	messages_qt_exit();
 }
 
 int messages_connect(void **s)
@@ -1354,9 +1359,11 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 	switch (indicator) {
 		case 0x0:
 			stat->read = value;
+			messages_qt_set_read(handle, value & 0x01);
 			break;
 		case 0x1:
 			stat->deleted = value;
+			messages_qt_set_deleted(handle, value & 0x01);
 			break;
 		default:
 			return -EBADR;

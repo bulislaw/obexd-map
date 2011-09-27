@@ -108,13 +108,24 @@ AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
 ])
 
 messages_driver=dummy
+enable_messages_qt=no
 AC_ARG_WITH(messages, AC_HELP_STRING([--with-messages=DRIVER], [select messages driver]), [
 	if (test "${withval}" = "no"); then
 		messages_driver=dummy;
 	else
 		messages_driver=${withval};
 	fi
+	if (test "${withval}" = "tracker"); then
+		PKG_CHECK_MODULES(QTCORE, QtCore, dummy=yes,
+			AC_MSG_ERROR([QtCore is required to build messages-tracker]))
+		PKG_CHECK_MODULES(COMMHISTORY, commhistory, dummy=yes,
+			AC_MSG_ERROR([libcommhistory is required to build messages-tracker]))
+		enable_messages_qt="yes";
+		( cd messages-qt; qmake )
+	fi
 ])
+
+AM_CONDITIONAL(MESSAGES_QT, test "${enable_messages_qt}" = "yes")
 
 AC_SUBST([MESSAGES_DRIVER], [messages-${messages_driver}.c])
 
