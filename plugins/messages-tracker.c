@@ -169,6 +169,7 @@ struct session {
 	messages_event_cb event_cb;
 	struct request *request;
 	GHashTable *msg_stat;
+	gboolean destroy;
 };
 
 static struct message_folder *folder_tree = NULL;
@@ -786,6 +787,10 @@ aborted:
 	g_free(request->filter);
 
 	g_free(request);
+
+	session->request = NULL;
+	if (session->destroy)
+		messages_disconnect(session);
 }
 
 static void get_message_resp(const char **reply, void *s)
@@ -855,6 +860,10 @@ done:
 aborted:
 	g_free(request->name);
 	g_free(request);
+
+	session->request = NULL;
+	if (session->destroy)
+		messages_disconnect(session);
 }
 
 static void notify_new_sms(const char *handle)
@@ -956,6 +965,12 @@ int messages_connect(void **s)
 void messages_disconnect(void *s)
 {
 	struct session *session = s;
+
+	if (session->request != NULL) {
+		session->destroy = TRUE;
+
+		return;
+	}
 
 	messages_set_notification_registration(session, NULL, NULL);
 
@@ -1096,6 +1111,10 @@ done:
 aborted:
 	g_free(request->name);
 	g_free(request);
+
+	session->request = NULL;
+	if (session->destroy)
+		messages_disconnect(session);
 
 	return FALSE;
 }
