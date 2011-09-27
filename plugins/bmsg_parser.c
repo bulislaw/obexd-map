@@ -596,6 +596,14 @@ static gboolean match_and_move(char **buf, char *pattern, size_t *len)
 	return FALSE;
 }
 
+size_t bmsg_parser_tail_length(struct bmsg_bmsg *bmsg)
+{
+	/* strlen("END:BBODY\r\n") + bmsg->nenvelopes * strlen("END:BENV\r\n") +
+	 * strlen("END:BMSG\r\n")
+	 */
+	return (11 + bmsg->nenvelopes * 10 + 10);
+}
+
 gboolean bmsg_parser_tail_correct(struct bmsg_bmsg *bmsg, char *tail, size_t len)
 {
 	int nenv = bmsg->nenvelopes;

@@ -1539,15 +1539,32 @@ static int message_flush(void *obj)
 {
 	struct mas_session *mas = obj;
 	struct message_put_request *request = mas->request;
+	char *tail;
+	size_t len;
 	int ret;
 
 	if (mas->finished)
 		return 0;
 
-	if (!bmsg_parser_tail_correct(request->bmsg, request->buf->str,
-						request->buf->len)) {
+	len = bmsg_parser_tail_length(request->bmsg);
+
+	if (request->buf->len < len) {
+		DBG("Not enough bytes received!");
+		return -1;
+	}
+
+	tail = request->buf->str + request->buf->len - len;
+	if (!bmsg_parser_tail_correct(request->bmsg, tail, len)) {
 		DBG("BMSG tail check failed!");
 		return -1;
+	}
+
+	if (request->buf->len > len) {
+		ret = messages_push_message_body(mas->backend_data,
+						request->buf->str,
+						request->buf->len - len);
+		if (ret < 0)
+			return ret;
 	}
 
 	ret = messages_push_message_body(mas->backend_data, NULL, 0);

@@ -89,6 +89,7 @@ struct bmsg_parser *bmsg_parser_new(void);
 int bmsg_parser_process(struct bmsg_parser *pd, char **data, size_t len);
 struct bmsg_bmsg *bmsg_parser_get_bmsg(struct bmsg_parser *pd);
 void bmsg_parser_free(struct bmsg_parser *pd);
+size_t bmsg_parser_tail_length(struct bmsg_bmsg *bmsg);
 gboolean bmsg_parser_tail_correct(struct bmsg_bmsg *bmsg, char *tail, size_t len);
 
 
