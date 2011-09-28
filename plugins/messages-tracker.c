@@ -152,6 +152,7 @@ struct push_message_request {
 	struct bmsg_bmsg *bmsg;
 	void *user_data;
 	char *uuid;
+	const char *name;
 	guint watch;
 	gboolean retry;
 	DBusPendingCall *send_sms, *get_handle;
@@ -1661,6 +1662,35 @@ failed:
 	return -ENOMEM;
 }
 
+static void tout(int id, void *s)
+{
+	struct session *session = s;
+	struct push_message_request *request = session->request_data;
+	char handle[17];
+
+	DBG("");
+
+	if (id < 0) {
+		request->cb(session, id, NULL, request->user_data);
+		return;
+	}
+
+	snprintf(handle, 17, "%016d", id);
+	request->cb(session, 0, handle, request->user_data);
+}
+
+static int store_sms(struct session *session, const char *recipient,
+					const char *body)
+{
+	struct push_message_request *request = session->request_data;
+
+	DBG("");
+
+	messages_qt_insert_message(recipient, body, request->name, tout, session);
+
+	return 0;
+}
+
 int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 						unsigned long flags,
 						messages_push_message_cb cb,
@@ -1673,12 +1703,14 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	path = g_build_filename(session->cwd, name, NULL);
 	DBG("Push destination: %s", path);
 
+	/*
 	if (g_strcmp0(path, "/telecom/msg/outbox") != 0) {
 		g_free(path);
 		return -EACCES;
 	}
 
 	g_free(path);
+	*/
 
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
@@ -1704,6 +1736,7 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	request->cb = cb;
 	request->body = g_string_new("");
 	request->user_data = user_data;
+	request->name = path;
 
 	session->request_data = request;
 	session->abort_request = push_message_abort;
@@ -1764,7 +1797,11 @@ int messages_push_message_body(void *s, const char *body, size_t len)
 	if (ret < 0)
 		goto failed;
 
-	ret = send_sms(session, vcard->tel, request->body->str, TRUE);
+	if (g_strcmp0(request->name, "/telecom/msg/outbox") == 0)
+		ret = send_sms(session, vcard->tel, request->body->str, TRUE);
+	else
+		ret = store_sms(session, vcard->tel, request->body->str);
+
 	if (ret < 0)
 		goto failed;
 

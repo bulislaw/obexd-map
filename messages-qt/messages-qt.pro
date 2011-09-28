@@ -8,7 +8,8 @@ PKGCONFIG += glib-2.0
 PKGCONFIG += commhistory
 
 # Input
-SOURCES += messages-qt.cpp messages-qt.h
+SOURCES += messages-qt.cpp messages-manager.cpp
+HEADERS += messages-manager.h messages-qt.h
 
 mc.target = maintainer-clean
 mc.commands = 

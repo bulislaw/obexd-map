@@ -2,6 +2,7 @@
 #include <CommHistory/SingleEventModel>
 #include <CommHistory/GroupModel>
 #include <CommHistory/Event>
+#include "messages-manager.h"
 
 extern "C" {
 #ifdef HAVE_CONFIG_H
@@ -104,4 +105,14 @@ int messages_qt_set_read(const char *handle, gboolean read)
 	event.setIsRead(read);
 
 	return messages_qt_sync_event(model, event);
+}
+
+int messages_qt_insert_message(const char *remote, const char *body,
+						const char *folder,
+						messages_qt_callback_t callback,
+						void *user_data)
+{
+	MessagesManager *manager = new MessagesManager();
+
+	return manager->addMessage(remote, body, folder, callback, user_data);
 }
