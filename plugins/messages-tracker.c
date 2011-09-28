@@ -245,6 +245,14 @@ static struct messages_filter *copy_messages_filter(
 	return filter;
 }
 
+static gboolean validate_handle(const char *h)
+{
+	while(*h && *h >= '0' && *h <= '9')
+		h++;
+
+	return *h == '\0' ? TRUE : FALSE;
+}
+
 static char *fill_handle(const char *handle)
 {
 	int fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
@@ -1284,10 +1292,14 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 	struct request *request;
 	DBusPendingCall *call;
 	int err = 0;
-	char *handle = strip_handle(h);
-	char *query_handle = g_strdup_printf(MESSAGES_FILTER_BY_HANDLE, handle);
-	char *query = path2query("telecom/msg", LIST_MESSAGES_QUERY,
-								 query_handle);
+	char *handle, *query_handle, *query;
+
+	if (!validate_handle(h))
+		return -ENOENT;
+
+	handle = strip_handle(h);
+	query_handle = g_strdup_printf(MESSAGES_FILTER_BY_HANDLE, handle);
+	query = path2query("telecom/msg", LIST_MESSAGES_QUERY, query_handle);
 
 	if (query == NULL) {
 		err = -ENOENT;
