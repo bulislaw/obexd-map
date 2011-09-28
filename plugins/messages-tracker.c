@@ -201,24 +201,6 @@ static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
 static gint event_watch_id;
 
-static gboolean trace_call(void *data)
-{
-	DBusPendingCall *call = data;
-
-	if (dbus_pending_call_get_completed(call) == TRUE) {
-		dbus_pending_call_unref(call);
-
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
-static void new_call(DBusPendingCall *call)
-{
-	g_timeout_add_seconds(5, trace_call, call);
-}
-
 static void free_msg_data(struct messages_message *msg)
 {
 	g_free(msg->handle);
@@ -366,6 +348,7 @@ done:
 	session->request->generate_response(NULL, session);
 
 	dbus_message_unref(reply);
+	dbus_pending_call_unref(call);
 }
 
 static DBusPendingCall *query_tracker(char *query, void *user_data, int *err)
@@ -1288,8 +1271,6 @@ int messages_get_messages_listing(void *s, const char *name,
 	}
 
 	call = query_tracker(query, session, &err);
-	if (err == 0)
-		new_call(call);
 
 	g_free(query);
 
@@ -1332,8 +1313,6 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 	session->request = request;
 
 	call = query_tracker(query, session, &err);
-	if (err == 0)
-		new_call(call);
 
 failed:
 	g_free(query_handle);
