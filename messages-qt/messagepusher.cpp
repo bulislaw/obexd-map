@@ -157,7 +157,7 @@ int MessagePusher::push(const char *remote, const char *body,
 	messagePusher->user_data = user_data;
 
 	messagePusher->remoteUid = QString(remote);
-	messagePusher->messageBody = QString(body);
+	messagePusher->messageBody = QString::fromUtf8(body);
 	messagePusher->direction = direction;
 
 	if (!messagePusher->groupModel.getGroups(RING_ACCOUNT, QString(remote)))
