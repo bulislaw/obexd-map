@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <glib.h>
 
 typedef void (*messages_qt_callback_t)(int id, void *user_data);
@@ -10,3 +14,7 @@ int messages_qt_insert_message(const char *remote, const char *body,
 						const char *folder,
 						messages_qt_callback_t cb,
 						void *user_data);
+
+#ifdef __cplusplus
+}
+#endif

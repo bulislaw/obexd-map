@@ -1366,7 +1366,7 @@ static void push_message_cb(void *session, int err, const char *handle,
 	if (handle == NULL) {
 		DBG("err: %d", err);
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
-		mas->finished = TRUE;
+		/* mas->finished = TRUE; FIXME!!! */
 	} else {
 		DBG("handle: %s", handle);
 		obex_name_write(mas->obex_os, mas->obex_obj, handle);
@@ -1475,6 +1475,9 @@ static ssize_t message_write_body(struct mas_session *mas, const void *buf,
 		n = request->remaining;
 
 	ret = messages_push_message_body(mas->backend_data, buf, n);
+	if (ret < 0)
+		return ret;
+
 	request->remaining -= ret;
 
 	return ret;

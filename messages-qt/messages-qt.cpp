@@ -2,19 +2,24 @@
 #include <CommHistory/SingleEventModel>
 #include <CommHistory/GroupModel>
 #include <CommHistory/Event>
-#include "messages-manager.h"
+
+#include "messages-qt-log.h"
+#include "messagepusher.h"
+#include "messageupdater.h"
+
+#include "messages-qt.h"
 
 extern "C" {
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
 #include <errno.h>
 
-#include "messages-qt.h"
 #include "messages.h"
-#include "log.h"
 #include "glib.h"
+
 }
 
 static QCoreApplication *app = NULL;
@@ -24,6 +29,7 @@ int messages_qt_init(void)
 	static char *argv[] = {(char *)""};
 	static int argc = 1;
 
+	/* QCoreApplication is required when using libcommhistory */
 	if (app == NULL)
 		app = new QCoreApplication(argc, argv);
 
@@ -38,73 +44,52 @@ void messages_qt_exit(void)
 	}
 }
 
-static int messages_qt_get_event(CommHistory::SingleEventModel &model,
-				CommHistory::Event &event, const char *handle)
+struct updater_call {
+	int ret;
+	gboolean done;
+};
+
+static void updater_callback(int err, void *user_data)
 {
-	QString uri = QString("message:");
+	struct updater_call *uc = (struct updater_call *)user_data;
 
-	uri += QString::number(QString(handle).toLong());
-
-	model.setQueryMode(CommHistory::EventModel::SyncQuery);
-
-	if (!model.getEventByUri(QUrl(uri))) {
-		obex_debug("Cannot retrieve given event: %s", handle);
-		return -ENOENT;
-	}
-
-	event = model.event(model.index(0, 0));
-
-	return 0;
-}
-
-static int messages_qt_sync_event(CommHistory::SingleEventModel &model,
-						CommHistory::Event &event)
-{
-	if (!model.modifyEvent(event)) {
-		obex_debug("Cannot modify event!");
-		return -EACCES;
-	}
-
-	CommHistory::GroupModel gm;
-
-	/* Getting group model seems to be enough for libcommhistory to update
-	 * groups (and thus UI) related to this event
-	 */
-	gm.setQueryMode(CommHistory::EventModel::SyncQuery);
-	gm.getGroups(event.localUid(), event.remoteUid());
-
-	return 0;
+	uc->ret = err;
+	uc->done = TRUE;
 }
 
 int messages_qt_set_deleted(const char *handle, gboolean deleted)
 {
-	CommHistory::SingleEventModel model;
-	CommHistory::Event event;
+	struct updater_call uc;
 	int ret;
 
-	ret = messages_qt_get_event(model, event, handle);
+	ret = MessageUpdater::setDeleted(handle, deleted, updater_callback,
+									&uc);
 	if (ret < 0)
 		return ret;
 
-	event.setDeleted(deleted);
+	/* XXX: If this actually makes whole glib main loop to iterate, things
+	 * may go wrong. Needs checking or just reimplementing API to do
+	 * SetMessageStatus asynchronously. */
+	while (!uc.done)
+		app->processEvents();
 
-	return messages_qt_sync_event(model, event);
+	return uc.ret;
 }
 
 
 int messages_qt_set_read(const char *handle, gboolean read)
 {
-	CommHistory::SingleEventModel model;
-	CommHistory::Event event;
+	struct updater_call uc;
 	int ret;
 
-	ret = messages_qt_get_event(model, event, handle);
+	ret = MessageUpdater::setIsRead(handle, read, updater_callback, &uc);
 	if (ret < 0)
 		return ret;
 
-	event.setIsRead(read);
+	while (!uc.done)
+		app->processEvents();
 
-	return messages_qt_sync_event(model, event);
+	return uc.ret;
 }
 
 int messages_qt_insert_message(const char *remote, const char *body,
@@ -112,7 +97,5 @@ int messages_qt_insert_message(const char *remote, const char *body,
 						messages_qt_callback_t callback,
 						void *user_data)
 {
-	MessagesManager *manager = new MessagesManager();
-
-	return manager->addMessage(remote, body, folder, callback, user_data);
+	return MessagePusher::push(remote, body, folder, callback, user_data);
 }

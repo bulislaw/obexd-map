@@ -1348,6 +1348,7 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 {
 	struct session *session = s;
 	struct message_status *stat = NULL;
+	int ret;
 
 	stat = g_hash_table_lookup(session->msg_stat, handle);
 	if (stat == NULL) {
@@ -1359,12 +1360,18 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 
 	switch (indicator) {
 		case 0x0:
+			ret = messages_qt_set_read(handle, value & 0x01);
+			if (ret < 0)
+				return ret;
+
 			stat->read = value;
-			messages_qt_set_read(handle, value & 0x01);
 			break;
 		case 0x1:
+			ret = messages_qt_set_deleted(handle, value & 0x01);
+			if (ret < 0)
+				return ret;
+
 			stat->deleted = value;
-			messages_qt_set_deleted(handle, value & 0x01);
 			break;
 		default:
 			return -EBADR;
