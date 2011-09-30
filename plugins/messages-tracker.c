@@ -61,23 +61,16 @@
 #define MESSAGE_SUBJECT 1
 #define MESSAGE_SDATE 2
 #define MESSAGE_RDATE 3
-#define MESSAGE_FROM_FN 4
-#define MESSAGE_FROM_GIVEN 5
-#define MESSAGE_FROM_FAMILY 6
-#define MESSAGE_FROM_ADDITIONAL 7
-#define MESSAGE_FROM_PREFIX 8
-#define MESSAGE_FROM_SUFFIX 9
-#define MESSAGE_FROM_PHONE 10
-#define MESSAGE_TO_FN 11
-#define MESSAGE_TO_GIVEN 12
-#define MESSAGE_TO_FAMILY 13
-#define MESSAGE_TO_ADDITIONAL 14
-#define MESSAGE_TO_PREFIX 15
-#define MESSAGE_TO_SUFFIX 16
-#define MESSAGE_TO_PHONE 17
-#define MESSAGE_READ 18
-#define MESSAGE_SENT 19
-#define MESSAGE_CONTENT 20
+#define MESSAGE_CONTACT_FN 4
+#define MESSAGE_CONTACT_GIVEN 5
+#define MESSAGE_CONTACT_FAMILY 6
+#define MESSAGE_CONTACT_ADDITIONAL 7
+#define MESSAGE_CONTACT_PREFIX 8
+#define MESSAGE_CONTACT_SUFFIX 9
+#define MESSAGE_CONTACT_PHONE 10
+#define MESSAGE_READ 11
+#define MESSAGE_SENT 12
+#define MESSAGE_CONTENT 13
 
 #define LIST_MESSAGES_QUERY						\
 "SELECT "								\
@@ -85,20 +78,13 @@
 "nmo:messageSubject(?msg) "						\
 "nmo:sentDate(?msg) "							\
 "nmo:receivedDate(?msg) "						\
-"nco:fullname(?from_c) "						\
-"nco:nameGiven(?from_c) "						\
-"nco:nameFamily(?from_c) "						\
-"nco:nameAdditional(?from_c) "						\
-"nco:nameHonorificPrefix(?from_c) "					\
-"nco:nameHonorificSuffix(?from_c) "					\
-"nco:phoneNumber(?from_phone) "						\
-"nco:fullname(?to_c) "							\
-"nco:nameGiven(?to_c) "							\
-"nco:nameFamily(?to_c) "						\
-"nco:nameAdditional(?to_c) "						\
-"nco:nameHonorificPrefix(?to_c) "					\
-"nco:nameHonorificSuffix(?to_c) "					\
-"nco:phoneNumber(?to_phone) "						\
+"nco:fullname(?cont) "							\
+"nco:nameGiven(?cont) "							\
+"nco:nameFamily(?cont) "						\
+"nco:nameAdditional(?cont) "						\
+"nco:nameHonorificPrefix(?cont) "					\
+"nco:nameHonorificSuffix(?cont) "					\
+"nco:phoneNumber(?phone) "						\
 "nmo:isRead(?msg) "							\
 "nmo:isSent(?msg) "							\
 "nie:plainTextContent(?msg) "						\
@@ -106,29 +92,29 @@
 	"?msg a nmo:SMSMessage . "					\
 	"%s "								\
 	"%s "								\
-	"OPTIONAL { "							\
-		"?msg nmo:from ?from . "				\
-		"?from nco:hasPhoneNumber ?from_phone . "		\
-		"?from_phone maemo:localPhoneNumber ?from_lphone . "	\
-		"OPTIONAL { "						\
-			"?from_c a nco:PersonContact . "		\
-			"OPTIONAL {?from_c nco:hasPhoneNumber ?phone .} "\
-			"OPTIONAL {?from_c nco:hasAffiliation ?af . "	\
-				"?af nco:hasPhoneNumber ?phone . } "	\
-			"?phone maemo:localPhoneNumber ?from_lphone . "	\
-		"} "							\
+	"{ "								\
+	"	?msg nmo:from ?msg_cont .  "				\
+	"	?msg nmo:isSent false "					\
+	"} UNION { "							\
+	"	?msg nmo:to ?msg_cont . "				\
+	"	?msg nmo:isSent true "					\
 	"} "								\
+	"?msg_cont nco:hasPhoneNumber ?phone . "			\
+	"?phone maemo:localPhoneNumber ?lphone . "			\
 	"OPTIONAL { "							\
-		"?msg nmo:to ?to . "					\
-		"?to nco:hasPhoneNumber ?to_phone . "			\
-		"?to_phone maemo:localPhoneNumber ?to_lphone . "	\
-		"OPTIONAL { "						\
-			"?to_c a nco:PersonContact . "			\
-			"OPTIONAL {?to_c nco:hasPhoneNumber ?phone1 .} "\
-			"OPTIONAL {?to_c nco:hasAffiliation ?af . "	\
-				"?af nco:hasPhoneNumber ?phone1 . } "	\
-			"?phone1 maemo:localPhoneNumber ?to_lphone "	\
-		"} "							\
+		"{ SELECT ?cont ?lphone "				\
+			"count(?cont) as ?cnt "				\
+		"WHERE { "						\
+			"?cont a nco:PersonContact . "			\
+			"{ "						\
+				"?cont nco:hasAffiliation ?_role . "	\
+				"?_role nco:hasPhoneNumber ?_phone . "	\
+			"} UNION { "					\
+				"?cont nco:hasPhoneNumber ?_phone "	\
+			"} "						\
+			"?_phone maemo:localPhoneNumber ?lphone. "	\
+		"} GROUP BY ?lphone } "					\
+		"FILTER(?cnt = 1) "					\
 	"} "								\
 "} ORDER BY DESC(nmo:sentDate(?msg)) "
 
@@ -637,29 +623,15 @@ static struct phonebook_contact *pull_message_contact(const char **reply,
 
 	contact = g_new0(struct phonebook_contact, 1);
 
-	if (!sent) {
-		contact->fullname = g_strdup(reply[MESSAGE_FROM_FN]);
-		contact->given = g_strdup(reply[MESSAGE_FROM_GIVEN]);
-		contact->family = g_strdup(reply[MESSAGE_FROM_FAMILY]);
-		contact->additional = g_strdup(reply[MESSAGE_FROM_ADDITIONAL]);
-		contact->prefix = g_strdup(reply[MESSAGE_FROM_PREFIX]);
-		contact->suffix = g_strdup(reply[MESSAGE_FROM_SUFFIX]);
-	} else {
-		contact->fullname = g_strdup(reply[MESSAGE_TO_FN]);
-		contact->given = g_strdup(reply[MESSAGE_TO_GIVEN]);
-		contact->family = g_strdup(reply[MESSAGE_TO_FAMILY]);
-		contact->additional = g_strdup(reply[MESSAGE_TO_ADDITIONAL]);
-		contact->prefix = g_strdup(reply[MESSAGE_TO_PREFIX]);
-		contact->suffix = g_strdup(reply[MESSAGE_TO_SUFFIX]);
-	}
+	contact->fullname = g_strdup(reply[MESSAGE_CONTACT_FN]);
+	contact->given = g_strdup(reply[MESSAGE_CONTACT_GIVEN]);
+	contact->family = g_strdup(reply[MESSAGE_CONTACT_FAMILY]);
+	contact->additional = g_strdup(reply[MESSAGE_CONTACT_ADDITIONAL]);
+	contact->prefix = g_strdup(reply[MESSAGE_CONTACT_PREFIX]);
+	contact->suffix = g_strdup(reply[MESSAGE_CONTACT_SUFFIX]);
 
 	number = g_new0(struct phonebook_field, 1);
-
-	if (!sent)
-		number->text = g_strdup(reply[MESSAGE_FROM_PHONE]);
-	else
-		number->text = g_strdup(reply[MESSAGE_TO_PHONE]);
-
+	number->text = g_strdup(reply[MESSAGE_CONTACT_PHONE]);
 	number->type = TEL_TYPE_NONE;
 	contact->numbers = g_slist_append(contact->numbers, number);
 
@@ -709,20 +681,29 @@ static struct messages_message *pull_message_data(const char **reply)
 
 	data->mask |= PMASK_DATETIME;
 
-	data->sender_name = merge_names(reply[MESSAGE_FROM_GIVEN],
-					reply[MESSAGE_FROM_FAMILY]);
-	if (data->sender_name[0] != '\0')
-		data->mask |= PMASK_SENDER_NAME;
+	data->sent = g_strcmp0(reply[MESSAGE_SENT], "true") == 0 ? TRUE : FALSE;
+	data->mask |= PMASK_SENT;
 
-	data->sender_addressing = g_strdup(reply[MESSAGE_FROM_PHONE]);
-	data->mask |= PMASK_SENDER_ADDRESSING;
+	if (!data->sent) {
+		data->sender_name = merge_names(reply[MESSAGE_CONTACT_GIVEN],
+						reply[MESSAGE_CONTACT_FAMILY]);
+		if (data->sender_name[0] != '\0')
+			data->mask |= PMASK_SENDER_NAME;
 
-	data->recipient_name = merge_names(reply[MESSAGE_TO_GIVEN],
-						reply[MESSAGE_TO_FAMILY]);
-	if (data->recipient_name[0] != '\0')
-		data->mask |= PMASK_RECIPIENT_NAME;
+		data->sender_addressing =
+					g_strdup(reply[MESSAGE_CONTACT_PHONE]);
+		data->mask |= PMASK_SENDER_ADDRESSING;
 
-	data->recipient_addressing = g_strdup(reply[MESSAGE_TO_PHONE]);
+		data->recipient_addressing = g_strdup("");
+	} else {
+		data->recipient_name = merge_names(reply[MESSAGE_CONTACT_GIVEN],
+						reply[MESSAGE_CONTACT_FAMILY]);
+		if (data->recipient_name[0] != '\0')
+			data->mask |= PMASK_RECIPIENT_NAME;
+
+		data->recipient_addressing =
+					g_strdup(reply[MESSAGE_CONTACT_PHONE]);
+	}
 	data->mask |= PMASK_RECIPIENT_ADDRESSING;
 
 	data->type = g_strdup("SMS_GSM");
@@ -745,9 +726,6 @@ static struct messages_message *pull_message_data(const char **reply)
 
 	data->read = g_strcmp0(reply[MESSAGE_READ], "true") == 0 ? TRUE : FALSE;
 	data->mask |= PMASK_READ;
-
-	data->sent = g_strcmp0(reply[MESSAGE_SENT], "true") == 0 ? TRUE : FALSE;
-	data->mask |= PMASK_SENT;
 
 	data->protect = FALSE;
 	data->mask |= PMASK_PROTECTED;
