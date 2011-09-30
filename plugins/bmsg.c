@@ -22,17 +22,19 @@
 
 #include "bmsg.h"
 
-static void string_append_glist_vcard(void *list_item, void *list)
+static void string_append_glist(void *list_item, void *list)
 {
 	GString *buf = list;
 
-	phonebook_add_contact(buf, list_item, 0, FORMAT_VCARD30);
+	g_string_append(buf, list_item);
 }
 
 static void envelope_destroy(struct bmsg_envelope *env)
 {
-	if (env->recipients)
+	if (env->recipients) {
+		g_list_foreach(env->recipients, (GFunc) g_free, NULL);
 		g_list_free(env->recipients);
+	}
 
 	if (env->content == NULL)
 		return;
@@ -66,6 +68,7 @@ void bmsg_destroy(struct bmsg *msg)
 	g_free(msg->folder);
 
 	if (msg->originators) {
+		g_list_foreach(msg->originators, (GFunc) g_free, NULL);
 		g_list_free(msg->originators);
 	}
 
@@ -87,7 +90,11 @@ void bmsg_destroy(struct bmsg *msg)
 
 void bmsg_add_originator(struct bmsg *msg, struct phonebook_contact *contact)
 {
-	msg->originators = g_list_append(msg->originators, contact);
+	GString *vcard = g_string_new("");
+
+	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD30);
+	msg->originators = g_list_append(msg->originators,
+						g_string_free(vcard, FALSE));
 }
 
 gboolean bmsg_add_envelope(struct bmsg *msg)
@@ -112,13 +119,19 @@ gboolean bmsg_add_envelope(struct bmsg *msg)
 void bmsg_add_recipient(struct bmsg *msg, struct phonebook_contact *contact)
 {
 	struct bmsg_envelope *top_env;
+	GString *vcard;
 
 	if (msg->envelopes->len == 0)
 		return;
 
 	top_env = g_array_index(msg->envelopes, struct bmsg_envelope *,
 						msg->envelopes->len - 1);
-	top_env->recipients = g_list_append(top_env->recipients, contact);
+
+	vcard = g_string_new("");
+	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD30);
+
+	top_env->recipients = g_list_append(top_env->recipients,
+						g_string_free(vcard, FALSE));
 }
 
 gboolean bmsg_add_content(struct bmsg *msg, gint32 part_id, char *encoding,
@@ -204,7 +217,7 @@ static GString *parse_envelope(struct bmsg *msg, unsigned num)
 	env = g_array_index(msg->envelopes, struct bmsg_envelope *, num);
 
 	g_string_append_printf(buf, "BEGIN:BENV\r\n");
-	g_list_foreach(env->recipients, string_append_glist_vcard, buf);
+	g_list_foreach(env->recipients, string_append_glist, buf);
 
 	tmp = parse_envelope(msg, num + 1);
 	if (tmp == NULL) {
@@ -238,7 +251,7 @@ char *bmsg_text(struct bmsg *msg)
 	g_string_append_printf(buf, "TYPE:%s\r\n", msg->type);
 	g_string_append_printf(buf, "FOLDER:%s\r\n", msg->folder);
 
-	g_list_foreach(msg->originators, string_append_glist_vcard, buf);
+	g_list_foreach(msg->originators, string_append_glist, buf);
 
 	env = parse_envelope(msg, 0);
 	if (env == NULL) {
