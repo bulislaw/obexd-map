@@ -629,22 +629,37 @@ static gboolean filter_message(struct messages_message *message,
 	return TRUE;
 }
 
-static struct phonebook_contact *pull_message_contact(const char **reply)
+static struct phonebook_contact *pull_message_contact(const char **reply,
+								gboolean sent)
 {
 	struct phonebook_contact *contact;
 	struct phonebook_field *number;
 
 	contact = g_new0(struct phonebook_contact, 1);
 
-	contact->fullname = g_strdup(reply[MESSAGE_FROM_FN]);
-	contact->given = g_strdup(reply[MESSAGE_FROM_GIVEN]);
-	contact->family = g_strdup(reply[MESSAGE_FROM_FAMILY]);
-	contact->additional = g_strdup(reply[MESSAGE_FROM_ADDITIONAL]);
-	contact->prefix = g_strdup(reply[MESSAGE_FROM_PREFIX]);
-	contact->suffix = g_strdup(reply[MESSAGE_FROM_SUFFIX]);
+	if (!sent) {
+		contact->fullname = g_strdup(reply[MESSAGE_FROM_FN]);
+		contact->given = g_strdup(reply[MESSAGE_FROM_GIVEN]);
+		contact->family = g_strdup(reply[MESSAGE_FROM_FAMILY]);
+		contact->additional = g_strdup(reply[MESSAGE_FROM_ADDITIONAL]);
+		contact->prefix = g_strdup(reply[MESSAGE_FROM_PREFIX]);
+		contact->suffix = g_strdup(reply[MESSAGE_FROM_SUFFIX]);
+	} else {
+		contact->fullname = g_strdup(reply[MESSAGE_TO_FN]);
+		contact->given = g_strdup(reply[MESSAGE_TO_GIVEN]);
+		contact->family = g_strdup(reply[MESSAGE_TO_FAMILY]);
+		contact->additional = g_strdup(reply[MESSAGE_TO_ADDITIONAL]);
+		contact->prefix = g_strdup(reply[MESSAGE_TO_PREFIX]);
+		contact->suffix = g_strdup(reply[MESSAGE_TO_SUFFIX]);
+	}
 
 	number = g_new0(struct phonebook_field, 1);
-	number->text = g_strdup(reply[MESSAGE_FROM_PHONE]);
+
+	if (!sent)
+		number->text = g_strdup(reply[MESSAGE_FROM_PHONE]);
+	else
+		number->text = g_strdup(reply[MESSAGE_TO_PHONE]);
+
 	number->type = TEL_TYPE_NONE;
 	contact->numbers = g_slist_append(contact->numbers, number);
 
@@ -834,7 +849,7 @@ static void get_message_resp(const char **reply, void *s)
 	g_free(msg_data->handle);
 	msg_data->handle = handle;
 
-	contact = pull_message_contact(reply);
+	contact = pull_message_contact(reply, msg_data->sent);
 
 	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
 	if (stat != NULL && stat->read != STATUS_NOT_SET)
@@ -847,8 +862,14 @@ static void get_message_resp(const char **reply, void *s)
 	bmsg = g_new0(struct bmsg, 1);
 	bmsg_init(bmsg, BMSG_VERSION_1_0, status, BMSG_SMS, folder);
 
-	bmsg_add_originator(bmsg, contact);
+	if (!msg_data->sent)
+		bmsg_add_originator(bmsg, contact);
+
 	bmsg_add_envelope(bmsg);
+
+	if (msg_data->sent)
+		bmsg_add_recipient(bmsg, contact);
+
 	bmsg_add_content(bmsg, -1, NULL, SMS_DEFAULT_CHARSET, NULL,
 						reply[MESSAGE_CONTENT]);
 

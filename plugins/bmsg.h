@@ -80,6 +80,7 @@ void bmsg_init(struct bmsg *msg, const char *version, const char *status,
 					const char *type, const char *folder);
 void bmsg_destroy(struct bmsg *msg);
 void bmsg_add_originator(struct bmsg *msg, struct phonebook_contact *contact);
+void bmsg_add_recipient(struct bmsg *msg, struct phonebook_contact *contact);
 gboolean bmsg_add_envelope(struct bmsg *msg);
 gboolean bmsg_add_content(struct bmsg *msg, gint32 part_id, char *encoding,
 			char *charset, char *lang, const char* content);

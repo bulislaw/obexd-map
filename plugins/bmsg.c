@@ -22,13 +22,6 @@
 
 #include "bmsg.h"
 
-static void free_glist_contact(void *item, void *user_data)
-{
-	struct phonebook_contact *tmp = item;
-
-	phonebook_contact_free(tmp);
-}
-
 static void string_append_glist_vcard(void *list_item, void *list)
 {
 	GString *buf = list;
@@ -38,10 +31,8 @@ static void string_append_glist_vcard(void *list_item, void *list)
 
 static void envelope_destroy(struct bmsg_envelope *env)
 {
-	if (env->recipients) {
-		g_list_foreach(env->recipients, free_glist_contact, NULL);
+	if (env->recipients)
 		g_list_free(env->recipients);
-	}
 
 	if (env->content == NULL)
 		return;
@@ -116,6 +107,18 @@ gboolean bmsg_add_envelope(struct bmsg *msg)
 	g_array_append_val(msg->envelopes, tmp);
 
 	return TRUE;
+}
+
+void bmsg_add_recipient(struct bmsg *msg, struct phonebook_contact *contact)
+{
+	struct bmsg_envelope *top_env;
+
+	if (msg->envelopes->len == 0)
+		return;
+
+	top_env = g_array_index(msg->envelopes, struct bmsg_envelope *,
+						msg->envelopes->len - 1);
+	top_env->recipients = g_list_append(top_env->recipients, contact);
 }
 
 gboolean bmsg_add_content(struct bmsg *msg, gint32 part_id, char *encoding,
