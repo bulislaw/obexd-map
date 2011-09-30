@@ -67,9 +67,10 @@ int messages_qt_set_deleted(const char *handle, gboolean deleted)
 	if (ret < 0)
 		return ret;
 
-	/* XXX: If this actually makes whole glib main loop to iterate, things
-	 * may go wrong. Needs checking or just reimplementing API to do
-	 * SetMessageStatus asynchronously. */
+	uc.done = FALSE;
+	/* XXX: This actually makes whole glib main loop to iterate, things may
+	 * go wrong. Needs reimplementing API to do SetMessageStatus
+	 * asynchronously. */
 	while (!uc.done)
 		app->processEvents();
 
@@ -86,6 +87,7 @@ int messages_qt_set_read(const char *handle, gboolean read)
 	if (ret < 0)
 		return ret;
 
+	uc.done = FALSE;
 	while (!uc.done)
 		app->processEvents();
 
