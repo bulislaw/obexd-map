@@ -3,10 +3,6 @@
 #include <CommHistory/GroupModel>
 #include <CommHistory/EventModel>
 
-namespace CommHistory {
-	class Group;
-};
-
 typedef void (*MessagePusherCallback)(int ret, void *user_data);
 
 class MessagePusher : public QObject {
