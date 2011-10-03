@@ -249,6 +249,7 @@ struct msg_listing_request {
 	gboolean nth_call;
 	gboolean only_count;
 	struct messages_filter filter;
+	uint8_t subject_len;
 };
 
 struct folder_listing_request {
@@ -1068,13 +1069,12 @@ static void get_messages_listing_cb(void *session, int err,
 	g_string_append_escaped_printf(mas->buffer, " handle=\"%s\"",
 								entry->handle);
 
-	if (request->filter.parameter_mask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT) {
+	if (request->filter.parameter_mask & PMASK_SUBJECT &&
+			entry->mask & PMASK_SUBJECT) {
 		char *subject;
-		uint8_t limit = 255;
 
 		subject	= g_strdup(entry->subject);
-		aparams_read(mas->inparams, SUBJECTLENGTH_TAG, &limit);
-		trim_utf8(subject, limit);
+		trim_utf8(subject, request->subject_len);
 
 		g_string_append_escaped_printf(mas->buffer, " subject=\"%s\"",
 				subject);
@@ -1348,6 +1348,10 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 					&request->filter.parameter_mask);
 	if (request->filter.parameter_mask == 0)
 		request->filter.parameter_mask = 0xFFFF;
+
+	aparams_read(mas->inparams, SUBJECTLENGTH_TAG, &request->subject_len);
+	if (request->subject_len == 0)
+		request->subject_len = 255;
 
 	aparams_read(mas->inparams, STARTOFFSET_TAG, &offset);
 	aparams_read(mas->inparams, FILTERMESSAGETYPE_TAG,
