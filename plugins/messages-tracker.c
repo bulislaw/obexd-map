@@ -900,7 +900,6 @@ static void notify_new_sms(const char *handle)
 	data->old_folder = g_strdup("");
 	data->handle = fill_handle(handle);
 
-	next = mns_srv;
 	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
 		struct session *session = next->data;
 
