@@ -1729,7 +1729,7 @@ static void *any_open(const char *name, int oflag, mode_t mode,
 
 static ssize_t any_write(void *object, const void *buf, size_t count)
 {
-	DBG("");
+	DBG("ignored %zu byte(s)", count);
 
 	return count;
 }
