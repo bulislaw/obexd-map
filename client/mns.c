@@ -107,14 +107,14 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 	struct session_data *session = user_data;
 #endif
 
-	DBG("At the very beginning");
+	DBG("");
 
-	if (mns->msg)
+	if (mns->msg) {
+		DBG("Another transfer in progress!");
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InProgress",
 				"Transfer in progress");
-
-	DBG("2");
+	}
 
 	buf = g_string_new("");
 
@@ -125,14 +125,15 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 			DBUS_TYPE_STRING, &folder,
 			DBUS_TYPE_STRING, &old_folder,
 			DBUS_TYPE_BYTE, &msgtype,
-			DBUS_TYPE_INVALID) == FALSE)
+			DBUS_TYPE_INVALID) == FALSE) {
+		DBG("Invalid arguments!");
 		return g_dbus_create_error(message,
 				ERROR_INF ".InvalidArguments", NULL);
+	}
 
 	eapp.tag = MASINSTANCEID_TAG;
 	eapp.len = 1;
 	eapp.masinstanceid = masinstanceid;
-	DBG("3");
 
 	g_string_append(buf, "<MAP-event-report version=\"1.0\">\n");
 
@@ -165,13 +166,13 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 		g_string_append(buf, "<event type=\"MessageShift\"");
 		break;
 	default:
+		DBG("Incorrect type of event!");
 		g_string_free(buf, TRUE);
 		return g_dbus_create_error(message,
 				ERROR_INF ".InvalidArguments",
 				"Incorrect event type");
 	}
 
-	DBG("4");
 	/* FIXME: escape disallowed characters */
 	if ((evtype != MET_MEMORY_FULL) && (evtype != MET_MEMORY_AVAILABLE)) {
 		g_string_append_printf(buf, " handle=\"%s\"", handle);
@@ -195,11 +196,13 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 		}
 	}
 
-	DBG("5");
 	if (evtype == MET_MESSAGE_SHIFT)
 		g_string_append_printf(buf, " old_folder=\"%s\"", old_folder);
 
 	g_string_append(buf, "/>\n</MAP-event-report>");
+
+	DBG("Object to be sent:");
+	DBG("%s", buf->str);
 
 	cbuf = buf->str;
 
@@ -221,13 +224,14 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 	/* XXX: session_put makes a copy of eapp, cbuf will be freed after use
 	 */
 
-	DBG("6");
 	if (obc_session_put(mns->session, "x-bt/MAP-event-report", NULL, NULL,
 				(const guint8 *)&eapp, sizeof(eapp),
-				mns_send_event_callback, cbuf, mns) < 0)
+				mns_send_event_callback, cbuf, mns) < 0) {
+		DBG("obc_session_put() failed!");
 		return g_dbus_create_error(message,
 				ERROR_INF ".Failed",
 				"Fail me more.");
+	}
 
 	mns->msg = dbus_message_ref(message);
 
