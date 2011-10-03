@@ -944,6 +944,8 @@ static int mas_get(struct obex_session *os, obex_object_t *obj, void *user_data)
 	DBG("GET: name %s type %s mas %p",
 			name, type, mas);
 
+	mas->buffer = g_string_new("");
+
 	if (type == NULL)
 		return -EBADR;
 
@@ -966,6 +968,8 @@ static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	int ret;
 
 	DBG("PUT: name %s type %s mas %p", name, type, mas);
+
+	mas->buffer = g_string_new("");
 
 	if (type == NULL)
 		return -EBADR;
@@ -1288,8 +1292,6 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 
 	DBG("name = %s", name);
 
-	mas->buffer = NULL;
-
 	request = g_new0(struct folder_listing_request, 1);
 	mas->request = request;
 	mas->request_free = g_free;
@@ -1301,8 +1303,6 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 
 	*err = messages_get_folder_listing(mas->backend_data, name, max, offset,
 			get_folder_listing_cb, mas);
-
-	mas->buffer = g_string_new("");
 
 	if (*err < 0)
 		return NULL;
@@ -1341,8 +1341,6 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 	mas->request = request;
 	mas->request_free = msg_listing_free;
 
-	mas->buffer = NULL;
-
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
 	request->only_count = max > 0 ? FALSE : TRUE;
 
@@ -1370,8 +1368,6 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 	*err = messages_get_messages_listing(mas->backend_data, name, max,
 			offset, &request->filter,
 			get_messages_listing_cb, mas);
-
-	mas->buffer = g_string_new("");
 
 	if (*err < 0)
 		return NULL;
@@ -1456,8 +1452,6 @@ static void message_get(struct mas_session *mas, const char *name, int *err)
 
 	*err = messages_get_message(mas->backend_data, name, 0,
 			get_message_cb, mas);
-
-	mas->buffer = g_string_new("");
 }
 
 static void *message_open(const char *name, int oflag, mode_t mode,
