@@ -221,7 +221,6 @@ struct mas_session {
 	void *backend_data;
 	gboolean ap_sent;
 	gboolean finished;
-	gboolean nth_call;
 	GString *buffer;
 	GHashTable *inparams;
 	GHashTable *outparams;
@@ -875,7 +874,6 @@ static void mas_reset(struct obex_session *os, void *user_data)
 	aparams_free(mas->outparams);
 	mas->outparams = NULL;
 	mas->ap_sent = FALSE;
-	mas->nth_call = FALSE;
 	mas->finished = FALSE;
 	mas->request_free = NULL;
 	mas->request = NULL;
