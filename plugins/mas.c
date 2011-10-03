@@ -1213,7 +1213,7 @@ static void get_folder_listing_cb(void *session, int err, uint16_t size,
 	}
 
 	if (request->only_count) {
-		if (!err != -EAGAIN)
+		if (err != -EAGAIN)
 			aparams_write(mas->outparams, FOLDERLISTINGSIZE_TAG,
 					&size);
 		if (!name)
