@@ -1060,8 +1060,7 @@ void messages_disconnect(void *s)
 
 	messages_set_notification_registration(session, NULL, NULL);
 
-	if (session->msg_stat)
-		g_hash_table_destroy(session->msg_stat);
+	g_hash_table_destroy(session->msg_stat);
 	g_free(session->cwd);
 	g_free(session);
 }
