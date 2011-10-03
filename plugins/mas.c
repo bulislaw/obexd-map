@@ -223,7 +223,6 @@ struct mas_session {
 	gboolean finished;
 	gboolean nth_call;
 	GString *buffer;
-	GString *apbuf;
 	GHashTable *inparams;
 	GHashTable *outparams;
 	DBusConnection *dbus;
@@ -856,10 +855,6 @@ static void mas_reset(struct obex_session *os, void *user_data)
 		g_string_free(mas->buffer, TRUE);
 		mas->buffer = NULL;
 	}
-	if (mas->apbuf) {
-		g_string_free(mas->apbuf, TRUE);
-		mas->apbuf = NULL;
-	}
 
 	if (mas->request_free != NULL)
 		mas->request_free(mas->request);
@@ -1292,7 +1287,6 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 
 	DBG("name = %s", name);
 
-	mas->apbuf = NULL;
 	mas->buffer = NULL;
 
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
@@ -1324,7 +1318,6 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 
-	mas->apbuf = NULL;
 	mas->buffer = NULL;
 
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
@@ -1702,20 +1695,36 @@ static ssize_t any_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi)
 {
 	struct mas_session *mas = object;
+	GString *buffer;
+	ssize_t ret;
 
 	DBG("");
 
 	if (mas->buffer->len == 0 && !mas->finished)
 		return -EAGAIN;
 
+	if (mas->ap_sent)
+		return 0;
+
 	*hi = OBEX_HDR_APPARAM;
 
-	if (!mas->ap_sent) {
+	buffer = revparse_aparam(mas->outparams);
+	if (buffer == NULL) {
 		mas->ap_sent = TRUE;
-		mas->apbuf = revparse_aparam(mas->outparams);
+		return 0;
 	}
 
-	return string_read(mas->apbuf, buf, mtu);
+	ret = string_read(buffer, buf, mtu);
+	if (buffer->len > 0) {
+		DBG("Application parameters header won't fit in MTU, "
+							"aborting request!");
+		ret = -EIO;
+	}
+
+	g_string_free(buffer, TRUE);
+	mas->ap_sent = TRUE;
+
+	return ret;
 }
 
 static ssize_t any_read(void *obj, void *buf, size_t count)
