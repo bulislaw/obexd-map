@@ -1071,6 +1071,9 @@ int messages_set_notification_registration(void *s, messages_event_cb cb,
 	struct session *session = s;
 
 	if (cb != NULL) {
+		if (g_slist_find(mns_srv, session) != NULL)
+			return 0;
+
 		if (g_slist_length(mns_srv) == 0)
 			event_watch_id = g_dbus_add_signal_watch(
 							session_connection,
