@@ -252,6 +252,11 @@ struct msg_listing_request {
 	struct messages_filter filter;
 };
 
+struct folder_listing_request {
+	gboolean nth_call;
+	gboolean only_count;
+};
+
 struct message_put_request {
 	GString *buf;		/* FIXME: use mas_session.buffer instead */
 	const char *name;
@@ -1200,16 +1205,14 @@ static void get_folder_listing_cb(void *session, int err, uint16_t size,
 					const char *name, void *user_data)
 {
 	struct mas_session *mas = user_data;
-	uint16_t max = 1024;
+	struct folder_listing_request *request = mas->request;
 
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
 		return;
 	}
 
-	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
-
-	if (max == 0) {
+	if (request->only_count) {
 		if (!err != -EAGAIN)
 			aparams_write(mas->outparams, FOLDERLISTINGSIZE_TAG,
 					&size);
@@ -1218,7 +1221,7 @@ static void get_folder_listing_cb(void *session, int err, uint16_t size,
 		goto proceed;
 	}
 
-	if (!mas->nth_call) {
+	if (!request->nth_call) {
 		g_string_append(mas->buffer, XML_DECL);
 		g_string_append(mas->buffer, FL_DTD);
 		if (!name) {
@@ -1227,7 +1230,7 @@ static void get_folder_listing_cb(void *session, int err, uint16_t size,
 			goto proceed;
 		}
 		g_string_append(mas->buffer, FL_BODY_BEGIN);
-		mas->nth_call = TRUE;
+		request->nth_call = TRUE;
 	}
 
 	if (!name) {
@@ -1275,6 +1278,7 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 				void *driver_data, size_t *size, int *err)
 {
 	struct mas_session *mas = driver_data;
+	struct folder_listing_request *request;
 	/* 1024 is the default when there was no MaxListCount sent */
 	uint16_t max = 1024;
 	uint16_t offset = 0;
@@ -1288,7 +1292,13 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 
 	mas->buffer = NULL;
 
+	request = g_new0(struct folder_listing_request, 1);
+	mas->request = request;
+	mas->request_free = g_free;
+
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
+	request->only_count = max > 0 ? FALSE : TRUE;
+
 	aparams_read(mas->inparams, STARTOFFSET_TAG, &offset);
 
 	*err = messages_get_folder_listing(mas->backend_data, name, max, offset,
