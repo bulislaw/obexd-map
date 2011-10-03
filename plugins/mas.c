@@ -846,8 +846,12 @@ static int get_params(struct obex_session *os, obex_object_t *obj,
 	return 0;
 }
 
-static void reset_request(struct mas_session *mas)
+static void mas_reset(struct obex_session *os, void *user_data)
 {
+	struct mas_session *mas = user_data;
+
+	DBG("");
+
 	if (mas->buffer) {
 		g_string_free(mas->buffer, TRUE);
 		mas->buffer = NULL;
@@ -873,7 +877,6 @@ static void reset_request(struct mas_session *mas)
 
 static void mas_clean(struct mas_session *mas)
 {
-	reset_request(mas);
 	g_free(mas->remote_addr);
 	g_free(mas);
 }
@@ -942,18 +945,13 @@ static int mas_get(struct obex_session *os, obex_object_t *obj, void *user_data)
 
 	ret = get_params(os, obj, mas);
 	if (ret < 0)
-		goto failed;
+		return ret;
 
 	ret = obex_get_stream_start(os, name);
 	if (ret < 0)
-		goto failed;
+		return ret;
 
 	return 0;
-
-failed:
-	reset_request(mas);
-
-	return ret;
 }
 
 static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
@@ -970,21 +968,15 @@ static int mas_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 
 	ret = get_params(os, obj, mas);
 	if (ret < 0)
-		goto failed;
+		return ret;
 
 	mas->obex_obj = obj;
 
 	ret = obex_put_stream_start(os, name);
 	if (ret < 0)
-		goto failed;
-
+		return ret;
 
 	return 0;
-
-failed:
-	reset_request(mas);
-
-	return ret;
 }
 
 /* FIXME: Preserve whitespaces */
@@ -1648,7 +1640,6 @@ static int notification_registration_close(void *obj)
 	}
 
 	g_free(nr);
-	reset_request(mas);
 
 	return 0;
 }
@@ -1751,8 +1742,6 @@ static int any_close(void *obj)
 	if (!mas->finished)
 		messages_abort(mas->backend_data);
 
-	reset_request(mas);
-
 	return 0;
 }
 
@@ -1768,6 +1757,7 @@ static struct obex_service_driver mas = {
 	.put = mas_put,
 	.setpath = mas_setpath,
 	.disconnect = mas_disconnect,
+	.reset = mas_reset,
 };
 
 static struct obex_mime_type_driver mime_map = {
