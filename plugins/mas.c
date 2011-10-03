@@ -257,6 +257,10 @@ struct folder_listing_request {
 	gboolean only_count;
 };
 
+struct get_message_request {
+	unsigned long flags;
+};
+
 struct message_put_request {
 	GString *buf;		/* FIXME: use mas_session.buffer instead */
 	const char *name;
@@ -1175,6 +1179,7 @@ static void get_message_cb(void *session, int err, gboolean fmore,
 	const char *chunk, void *user_data)
 {
 	struct mas_session *mas = user_data;
+	struct get_message_request *request = mas->request;
 	uint8_t fmore_byte;
 
 	DBG("");
@@ -1187,7 +1192,7 @@ static void get_message_cb(void *session, int err, gboolean fmore,
 	if (!chunk) {
 		mas->finished = TRUE;
 
-		if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, NULL)) {
+		if (request->flags & MESSAGES_FRACTION) {
 			fmore_byte = fmore ? 1 : 0;
 			aparams_write(mas->outparams, FRACTIONDELIVER_TAG,
 									&fmore);
@@ -1438,21 +1443,25 @@ static void message_put(struct mas_session *mas, const char *name, int *err)
 
 static void message_get(struct mas_session *mas, const char *name, int *err)
 {
-	unsigned long flags;
+	struct get_message_request *request;
 	uint8_t freq;
 	uint8_t charset = 0;
 
 	DBG("");
 
+	request = g_new0(struct get_message_request, 1);
+	mas->request = request;
+	mas->request_free = g_free;
+
 	if (aparams_read(mas->inparams, FRACTIONREQUEST_TAG, &freq)) {
-		flags |= MESSAGES_FRACTION;
+		request->flags |= MESSAGES_FRACTION;
 		if (freq & 0x01)
-			flags |= MESSAGES_NEXT;
+			request->flags |= MESSAGES_NEXT;
 	}
 
 	aparams_read(mas->inparams, CHARSET_TAG, &charset);
 	if (charset & 0x01)
-		flags |= MESSAGES_UTF8;
+		request->flags |= MESSAGES_UTF8;
 
 	*err = messages_get_message(mas->backend_data, name, 0,
 			get_message_cb, mas);
