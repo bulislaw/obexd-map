@@ -1463,7 +1463,7 @@ static void message_get(struct mas_session *mas, const char *name, int *err)
 	if (charset & 0x01)
 		request->flags |= MESSAGES_UTF8;
 
-	*err = messages_get_message(mas->backend_data, name, 0,
+	*err = messages_get_message(mas->backend_data, name, request->flags,
 			get_message_cb, mas);
 }
 
