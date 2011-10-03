@@ -246,6 +246,12 @@ struct notification_registration {
 	uint8_t status;
 };
 
+struct msg_listing_request {
+	gboolean nth_call;
+	gboolean only_count;
+	struct messages_filter filter;
+};
+
 struct message_put_request {
 	GString *buf;		/* FIXME: use mas_session.buffer instead */
 	const char *name;
@@ -1017,28 +1023,25 @@ static void get_messages_listing_cb(void *session, int err,
 		void *user_data)
 {
 	struct mas_session *mas = user_data;
-	uint32_t parametermask = 0xFFFF;
-	uint16_t max = 1024;
+	struct msg_listing_request *request = mas->request;
 	uint8_t newmsg_byte;
 	char timebuf[21];
 	char *timestr = timebuf;
 	time_t t;
-
-	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
 
 	if (err < 0 && err != -EAGAIN) {
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
 		return;
 	}
 
-	if (!mas->nth_call) {
-		if (max)
+	if (!request->nth_call) {
+		if (!request->only_count)
 			g_string_append(mas->buffer, ML_BODY_BEGIN);
-		mas->nth_call = TRUE;
+		request->nth_call = TRUE;
 	}
 
 	if (!entry) {
-		if (max)
+		if (!request->only_count)
 			g_string_append(mas->buffer, ML_BODY_END);
 		mas->finished = TRUE;
 
@@ -1053,16 +1056,12 @@ static void get_messages_listing_cb(void *session, int err,
 		goto proceed;
 	}
 
-	aparams_read(mas->inparams, PARAMETERMASK_TAG, &parametermask);
-	if (parametermask == 0)
-		parametermask = 0xFFFF;
-
 	g_string_append(mas->buffer, "<msg");
 
 	g_string_append_escaped_printf(mas->buffer, " handle=\"%s\"",
 								entry->handle);
 
-	if (parametermask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT) {
+	if (request->filter.parameter_mask & PMASK_SUBJECT && entry->mask & PMASK_SUBJECT) {
 		char *subject;
 		uint8_t limit = 255;
 
@@ -1076,84 +1075,84 @@ static void get_messages_listing_cb(void *session, int err,
 		g_free(subject);
 	}
 
-	if (parametermask & PMASK_DATETIME &&
+	if (request->filter.parameter_mask & PMASK_DATETIME &&
 			entry->mask & PMASK_DATETIME)
 		g_string_append_escaped_printf(mas->buffer, " datetime=\"%s\"",
 				entry->datetime);
 
-	if (parametermask & PMASK_SENDER_NAME &&
+	if (request->filter.parameter_mask & PMASK_SENDER_NAME &&
 			entry->mask & PMASK_SENDER_NAME)
 		g_string_append_escaped_printf(mas->buffer,
 						" sender_name=\"%s\"",
 						entry->sender_name);
 
-	if (parametermask & PMASK_SENDER_ADDRESSING &&
+	if (request->filter.parameter_mask & PMASK_SENDER_ADDRESSING &&
 			entry->mask & PMASK_SENDER_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" sender_addressing=\"%s\"",
 						entry->sender_addressing);
 
-	if (parametermask & PMASK_REPLYTO_ADDRESSING &&
+	if (request->filter.parameter_mask & PMASK_REPLYTO_ADDRESSING &&
 			entry->mask & PMASK_REPLYTO_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" replyto_addressing=\"%s\"",
 						entry->replyto_addressing);
 
-	if (parametermask & PMASK_RECIPIENT_NAME &&
+	if (request->filter.parameter_mask & PMASK_RECIPIENT_NAME &&
 			entry->mask & PMASK_RECIPIENT_NAME)
 		g_string_append_escaped_printf(mas->buffer,
 						" recipient_name=\"%s\"",
 						entry->recipient_name);
 
-	if (parametermask & PMASK_RECIPIENT_ADDRESSING &&
+	if (request->filter.parameter_mask & PMASK_RECIPIENT_ADDRESSING &&
 			entry->mask & PMASK_RECIPIENT_ADDRESSING)
 		g_string_append_escaped_printf(mas->buffer,
 						" recipient_addressing=\"%s\"",
 						entry->recipient_addressing);
 
-	if (parametermask & PMASK_TYPE &&
+	if (request->filter.parameter_mask & PMASK_TYPE &&
 			entry->mask & PMASK_TYPE)
 		g_string_append_escaped_printf(mas->buffer, " type=\"%s\"",
 				entry->type);
 
-	if (parametermask & PMASK_RECEPTION_STATUS &&
+	if (request->filter.parameter_mask & PMASK_RECEPTION_STATUS &&
 			entry->mask & PMASK_RECEPTION_STATUS)
 		g_string_append_escaped_printf(mas->buffer,
 						" reception_status=\"%s\"",
 						entry->reception_status);
 
-	if (parametermask & PMASK_SIZE &&
+	if (request->filter.parameter_mask & PMASK_SIZE &&
 			entry->mask & PMASK_SIZE)
 		g_string_append_escaped_printf(mas->buffer, " size=\"%s\"",
 				entry->size);
 
-	if (parametermask & PMASK_ATTACHMENT_SIZE &&
+	if (request->filter.parameter_mask & PMASK_ATTACHMENT_SIZE &&
 			entry->mask & PMASK_ATTACHMENT_SIZE)
 		g_string_append_escaped_printf(mas->buffer,
 						" attachment_size=\"%s\"",
 						entry->attachment_size);
 
-	if (parametermask & PMASK_TEXT &&
+	if (request->filter.parameter_mask & PMASK_TEXT &&
 			entry->mask & PMASK_TEXT)
 		g_string_append_escaped_printf(mas->buffer, " text=\"%s\"",
 				yesorno(entry->text));
 
-	if (parametermask & PMASK_READ &&
+	if (request->filter.parameter_mask & PMASK_READ &&
 			entry->mask & PMASK_READ)
 		g_string_append_escaped_printf(mas->buffer, " read=\"%s\"",
 				yesorno(entry->read));
 
-	if (parametermask & PMASK_SENT &&
+	if (request->filter.parameter_mask & PMASK_SENT &&
 			entry->mask & PMASK_SENT)
 		g_string_append_escaped_printf(mas->buffer, " sent=\"%s\"",
 				yesorno(entry->sent));
 
-	if (parametermask & PMASK_PROTECTED &&
+	if (request->filter.parameter_mask & PMASK_PROTECTED &&
 			entry->mask & PMASK_PROTECTED)
 		g_string_append_escaped_printf(mas->buffer, " protected=\"%s\"",
 				yesorno(entry->protect));
 
-	if (parametermask & PMASK_PRIORITY &&
+	if (request->filter.parameter_mask & PMASK_PRIORITY &&
 			entry->mask & PMASK_PRIORITY)
 		g_string_append_escaped_printf(mas->buffer, " priority=\"%s\"",
 				yesorno(entry->priority));
@@ -1303,11 +1302,23 @@ static void *folder_listing_open(const char *name, int oflag, mode_t mode,
 		return mas;
 }
 
+static void msg_listing_free(gpointer data)
+{
+	struct msg_listing_request *request = data;
+
+	g_free(request->filter.period_begin);
+	g_free(request->filter.period_end);
+	g_free(request->filter.recipient);
+	g_free(request->filter.originator);
+
+	g_free(request);
+}
+
 static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 				void *driver_data, size_t *size, int *err)
 {
 	struct mas_session *mas = driver_data;
-	struct messages_filter filter = { 0, };
+	struct msg_listing_request *request;
 	uint16_t max = 1024;
 	uint16_t offset = 0;
 
@@ -1318,21 +1329,38 @@ static void *msg_listing_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 
+	request = g_new0(struct msg_listing_request, 1);
+	mas->request = request;
+	mas->request_free = msg_listing_free;
+
 	mas->buffer = NULL;
 
 	aparams_read(mas->inparams, MAXLISTCOUNT_TAG, &max);
+	request->only_count = max > 0 ? FALSE : TRUE;
+
+	aparams_read(mas->inparams, PARAMETERMASK_TAG,
+					&request->filter.parameter_mask);
+	if (request->filter.parameter_mask == 0)
+		request->filter.parameter_mask = 0xFFFF;
+
 	aparams_read(mas->inparams, STARTOFFSET_TAG, &offset);
-	aparams_read(mas->inparams, PARAMETERMASK_TAG, &filter.parameter_mask);
-	aparams_read(mas->inparams, FILTERMESSAGETYPE_TAG, &filter.type);
-	aparams_read(mas->inparams, FILTERPERIODBEGIN_TAG, &filter.period_begin);
-	aparams_read(mas->inparams, FILTERPERIODEND_TAG, &filter.period_end);
-	aparams_read(mas->inparams, FILTERREADSTATUS_TAG, &filter.read_status);
-	aparams_read(mas->inparams, FILTERRECIPIENT_TAG, &filter.recipient);
-	aparams_read(mas->inparams, FILTERORIGINATOR_TAG, &filter.originator);
-	aparams_read(mas->inparams, FILTERPRIORITY_TAG, &filter.priority);
+	aparams_read(mas->inparams, FILTERMESSAGETYPE_TAG,
+					&request->filter.type);
+	aparams_read(mas->inparams, FILTERPERIODBEGIN_TAG,
+					&request->filter.period_begin);
+	aparams_read(mas->inparams, FILTERPERIODEND_TAG,
+					&request->filter.period_end);
+	aparams_read(mas->inparams, FILTERREADSTATUS_TAG,
+					&request->filter.read_status);
+	aparams_read(mas->inparams, FILTERRECIPIENT_TAG,
+					&request->filter.recipient);
+	aparams_read(mas->inparams, FILTERORIGINATOR_TAG,
+					&request->filter.originator);
+	aparams_read(mas->inparams, FILTERPRIORITY_TAG,
+					&request->filter.priority);
 
 	*err = messages_get_messages_listing(mas->backend_data, name, max,
-			offset, &filter,
+			offset, &request->filter,
 			get_messages_listing_cb, mas);
 
 	mas->buffer = g_string_new("");
