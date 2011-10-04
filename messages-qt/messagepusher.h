@@ -13,6 +13,7 @@ public:
 					const char *folder,
 					MessagePusherCallback callback = NULL,
 					void *user_data = NULL);
+	void abort();
 
 private:
 	MessagePusherCallback callback;
@@ -27,9 +28,10 @@ private:
 	QString remoteUid;
 	QString messageBody;
 	CommHistory::Event::EventDirection direction;
+	bool aborted;
 
 	MessagePusher();
-	void abort(int err);
+	void reportError(int err);
 
 private slots:
 	void eventsCommitted(const QList<CommHistory::Event> &ids, bool success);

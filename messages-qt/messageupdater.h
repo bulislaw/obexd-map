@@ -13,6 +13,7 @@ public:
 	static int setDeleted(const char *handle, bool deleted,
 					MessageUpdaterCallback callback = NULL,
 					void *user_data = NULL);
+	void abort();
 private:
 	MessageUpdaterCallback callback;
 	void *user_data;
@@ -21,9 +22,10 @@ private:
 
 	void (MessageUpdater::*action)();
 	bool value;
+	bool aborted;
 
 	MessageUpdater();
-	void abort(int err);
+	void reportError(int err);
 	int getEvent(const char *handle);
 	void doSetIsRead();
 	void doSetDeleted();

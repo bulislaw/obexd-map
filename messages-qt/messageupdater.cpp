@@ -6,7 +6,8 @@ extern "C" {
 }
 
 MessageUpdater::MessageUpdater() :
-		callback(NULL)
+		callback(NULL),
+		aborted(false)
 {
 	QObject::connect(&singleEventModel,
 			SIGNAL(modelReady(bool)),
@@ -22,7 +23,13 @@ MessageUpdater::MessageUpdater() :
 					bool)));
 }
 
-void MessageUpdater::abort(int err)
+void MessageUpdater::abort()
+{
+	callback = NULL;
+	aborted = true;
+}
+
+void MessageUpdater::reportError(int err)
 {
 	if (callback)
 		callback(err, user_data);
@@ -37,7 +44,7 @@ void MessageUpdater::eventsCommitted(const QList<CommHistory::Event> &,
 
 	if (!success) {
 		DBG("Unsuccessful event commit!");
-		abort(-EIO);
+		reportError(-EIO);
 
 		return;
 	}
@@ -52,16 +59,21 @@ void MessageUpdater::modelReady(bool success)
 {
 	DBG("");
 
+	if (aborted) {
+		DBG("Updating has been aborted.");
+		return;
+	}
+
 	if (!success) {
 		DBG("Event retrieval failed!");
-		abort(-EIO);
+		reportError(-EIO);
 
 		return;
 	}
 
 	if (singleEventModel.rowCount() == 0) {
 		DBG("Event not found!");
-		abort(-ENOENT);
+		reportError(-ENOENT);
 
 		return;
 	}
@@ -78,7 +90,7 @@ void MessageUpdater::doSetIsRead()
 
 	if (!singleEventModel.modifyEvent(event)) {
 		DBG("SingleEventModel::modifyEvent() failed!");
-		abort(-EIO);
+		reportError(-EIO);
 	}
 }
 
@@ -91,7 +103,7 @@ void MessageUpdater::doSetDeleted()
 
 	if (!singleEventModel.modifyEvent(event)) {
 		DBG("SingleEventModel::modifyEvent() failed!");
-		abort(-EIO);
+		reportError(-EIO);
 	}
 }
 

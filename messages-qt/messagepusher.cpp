@@ -15,7 +15,8 @@ extern "C" {
 
 
 MessagePusher::MessagePusher() :
-		callback(NULL)
+		callback(NULL),
+		aborted(false)
 {
 	QObject::connect(&groupModel,
 			SIGNAL(modelReady(bool)),
@@ -35,7 +36,13 @@ MessagePusher::MessagePusher() :
 					bool)));
 }
 
-void MessagePusher::abort(int err)
+void MessagePusher::abort()
+{
+	callback = NULL;
+	aborted = true;
+}
+
+void MessagePusher::reportError(int err)
 {
 	if (callback)
 		callback(err, user_data);
@@ -50,7 +57,7 @@ void MessagePusher::eventsCommitted(const QList<CommHistory::Event> &,
 
 	if (!success) {
 		DBG("Unsuccessful event commit!");
-		abort(-EIO);
+		reportError(-EIO);
 
 		return;
 	}
@@ -65,9 +72,13 @@ void MessagePusher::groupsCommitted(const QList<int> &, bool success)
 {
 	DBG("");
 
+	if (aborted)
+		DBG("Abort has been requested, but at this point "
+							"I'd rather proceed.");
+
 	if (!success) {
 		DBG("Unsuccessful group commit!");
-		abort(-EIO);
+		reportError(-EIO);
 
 		return;
 	}
@@ -87,7 +98,7 @@ void MessagePusher::groupsCommitted(const QList<int> &, bool success)
 
 	if (!eventModel.addEvent(event)) {
 		DBG("EventModel::addEvent failed!");
-		abort(-EIO);
+		reportError(-EIO);
 	}
 
 	eventId = event.id();
@@ -97,9 +108,14 @@ void MessagePusher::modelReady(bool success)
 {
 	DBG("");
 
+	if (aborted) {
+		DBG("Pushing has been aborted.");
+		return;
+	}
+
 	if (!success) {
 		DBG("Groups retrieval failed!");
-		abort(-EIO);
+		reportError(-EIO);
 
 		return;
 	}
@@ -127,7 +143,7 @@ void MessagePusher::modelReady(bool success)
 
 	if (!groupModel.addGroup(group)) {
 		DBG("GroupModel::addGroup() failed!");
-		abort(-EIO);
+		reportError(-EIO);
 	}
 
 	groupId = group.id();
