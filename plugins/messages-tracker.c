@@ -1700,15 +1700,6 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	path = g_build_filename(session->cwd, name, NULL);
 	DBG("Push destination: %s", path);
 
-	/*
-	if (g_strcmp0(path, "/telecom/msg/outbox") != 0) {
-		g_free(path);
-		return -EACCES;
-	}
-
-	g_free(path);
-	*/
-
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
 		return -EINVAL;
