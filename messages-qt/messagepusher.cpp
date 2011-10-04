@@ -112,6 +112,8 @@ void MessagePusher::modelReady(bool success)
 
 	if (aborted) {
 		DBG("Pushing has been aborted.");
+		this->deleteLater();
+
 		return;
 	}
 
