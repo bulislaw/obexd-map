@@ -1659,7 +1659,7 @@ failed:
 	return -ENOMEM;
 }
 
-static void tout(int id, void *s)
+static void insert_message_cb(int id, void *s)
 {
 	struct session *session = s;
 	struct push_message_request *request = session->request_data;
@@ -1680,10 +1680,16 @@ static int store_sms(struct session *session, const char *recipient,
 					const char *body)
 {
 	struct push_message_request *request = session->request_data;
+	int ret;
 
 	DBG("");
 
-	messages_qt_insert_message(recipient, body, request->name, tout, session);
+	ret = messages_qt_insert_message(recipient, body, request->name,
+						insert_message_cb, session);
+	if (ret < 0) {
+		push_message_abort(session);
+		return ret;
+	}
 
 	return 0;
 }
