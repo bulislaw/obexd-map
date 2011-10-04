@@ -38,6 +38,8 @@ MessagePusher::MessagePusher() :
 
 void MessagePusher::abort()
 {
+	DBG("%p", this);
+
 	callback = NULL;
 	aborted = true;
 }
@@ -53,7 +55,7 @@ void MessagePusher::reportError(int err)
 void MessagePusher::eventsCommitted(const QList<CommHistory::Event> &,
 								bool success)
 {
-	DBG("");
+	DBG("%p", this);
 
 	if (!success) {
 		DBG("Unsuccessful event commit!");
@@ -70,7 +72,7 @@ void MessagePusher::eventsCommitted(const QList<CommHistory::Event> &,
 
 void MessagePusher::groupsCommitted(const QList<int> &, bool success)
 {
-	DBG("");
+	DBG("%p", this);
 
 	if (aborted)
 		DBG("Abort has been requested, but at this point "
@@ -106,7 +108,7 @@ void MessagePusher::groupsCommitted(const QList<int> &, bool success)
 
 void MessagePusher::modelReady(bool success)
 {
-	DBG("");
+	DBG("%p", this);
 
 	if (aborted) {
 		DBG("Pushing has been aborted.");
@@ -155,6 +157,9 @@ int MessagePusher::push(const char *remote, const char *body,
 					MessagePusherCallback callback,
 					void *user_data)
 {
+	DBG("remote = \"%s\", body = \"%s\", folder = \"%s\"",
+							remote, body, folder);
+
 	CommHistory::Event::EventDirection direction;
 	QString destFolder(folder);
 
@@ -168,6 +173,7 @@ int MessagePusher::push(const char *remote, const char *body,
 	}
 
 	MessagePusher *messagePusher = new MessagePusher();
+	DBG("this = %p", messagePusher);
 
 	messagePusher->callback = callback;
 	messagePusher->user_data = user_data;

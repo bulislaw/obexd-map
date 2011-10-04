@@ -40,7 +40,7 @@ void MessageUpdater::reportError(int err)
 void MessageUpdater::eventsCommitted(const QList<CommHistory::Event> &,
 								bool success)
 {
-	DBG("");
+	DBG("%p", this);
 
 	if (!success) {
 		DBG("Unsuccessful event commit!");
@@ -57,7 +57,7 @@ void MessageUpdater::eventsCommitted(const QList<CommHistory::Event> &,
 
 void MessageUpdater::modelReady(bool success)
 {
-	DBG("");
+	DBG("%p", this);
 
 	if (aborted) {
 		DBG("Updating has been aborted.");
@@ -126,6 +126,8 @@ int MessageUpdater::setIsRead(const char *handle, bool isRead,
 			MessageUpdaterCallback callback, void *user_data)
 {
 	MessageUpdater *messageUpdater = new MessageUpdater();
+	DBG("this = %p, handle = %s, isRead = %d", messageUpdater, handle,
+									isRead);
 
 	messageUpdater->value = isRead;
 	messageUpdater->callback = callback;
@@ -147,6 +149,8 @@ int MessageUpdater::setDeleted(const char *handle, bool deleted,
 			MessageUpdaterCallback callback, void *user_data)
 {
 	MessageUpdater *messageUpdater = new MessageUpdater();
+	DBG("this = %p, handle = %s, deleted = %d", messageUpdater,
+							handle, deleted);
 
 	messageUpdater->value = deleted;
 	messageUpdater->callback = callback;
