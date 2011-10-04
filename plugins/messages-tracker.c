@@ -595,9 +595,11 @@ static gboolean filter_message(struct messages_message *message,
 		char *orig = g_strdup_printf("*%s*", filter->originator);
 
 		if (g_pattern_match_simple(orig,
-					message->sender_addressing) == FALSE &&
+					message->sender_addressing != NULL ?
+					message->sender_addressing : "") == FALSE &&
 				g_pattern_match_simple(orig,
-					message->sender_name) == FALSE) {
+					message->sender_name != NULL ?
+					message->sender_name : "") == FALSE) {
 			g_free(orig);
 			return FALSE;
 		}
@@ -608,9 +610,12 @@ static gboolean filter_message(struct messages_message *message,
 		char *recip = g_strdup_printf("*%s*", filter->recipient);
 
 		if (g_pattern_match_simple(recip,
-					message->recipient_addressing) == FALSE
-				&& g_pattern_match_simple(recip,
-					message->recipient_name) == FALSE) {
+					message->recipient_addressing != NULL ?
+					message->recipient_addressing : "") ==
+					FALSE &&
+				g_pattern_match_simple(recip,
+					message->recipient_name != NULL ?
+					message->recipient_name : "") == FALSE) {
 			g_free(recip);
 			return FALSE;
 		}
