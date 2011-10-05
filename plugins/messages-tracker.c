@@ -1394,6 +1394,9 @@ static void push_message_abort(gpointer r)
 		dbus_pending_call_unref(request->get_handle);
 	}
 
+	if (request->insert_message_call != NULL)
+		messages_qt_insert_message_abort(request->insert_message_call);
+
 	g_dbus_remove_watch(session_connection, request->watch);
 	g_string_free(request->body, TRUE);
 	g_free(request->uuid);
