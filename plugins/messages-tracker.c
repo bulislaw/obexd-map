@@ -41,6 +41,9 @@
 #include "bmsg_parser.h"
 #include "messages-qt/messages-qt.h"
 
+/* 16 chars and terminating \0 */
+#define HANDLE_LEN (16 + 1)
+
 #define TRACKER_SERVICE "org.freedesktop.Tracker1"
 #define TRACKER_RESOURCES_PATH "/org/freedesktop/Tracker1/Resources"
 #define TRACKER_RESOURCES_INTERFACE "org.freedesktop.Tracker1.Resources"
@@ -1400,7 +1403,7 @@ static void push_message_abort(gpointer r)
 static void send_sms_finalize(struct session *session, const char *uri)
 {
 	struct push_message_request *request = session->request_data;
-	char handle[17]; /* 16 digits and \0 */
+	char handle[HANDLE_LEN];
 	unsigned long uri_no;
 
 	session->abort_request = NULL;
@@ -1409,7 +1412,7 @@ static void send_sms_finalize(struct session *session, const char *uri)
 	if (sscanf(uri, "message:%lu", &uri_no) != 1)
 		request->cb(session, -EIO, NULL, request->user_data);
 	else {
-		snprintf(handle, 17, "%016lu", uri_no);
+		snprintf(handle, HANDLE_LEN, "%016lu", uri_no);
 		request->cb(session, 0, handle, request->user_data);
 	}
 
