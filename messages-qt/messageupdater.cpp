@@ -61,6 +61,8 @@ void MessageUpdater::modelReady(bool success)
 
 	if (aborted) {
 		DBG("Updating has been aborted.");
+		this->deleteLater();
+
 		return;
 	}
 
