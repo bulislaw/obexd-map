@@ -1398,9 +1398,21 @@ static void push_message_abort(gpointer r)
 		messages_qt_insert_message_abort(request->insert_message_call);
 
 	g_dbus_remove_watch(session_connection, request->watch);
-	g_string_free(request->body, TRUE);
+
+	if (request->body)
+		g_string_free(request->body, TRUE);
+
 	g_free(request->uuid);
 	g_free(request);
+}
+
+static void push_message_finalize(struct session *session)
+{
+	DBG("");
+
+	push_message_abort(session->request_data);
+	session->request_data = NULL;
+	session->abort_request = NULL;
 }
 
 static void send_sms_finalize(struct session *session, const char *uri)
@@ -1409,9 +1421,6 @@ static void send_sms_finalize(struct session *session, const char *uri)
 	char handle[HANDLE_LEN];
 	unsigned long uri_no;
 
-	session->abort_request = NULL;
-	session->request_data = NULL;
-
 	if (sscanf(uri, "message:%lu", &uri_no) != 1)
 		request->cb(session, -EIO, NULL, request->user_data);
 	else {
@@ -1419,9 +1428,7 @@ static void send_sms_finalize(struct session *session, const char *uri)
 		request->cb(session, 0, handle, request->user_data);
 	}
 
-	g_dbus_remove_watch(session_connection, request->watch);
-	g_free(request->uuid);
-	g_free(request);
+	push_message_finalize(session);
 }
 
 static int get_uri_by_uuid(void *s, const char *id);
@@ -1463,7 +1470,6 @@ static void get_uri_by_uuid_pc(DBusPendingCall *pc, void *user_data)
 	dbus_message_iter_recurse(&irows, &icols);
 	dbus_message_iter_get_basic(&icols, &uri);
 	DBG("URI: %s", uri);
-	dbus_pending_call_unref(pc);
 	dbus_message_unref(reply);
 	send_sms_finalize(session, uri);
 
@@ -1528,6 +1534,8 @@ failed:
 
 	if (msg != NULL)
 		dbus_message_unref(msg);
+
+	push_message_finalize(session);
 
 	return -ENOMEM;
 }
@@ -1619,7 +1627,7 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 
 failed:
 	request->cb(session, -EIO, NULL, request->user_data);
-	push_message_abort(request);
+	push_message_finalize(session);
 	dbus_message_unref(reply);
 }
 
@@ -1707,10 +1715,6 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 {
 	struct session *session = s;
 	struct push_message_request *request;
-	char *path;
-
-	path = g_build_filename(session->cwd, name, NULL);
-	DBG("Push destination: %s", path);
 
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
@@ -1732,14 +1736,16 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	}
 
 	request = g_new0(struct push_message_request, 1);
+	session->request_data = request;
+	session->abort_request = push_message_abort;
+
 	request->bmsg = bmsg;
 	request->cb = cb;
 	request->body = g_string_new("");
 	request->user_data = user_data;
-	request->name = path;
 
-	session->request_data = request;
-	session->abort_request = push_message_abort;
+	request->name = g_build_filename(session->cwd, name, NULL);
+	DBG("Push destination: %s", request->name);
 
 	return 0;
 }
@@ -1811,7 +1817,7 @@ int messages_push_message_body(void *s, const char *body, size_t len)
 	return 0;
 
 failed:
-	push_message_abort(request);
+	push_message_finalize(session);
 
 	return ret;
 }
