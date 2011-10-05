@@ -625,7 +625,7 @@ write:
 
 	/* Flush on EOS */
 	if (os->driver->flush)
-		return os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+		return os->driver->flush(os->object);
 
 	return 0;
 }
