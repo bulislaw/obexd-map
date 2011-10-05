@@ -1576,7 +1576,7 @@ static int message_flush(void *obj)
 
 	if (request->buf->len < len) {
 		DBG("Not enough bytes received!");
-		return -1;
+		return -EBADR;
 	}
 
 	tail = request->buf->str + request->buf->len - len;
@@ -1587,7 +1587,7 @@ static int message_flush(void *obj)
 		tail += 2;
 		if (!bmsg_parser_tail_correct(request->bmsg, tail, len)) {
 			DBG("This doesn't help either!");
-			return -1;
+			return -EBADR;
 		}
 	}
 
@@ -1605,7 +1605,7 @@ static int message_flush(void *obj)
 
 	mas->finished = TRUE;
 
-	return 1;
+	return -EAGAIN;
 }
 
 static void *notification_registration_open(const char *name, int oflag,
