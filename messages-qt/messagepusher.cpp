@@ -154,7 +154,8 @@ void MessagePusher::modelReady(bool success)
 	DBG("Added new group, id: %d", groupId);
 }
 
-int MessagePusher::push(const char *remote, const char *body,
+int MessagePusher::push(MessagePusher **p, const char *remote,
+					const char *body,
 					const char *folder,
 					MessagePusherCallback callback,
 					void *user_data)
@@ -191,6 +192,9 @@ int MessagePusher::push(const char *remote, const char *body,
 
 		return -EIO;
 	}
+
+	if (p)
+		*p = messagePusher;
 
 	return 0;
 }

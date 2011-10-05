@@ -94,10 +94,28 @@ int messages_qt_set_read(const char *handle, gboolean read)
 	return uc.ret;
 }
 
-int messages_qt_insert_message(const char *remote, const char *body,
+void messages_qt_insert_message_abort(void *p)
+{
+	MessagePusher *messagePusher = (MessagePusher *)p;
+	messagePusher->abort();
+}
+
+int messages_qt_insert_message(void **p, const char *remote, const char *body,
 						const char *folder,
 						messages_qt_callback_t callback,
 						void *user_data)
 {
-	return MessagePusher::push(remote, body, folder, callback, user_data);
+	MessagePusher *messagePusher;
+	int ret;
+
+	ret = MessagePusher::push(&messagePusher, remote, body, folder,
+							callback, user_data);
+
+	if (ret < 0)
+		return ret;
+
+	if (p)
+		*p = messagePusher;
+
+	return 0;
 }

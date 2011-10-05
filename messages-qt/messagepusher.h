@@ -9,7 +9,8 @@ class MessagePusher : public QObject {
 	Q_OBJECT
 
 public:
-	static int push(const char *remote, const char *body,
+	static int push(MessagePusher **p, const char *remote,
+					const char *body,
 					const char *folder,
 					MessagePusherCallback callback = NULL,
 					void *user_data = NULL);

@@ -142,6 +142,7 @@ struct push_message_request {
 	guint watch;
 	gboolean retry;
 	DBusPendingCall *send_sms, *get_handle;
+	void *insert_message_call;
 };
 
 struct request {
@@ -1663,35 +1664,34 @@ static void insert_message_cb(int id, void *s)
 {
 	struct session *session = s;
 	struct push_message_request *request = session->request_data;
-	char handle[17];
+	char handle[HANDLE_LEN];
 
 	DBG("");
 
 	if (id < 0) {
 		request->cb(session, id, NULL, request->user_data);
-		return;
+		goto finalize;
 	}
 
-	snprintf(handle, 17, "%016d", id);
+	request->insert_message_call = NULL;
+
+	snprintf(handle, HANDLE_LEN, "%016d", id);
 	request->cb(session, 0, handle, request->user_data);
+
+finalize:
+	push_message_finalize(session);
 }
 
 static int store_sms(struct session *session, const char *recipient,
 					const char *body)
 {
 	struct push_message_request *request = session->request_data;
-	int ret;
 
 	DBG("");
 
-	ret = messages_qt_insert_message(recipient, body, request->name,
+	return messages_qt_insert_message(&request->insert_message_call,
+						recipient, body, request->name,
 						insert_message_cb, session);
-	if (ret < 0) {
-		push_message_abort(session);
-		return ret;
-	}
-
-	return 0;
 }
 
 int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
