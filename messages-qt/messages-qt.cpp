@@ -44,54 +44,45 @@ void messages_qt_exit(void)
 	}
 }
 
-struct updater_call {
-	int ret;
-	gboolean done;
-};
-
-static void updater_callback(int err, void *user_data)
+void messages_qt_set_abort(void *p)
 {
-	struct updater_call *uc = (struct updater_call *)user_data;
-
-	uc->ret = err;
-	uc->done = TRUE;
+	MessageUpdater *messageUpdater = (MessageUpdater *)p;
+	messageUpdater->abort();
 }
 
-int messages_qt_set_deleted(const char *handle, gboolean deleted)
+int messages_qt_set_deleted(void **p, const char *handle, gboolean deleted,
+			messages_qt_callback_t callback, void *user_data)
 {
-	struct updater_call uc;
+	MessageUpdater *messageUpdater;
 	int ret;
 
-	ret = MessageUpdater::setDeleted(handle, deleted, updater_callback,
-									&uc);
+	ret = MessageUpdater::setIsRead(&messageUpdater, handle, deleted,
+							callback, user_data);
 	if (ret < 0)
 		return ret;
 
-	uc.done = FALSE;
-	/* XXX: This actually makes whole glib main loop to iterate, things may
-	 * go wrong. Needs reimplementing API to do SetMessageStatus
-	 * asynchronously. */
-	while (!uc.done)
-		app->processEvents();
+	if (p)
+		*p = messageUpdater;
 
-	return uc.ret;
+	return 0;
 }
 
 
-int messages_qt_set_read(const char *handle, gboolean read)
+int messages_qt_set_read(void **p, const char *handle, gboolean read,
+			messages_qt_callback_t callback, void *user_data)
 {
-	struct updater_call uc;
+	MessageUpdater *messageUpdater;
 	int ret;
 
-	ret = MessageUpdater::setIsRead(handle, read, updater_callback, &uc);
+	ret = MessageUpdater::setIsRead(&messageUpdater, handle, read,
+							callback, user_data);
 	if (ret < 0)
 		return ret;
 
-	uc.done = FALSE;
-	while (!uc.done)
-		app->processEvents();
+	if (p)
+		*p = messageUpdater;
 
-	return uc.ret;
+	return 0;
 }
 
 void messages_qt_insert_message_abort(void *p)

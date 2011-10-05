@@ -160,10 +160,12 @@ struct request {
 	struct messages_filter *filter;
 	unsigned long flags;
 	gboolean deleted;
+	void *set_status_call;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
 		messages_get_message_cb message;
+		messages_set_message_status_cb status;
 	} cb;
 };
 
@@ -1337,12 +1339,26 @@ failed:
 	return err;
 }
 
+static void messages_qt_callback(int err, void *user_data)
+{
+	struct session *session = user_data;
+	struct request *request = session->request;
+
+	if (!session->aborted && request->cb.status)
+		request->cb.status(session, err, request->user_data);
+
+	g_free(request);
+	session->request = NULL;
+}
+
 int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
-								uint8_t value)
+			uint8_t value, messages_set_message_status_cb callback,
+			void *user_data)
 {
 	struct session *session = s;
 	struct message_status *stat = NULL;
 	int ret;
+	struct request *request;
 
 	stat = g_hash_table_lookup(session->msg_stat, handle);
 	if (stat == NULL) {
@@ -1352,22 +1368,33 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 		g_hash_table_insert(session->msg_stat, g_strdup(handle), stat);
 	}
 
+	request = g_new0(struct request, 1);
+	request->cb.status = callback;
+	request->user_data = user_data;
+	session->request = request;
+
 	switch (indicator) {
 		case 0x0:
-			ret = messages_qt_set_read(handle, value & 0x01);
+			ret = messages_qt_set_read(&request->set_status_call,
+						handle, value & 0x01,
+						messages_qt_callback, session);
 			if (ret < 0)
 				return ret;
 
 			stat->read = value;
 			break;
 		case 0x1:
-			ret = messages_qt_set_deleted(handle, value & 0x01);
+			ret = messages_qt_set_deleted(&request->set_status_call,
+						handle, value & 0x01,
+						messages_qt_callback, session);
 			if (ret < 0)
 				return ret;
 
 			stat->deleted = value;
 			break;
 		default:
+			g_free(request);
+			session->request = NULL;
 			return -EBADR;
 	}
 
@@ -1401,6 +1428,9 @@ static void push_message_abort(gpointer r)
 
 	if (request->body)
 		g_string_free(request->body, TRUE);
+
+	if (request->name)
+		g_free(request->name);
 
 	g_free(request->uuid);
 	g_free(request);

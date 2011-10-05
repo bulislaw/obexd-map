@@ -124,8 +124,9 @@ int MessageUpdater::getEvent(const char *handle)
 	return 0;
 }
 
-int MessageUpdater::setIsRead(const char *handle, bool isRead,
-			MessageUpdaterCallback callback, void *user_data)
+int MessageUpdater::setIsRead(MessageUpdater **p, const char *handle,
+				bool isRead, MessageUpdaterCallback callback,
+				void *user_data)
 {
 	MessageUpdater *messageUpdater = new MessageUpdater();
 	DBG("this = %p, handle = %s, isRead = %d", messageUpdater, handle,
@@ -144,11 +145,15 @@ int MessageUpdater::setIsRead(const char *handle, bool isRead,
 		return ret;
 	}
 
+	if (p)
+		*p = messageUpdater;
+
 	return 0;
 }
 
-int MessageUpdater::setDeleted(const char *handle, bool deleted,
-			MessageUpdaterCallback callback, void *user_data)
+int MessageUpdater::setDeleted(MessageUpdater **p, const char *handle,
+				bool deleted, MessageUpdaterCallback callback,
+				void *user_data)
 {
 	MessageUpdater *messageUpdater = new MessageUpdater();
 	DBG("this = %p, handle = %s, deleted = %d", messageUpdater,
@@ -166,6 +171,9 @@ int MessageUpdater::setDeleted(const char *handle, bool deleted,
 
 		return ret;
 	}
+
+	if (p)
+		*p = messageUpdater;
 
 	return 0;
 }

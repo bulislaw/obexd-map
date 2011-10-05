@@ -7,10 +7,12 @@ class MessageUpdater : public QObject {
 	Q_OBJECT
 
 public:
-	static int setIsRead(const char *handle, bool isRead,
+	static int setIsRead(MessageUpdater **p, const char *handle,
+					bool isRead,
 					MessageUpdaterCallback callback = NULL,
 					void *user_data = NULL);
-	static int setDeleted(const char *handle, bool deleted,
+	static int setDeleted(MessageUpdater **p, const char *handle,
+					bool deleted,
 					MessageUpdaterCallback callback = NULL,
 					void *user_data = NULL);
 	void abort();

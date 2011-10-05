@@ -240,8 +240,7 @@ struct any_object {
 	struct mas_session *mas;
 };
 
-struct notification_registration {
-	struct any_object any;
+struct notification_registration_request {
 	uint8_t status;
 };
 
@@ -1384,10 +1383,13 @@ static void push_message_cb(void *session, int err, const char *handle,
 {
 	struct mas_session *mas = user_data;
 
+	DBG("");
+
+	mas->finished = TRUE;
+
 	if (handle == NULL) {
 		DBG("err: %d", err);
 		obex_object_set_io_flags(mas, G_IO_ERR, err);
-		/* mas->finished = TRUE; FIXME!!! */
 	} else {
 		DBG("handle: %s", handle);
 		obex_name_write(mas->obex_os, mas->obex_obj, handle);
@@ -1603,8 +1605,6 @@ static int message_flush(void *obj)
 	if (ret < 0)
 		return ret;
 
-	mas->finished = TRUE;
-
 	return -EAGAIN;
 }
 
@@ -1612,7 +1612,7 @@ static void *notification_registration_open(const char *name, int oflag,
 		mode_t mode, void *driver_data, size_t *size, int *err)
 {
 	struct mas_session *mas = driver_data;
-	struct notification_registration *nr;
+	struct notification_registration_request *nr;
 	uint8_t status;
 
 	if (!(oflag & O_WRONLY)) {
@@ -1638,23 +1638,24 @@ static void *notification_registration_open(const char *name, int oflag,
 		return NULL;
 	}
 
-	nr = g_new0(struct notification_registration, 1);
-	nr->any.mas = mas;
+	nr = g_new0(struct notification_registration_request, 1);
 	nr->status = status;
+	mas->request = nr;
 
 	/* MNS connection operations take place in
 	 * notification_registration_close() - PTS requires that MAS responds to
 	 * SetNotificationReqistration first before changing state of MNS. */
 
 	*err = 0;
+	mas->finished = TRUE;
 
-	return nr;
+	return mas;
 }
 
 static int notification_registration_close(void *obj)
 {
-	struct notification_registration *nr = obj;
-	struct mas_session *mas = nr->any.mas;
+	struct mas_session *mas = obj;
+	struct notification_registration_request *nr = mas->request;
 
 	DBG("");
 
@@ -1673,6 +1674,23 @@ static int notification_registration_close(void *obj)
 	g_free(nr);
 
 	return 0;
+}
+
+static void message_status_cb(void *session, int err, void *user_data)
+{
+	struct mas_session *mas = user_data;
+
+	DBG("");
+
+	if (err == -EAGAIN)
+		return;
+
+	mas->finished = TRUE;
+
+	if (err < 0)
+		obex_object_set_io_flags(mas, G_IO_ERR, err);
+	else
+		obex_object_set_io_flags(mas, G_IO_OUT, 0);
 }
 
 static void *message_status_open(const char *name, int oflag, mode_t mode,
@@ -1705,7 +1723,7 @@ static void *message_status_open(const char *name, int oflag, mode_t mode,
 
 	DBG("indicator: %d, value: %d", indicator, value);
 	*err = messages_set_message_status(mas->backend_data, name, indicator,
-									value);
+						value, message_status_cb, mas);
 	if (*err)
 		return NULL;
 	else
@@ -1724,6 +1742,11 @@ static void *any_open(const char *name, int oflag, mode_t mode,
 
 static ssize_t any_write(void *object, const void *buf, size_t count)
 {
+	struct mas_session *mas = object;
+
+	if (!mas->finished)
+		return -EAGAIN;
+
 	DBG("ignored %zu byte(s)", count);
 
 	return count;
@@ -1785,6 +1808,8 @@ static int any_close(void *obj)
 	struct mas_session *mas = obj;
 
 	DBG("");
+
+	DBG("%d", mas->finished);
 
 	if (!mas->finished)
 		messages_abort(mas->backend_data);
