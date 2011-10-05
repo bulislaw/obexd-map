@@ -1319,11 +1319,6 @@ static void msg_listing_free(gpointer data)
 {
 	struct msg_listing_request *request = data;
 
-	g_free(request->filter.period_begin);
-	g_free(request->filter.period_end);
-	g_free(request->filter.recipient);
-	g_free(request->filter.originator);
-
 	g_free(request);
 }
 
