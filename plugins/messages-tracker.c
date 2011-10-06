@@ -129,6 +129,12 @@
 
 typedef void (*reply_list_foreach_cb)(const char **reply, void *user_data);
 
+enum event_direction {
+	DIRECTION_UNKNOWN,
+	DIRECTION_INBOUND,
+	DIRECTION_OUTBOUND
+};
+
 struct message_folder {
 	char *name;
 	GSList *subfolders;
@@ -192,6 +198,8 @@ static DBusConnection *session_connection = NULL;
 static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
 static gint event_watch_id;
+static gboolean push_in_progress;
+static GSList *mns_event_cache;
 
 static void free_msg_data(struct messages_message *msg)
 {
@@ -247,9 +255,15 @@ static gboolean validate_handle(const char *h)
 
 static char *fill_handle(const char *handle)
 {
-	int fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
-	char *fill = g_strnfill(fill_size, '0');
-	char *ret = g_strdup_printf("%s%s", fill, handle);
+	int fill_size;
+	char *fill, *ret;
+
+	if (handle == NULL)
+		return NULL;
+
+	fill_size = MESSAGE_HANDLE_SIZE - strlen(handle);
+	fill = g_strnfill(fill_size, '0');
+	ret = g_strdup_printf("%s%s", fill, handle);
 
 	g_free(fill);
 
@@ -893,25 +907,79 @@ aborted:
 		messages_disconnect(session);
 }
 
-static void notify_new_sms(const char *handle)
+static void notify_new_sms(const char *handle, enum event_direction direction)
 {
 	struct messages_event *data;
 	GSList *next;
 
+	DBG("");
+
 	data = g_new0(struct messages_event, 1);
-	data->folder = g_strdup("telecom/msg/inbox");
 	data->type = MET_NEW_MESSAGE;
 	data->msg_type = g_strdup("SMS_GSM");
 	data->old_folder = g_strdup("");
 	data->handle = fill_handle(handle);
 
+	switch (direction) {
+	case DIRECTION_INBOUND:
+		data->folder = g_strdup("telecom/msg/inbox");
+		break;
+	case DIRECTION_OUTBOUND:
+		data->folder = g_strdup("telecom/msg/sent");
+		break;
+	default:
+		free_event_data(data);
+		return;
+	}
+
+	if (push_in_progress) {
+		mns_event_cache = g_slist_append(mns_event_cache, data);
+
+		DBG("Event cached");
+		return;
+	}
+
 	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
 		struct session *session = next->data;
 
+		DBG("Event dispatched");
 		session->event_cb(session, data, session->event_user_data);
 	}
 
 	free_event_data(data);
+}
+
+static void notify_cached_events(const char *h)
+{
+	GSList *event;
+	char *handle = fill_handle(h);
+
+	DBG("");
+
+	for (event = mns_event_cache; event != NULL;
+						event = g_slist_next(event)) {
+		struct messages_event *data = event->data;
+		GSList *srv;
+
+		if (handle != NULL && g_strcmp0(handle, data->handle) == 0) {
+			free_event_data(data);
+
+			continue;
+		}
+
+		for (srv = mns_srv; srv != NULL; srv = g_slist_next(srv)) {
+			struct session *session = srv->data;
+
+			session->event_cb(session, data,
+						session->event_user_data);
+		}
+
+		free_event_data(data);
+	}
+
+	g_slist_free(mns_event_cache);
+	mns_event_cache = NULL;
+	g_free(handle);
 }
 
 static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
@@ -919,6 +987,7 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 {
 	DBusMessageIter arg, inner_arg, struct_arg;
 	unsigned ihandle = 0;
+	int32_t direction;
 	char *handle;
 
 	DBG("");
@@ -943,9 +1012,19 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 
 	handle = g_strdup_printf("%d", ihandle);
 
+	dbus_message_iter_next(&struct_arg); /* Type */
+	dbus_message_iter_next(&struct_arg); /* StartTime */
+	dbus_message_iter_next(&struct_arg); /* EndTime */
+	dbus_message_iter_next(&struct_arg); /* Direction */
+
+	if (dbus_message_iter_get_arg_type(&struct_arg) != DBUS_TYPE_INT32)
+		return TRUE;
+
+	dbus_message_iter_get_basic(&struct_arg, &direction);
+
 	DBG("new message: %s", handle);
 
-	notify_new_sms(handle);
+	notify_new_sms(handle, direction);
 
 	g_free(handle);
 
@@ -1440,6 +1519,9 @@ static void push_message_abort(gpointer r)
 
 	g_free(request->uuid);
 	g_free(request);
+
+	push_in_progress = FALSE;
+	notify_cached_events(NULL);
 }
 
 static void push_message_finalize(struct session *session)
@@ -1464,6 +1546,7 @@ static void send_sms_finalize(struct session *session, const char *uri)
 		request->cb(session, 0, handle, request->user_data);
 	}
 
+	notify_cached_events(handle);
 	push_message_finalize(session);
 }
 
@@ -1728,6 +1811,8 @@ static void insert_message_cb(int id, void *s)
 	snprintf(handle, HANDLE_LEN, "%016d", id);
 	request->cb(session, 0, handle, request->user_data);
 
+	notify_cached_events(handle);
+
 finalize:
 	push_message_finalize(session);
 }
@@ -1751,6 +1836,8 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 {
 	struct session *session = s;
 	struct push_message_request *request;
+
+	push_in_progress = TRUE;
 
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
