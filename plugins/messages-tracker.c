@@ -197,7 +197,7 @@ static struct message_folder *folder_tree = NULL;
 static DBusConnection *session_connection = NULL;
 static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
-static gint event_watch_id;
+static gint newmsg_watch_id, delmsg_watch_id;
 static gboolean push_in_progress;
 static GSList *mns_event_cache;
 
@@ -907,7 +907,8 @@ aborted:
 		messages_disconnect(session);
 }
 
-static void notify_new_sms(const char *handle, enum event_direction direction)
+static void notify_new_sms(const char *handle, enum messages_event_type type,
+						enum event_direction direction)
 {
 	struct messages_event *data;
 	GSList *next;
@@ -915,7 +916,7 @@ static void notify_new_sms(const char *handle, enum event_direction direction)
 	DBG("");
 
 	data = g_new0(struct messages_event, 1);
-	data->type = MET_NEW_MESSAGE;
+	data->type = type;
 	data->msg_type = g_strdup("SMS_GSM");
 	data->old_folder = g_strdup("");
 	data->handle = fill_handle(handle);
@@ -928,8 +929,8 @@ static void notify_new_sms(const char *handle, enum event_direction direction)
 		data->folder = g_strdup("telecom/msg/sent");
 		break;
 	default:
-		free_event_data(data);
-		return;
+		data->folder = g_strdup("");
+		break;
 	}
 
 	if (push_in_progress) {
@@ -1024,7 +1025,35 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 
 	DBG("new message: %s", handle);
 
-	notify_new_sms(handle, direction);
+	notify_new_sms(handle, MET_NEW_MESSAGE, direction);
+
+	g_free(handle);
+
+	return TRUE;
+}
+
+static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
+							void *user_data)
+{
+	DBusMessageIter arg;
+	unsigned ihandle = 0;
+	char *handle;
+
+	DBG("");
+
+	if (!dbus_message_iter_init(msg, &arg))
+		return TRUE;
+
+	if (dbus_message_iter_get_arg_type(&arg) != DBUS_TYPE_INT32)
+		return TRUE;
+
+	dbus_message_iter_get_basic(&arg, &ihandle);
+
+	handle = g_strdup_printf("%d", ihandle);
+
+	DBG("message deleted: %s", handle);
+
+	notify_new_sms(handle, MET_MESSAGE_DELETED, DIRECTION_UNKNOWN);
 
 	g_free(handle);
 
@@ -1157,15 +1186,23 @@ int messages_set_notification_registration(void *s, messages_event_cb cb,
 		if (g_slist_find(mns_srv, session) != NULL)
 			return 0;
 
-		if (g_slist_length(mns_srv) == 0)
-			event_watch_id = g_dbus_add_signal_watch(
+		if (g_slist_length(mns_srv) == 0) {
+			newmsg_watch_id = g_dbus_add_signal_watch(
 							session_connection,
 							NULL, NULL,
 							"com.nokia.commhistory",
 							"eventsAdded",
 							handle_new_sms,
 							NULL, NULL);
-		if (event_watch_id == 0)
+			delmsg_watch_id = g_dbus_add_signal_watch(
+							session_connection,
+							NULL, NULL,
+							"com.nokia.commhistory",
+							"eventDeleted",
+							handle_del_sms,
+							NULL, NULL);
+		}
+		if (newmsg_watch_id == 0 || delmsg_watch_id == 0)
 			return -EIO;
 
 		session->event_user_data = user_data;
@@ -1175,8 +1212,12 @@ int messages_set_notification_registration(void *s, messages_event_cb cb,
 	} else {
 		mns_srv = g_slist_remove(mns_srv, session);
 
-		if (g_slist_length(mns_srv) == 0)
-			g_dbus_remove_watch(session_connection, event_watch_id);
+		if (g_slist_length(mns_srv) == 0) {
+			g_dbus_remove_watch(session_connection,
+							newmsg_watch_id);
+			g_dbus_remove_watch(session_connection,
+							delmsg_watch_id);
+		}
 	}
 
 	return 0;
