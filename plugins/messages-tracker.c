@@ -141,7 +141,7 @@ struct push_message_request {
 	struct bmsg_bmsg *bmsg;
 	void *user_data;
 	char *uuid;
-	const char *name;
+	char *name;
 	guint watch;
 	gboolean retry;
 	DBusPendingCall *send_sms, *get_handle;
