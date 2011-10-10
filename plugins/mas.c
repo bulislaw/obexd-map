@@ -1577,6 +1577,11 @@ static int message_flush(void *obj)
 	if (mas->finished)
 		return 0;
 
+	if (request->bmsg == NULL) {
+		DBG("Flushing and no bmsg - this should not happened.");
+		return -EIO;
+	}
+
 	len = bmsg_parser_tail_length(request->bmsg);
 
 	if (request->buf->len < len) {

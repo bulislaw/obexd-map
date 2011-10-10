@@ -510,6 +510,19 @@ struct bmsg_parser *bmsg_parser_new(void)
 	return pd;
 }
 
+static char *memcrlf(char *s, size_t len)
+{
+	size_t i;
+
+	len -= 1;
+	for (i = 0; i < len; ++i) {
+		if (s[i] == '\r' && s[i+1] == '\n')
+			return s + i;
+	}
+
+	return NULL;
+}
+
 int bmsg_parser_process(struct bmsg_parser *pd, char **data, size_t len)
 {
 	int ret;
@@ -528,7 +541,7 @@ int bmsg_parser_process(struct bmsg_parser *pd, char **data, size_t len)
 			break;
 		}
 
-		pd->eol = g_strstr_len(pd->input, pd->nleft, "\r\n");
+		pd->eol = memcrlf(pd->input, pd->nleft);
 		if (pd->eol == NULL) {
 			ret = 1;
 			break;
