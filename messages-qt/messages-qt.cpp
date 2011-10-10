@@ -56,7 +56,7 @@ int messages_qt_set_deleted(void **p, const char *handle, gboolean deleted,
 	MessageUpdater *messageUpdater;
 	int ret;
 
-	ret = MessageUpdater::setIsRead(&messageUpdater, handle, deleted,
+	ret = MessageUpdater::setDeleted(&messageUpdater, handle, deleted,
 							callback, user_data);
 	if (ret < 0)
 		return ret;
