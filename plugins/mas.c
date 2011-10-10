@@ -469,7 +469,6 @@ static GHashTable *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 
 		switch (aparam_defs[tago].type) {
 		case APT_STR:
-			/* FIXME: mem leak? */
 			entry.valstr = g_try_malloc0(hdr->len + 1);
 			if (entry.valstr)
 				memcpy(entry.valstr, hdr->val, hdr->len);
@@ -495,6 +494,10 @@ static GHashTable *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 			goto failed;
 		}
 		aparams_write(aparams, hdr->tag, &entry);
+		/* aparams_write makes its own copy, thus: */
+		if (aparam_defs[tago].type == APT_STR)
+			g_free(entry.valstr);
+
 skip:
 		len += hdr->len + sizeof(struct aparam_header);
 	}
