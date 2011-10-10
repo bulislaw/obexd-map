@@ -1812,8 +1812,6 @@ static int any_close(void *obj)
 
 	DBG("");
 
-	DBG("%d", mas->finished);
-
 	if (!mas->finished)
 		messages_abort(mas->backend_data);
 
