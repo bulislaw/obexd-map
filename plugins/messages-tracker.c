@@ -1451,7 +1451,7 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 		goto failed;
 	}
 
-	if (flags & MESSAGES_FRACTION || flags & MESSAGES_NEXT) {
+	if (flags & MESSAGES_FRACTION && flags & MESSAGES_NEXT) {
 		err = -EBADR;
 
 		goto failed;
