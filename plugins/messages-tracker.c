@@ -1705,6 +1705,7 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 	DBusMessage *reply;
 	DBusError error;
 	char *uuid;
+	int err;
 
 	DBG("");
 
@@ -1714,6 +1715,7 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 	if (dbus_set_error_from_message(&error, reply)) {
 		DBG("%s: %s", error.name, error.message);
 		dbus_error_free(&error);
+		err = -EIO;
 
 		goto failed;
 	}
@@ -1721,12 +1723,21 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 	if (!dbus_message_has_signature(reply, DBUS_TYPE_STRING_AS_STRING)) {
 		DBG("Unexpected signature: %s",
 					dbus_message_get_signature(reply));
+		err = -EIO;
 
 		goto failed;
 	}
 
 	dbus_message_get_args(reply, NULL, DBUS_TYPE_STRING, &uuid,
 							DBUS_TYPE_INVALID);
+	if (uuid[0] == '\0') {
+		DBG("Empty response from SendSMS, possibly wrong phone number");
+		err = -EBADR;
+
+		goto failed;
+	}
+
+
 	DBG("Message UUID: %s", uuid);
 	request->uuid = g_strdup(uuid);
 
@@ -1745,7 +1756,7 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 	return;
 
 failed:
-	request->cb(session, -EIO, NULL, request->user_data);
+	request->cb(session, err, NULL, request->user_data);
 	push_message_finalize(session);
 	dbus_message_unref(reply);
 }
