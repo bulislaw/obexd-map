@@ -92,7 +92,7 @@ void bmsg_add_originator(struct bmsg *msg, struct phonebook_contact *contact)
 {
 	GString *vcard = g_string_new("");
 
-	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD30);
+	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD21);
 	msg->originators = g_list_append(msg->originators,
 						g_string_free(vcard, FALSE));
 }
@@ -128,7 +128,7 @@ void bmsg_add_recipient(struct bmsg *msg, struct phonebook_contact *contact)
 						msg->envelopes->len - 1);
 
 	vcard = g_string_new("");
-	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD30);
+	phonebook_add_contact(vcard, contact, 0, FORMAT_VCARD21);
 
 	top_env->recipients = g_list_append(top_env->recipients,
 						g_string_free(vcard, FALSE));
