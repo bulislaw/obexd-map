@@ -191,6 +191,8 @@ struct session {
 	GDestroyNotify abort_request;
 	void *request_data;
 	gboolean destroy;
+	gboolean push_in_progress;
+	GSList *mns_event_cache;
 };
 
 static struct message_folder *folder_tree = NULL;
@@ -198,8 +200,6 @@ static DBusConnection *session_connection = NULL;
 static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
 static gint newmsg_watch_id, delmsg_watch_id;
-static gboolean push_in_progress;
-static GSList *mns_event_cache;
 
 static void free_msg_data(struct messages_message *msg)
 {
@@ -907,6 +907,31 @@ aborted:
 		messages_disconnect(session);
 }
 
+static void session_dispatch_event(struct session *session,
+						struct messages_event *event)
+{
+	if (session->push_in_progress) {
+		struct messages_event *data;
+
+		data = g_new0(struct messages_event, 1);
+		data->type = event->type;
+		data->msg_type = g_strdup(event->msg_type);
+		data->old_folder = g_strdup(event->old_folder);
+		data->handle = g_strdup(event->handle);
+		data->folder = g_strdup(event->folder);
+
+		session->mns_event_cache = g_slist_append(
+						session->mns_event_cache,
+						data);
+
+		DBG("Event cached");
+	} else {
+		session->event_cb(session, event, session->event_user_data);
+
+		DBG("Event dispatched");
+	}
+}
+
 static void notify_new_sms(const char *handle, enum messages_event_type type,
 						enum event_direction direction)
 {
@@ -933,34 +958,25 @@ static void notify_new_sms(const char *handle, enum messages_event_type type,
 		break;
 	}
 
-	if (push_in_progress) {
-		mns_event_cache = g_slist_append(mns_event_cache, data);
-
-		DBG("Event cached");
-		return;
-	}
-
 	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
 		struct session *session = next->data;
 
-		DBG("Event dispatched");
-		session->event_cb(session, data, session->event_user_data);
+		session_dispatch_event(session, data);
 	}
 
 	free_event_data(data);
 }
 
-static void notify_cached_events(const char *h)
+static void notify_cached_events(struct session *session, const char *h)
 {
 	GSList *event;
 	char *handle = fill_handle(h);
 
 	DBG("");
 
-	for (event = mns_event_cache; event != NULL;
+	for (event = session->mns_event_cache; event != NULL;
 						event = g_slist_next(event)) {
 		struct messages_event *data = event->data;
-		GSList *srv;
 
 		if (handle != NULL && g_strcmp0(handle, data->handle) == 0) {
 			free_event_data(data);
@@ -968,18 +984,15 @@ static void notify_cached_events(const char *h)
 			continue;
 		}
 
-		for (srv = mns_srv; srv != NULL; srv = g_slist_next(srv)) {
-			struct session *session = srv->data;
-
+		if (g_slist_find(mns_srv, session) != NULL)
 			session->event_cb(session, data,
 						session->event_user_data);
-		}
 
 		free_event_data(data);
 	}
 
-	g_slist_free(mns_event_cache);
-	mns_event_cache = NULL;
+	g_slist_free(session->mns_event_cache);
+	session->mns_event_cache = NULL;
 	g_free(handle);
 }
 
@@ -1527,9 +1540,10 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 	return 0;
 }
 
-static void push_message_abort(gpointer r)
+static void push_message_abort(gpointer s)
 {
-	struct push_message_request *request = r;
+	struct session *session = s;
+	struct push_message_request *request = session->request_data;
 
 	DBG("");
 
@@ -1561,15 +1575,15 @@ static void push_message_abort(gpointer r)
 	g_free(request->uuid);
 	g_free(request);
 
-	push_in_progress = FALSE;
-	notify_cached_events(NULL);
+	session->push_in_progress = FALSE;
+	notify_cached_events(session, NULL);
 }
 
 static void push_message_finalize(struct session *session)
 {
 	DBG("");
 
-	push_message_abort(session->request_data);
+	push_message_abort(session);
 	session->request_data = NULL;
 	session->abort_request = NULL;
 }
@@ -1587,7 +1601,7 @@ static void send_sms_finalize(struct session *session, const char *uri)
 		request->cb(session, 0, handle, request->user_data);
 	}
 
-	notify_cached_events(handle);
+	notify_cached_events(session, handle);
 	push_message_finalize(session);
 }
 
@@ -1863,7 +1877,7 @@ static void insert_message_cb(int id, void *s)
 	snprintf(handle, HANDLE_LEN, "%016d", id);
 	request->cb(session, 0, handle, request->user_data);
 
-	notify_cached_events(handle);
+	notify_cached_events(session, handle);
 
 finalize:
 	push_message_finalize(session);
@@ -1889,7 +1903,7 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	struct session *session = s;
 	struct push_message_request *request;
 
-	push_in_progress = TRUE;
+	session->push_in_progress = TRUE;
 
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
@@ -2004,7 +2018,7 @@ void messages_abort(void *s)
 	DBG("");
 
 	if (session->abort_request != NULL)
-		session->abort_request(session->request_data);
+		session->abort_request(session);
 
 	session->aborted = TRUE;
 	session->abort_request = NULL;
