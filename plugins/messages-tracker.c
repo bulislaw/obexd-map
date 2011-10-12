@@ -838,9 +838,6 @@ static void get_message_resp(const char **reply, void *s)
 		goto aborted;
 
 	msg_data = pull_message_data(reply);
-	handle = fill_handle(msg_data->handle);
-	g_free(msg_data->handle);
-	msg_data->handle = handle;
 
 	contact = pull_message_contact(reply, msg_data->sent);
 
@@ -850,7 +847,14 @@ static void get_message_resp(const char **reply, void *s)
 
 	status = msg_data->read ? "READ" : "UNREAD";
 
-	folder = message2folder(msg_data);
+	if (stat != NULL && stat->deleted == 1)
+		folder = g_strdup("telecom/msg/deleted");
+	else
+		folder = message2folder(msg_data);
+
+	handle = fill_handle(msg_data->handle);
+	g_free(msg_data->handle);
+	msg_data->handle = handle;
 
 	bmsg = g_new0(struct bmsg, 1);
 	bmsg_init(bmsg, BMSG_VERSION_1_0, status, BMSG_SMS, folder);
