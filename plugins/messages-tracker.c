@@ -916,8 +916,7 @@ static void session_dispatch_event(struct session *session,
 	}
 }
 
-static void notify_new_sms(const char *handle, enum messages_event_type type,
-						enum event_direction direction)
+static void notify_new_sms(const char *handle, enum messages_event_type type)
 {
 	struct messages_event *data;
 	GSList *next;
@@ -925,17 +924,16 @@ static void notify_new_sms(const char *handle, enum messages_event_type type,
 
 	DBG("");
 
-	switch (direction) {
-	case DIRECTION_INBOUND:
-		folder = "telecom/msg/inbox";
-		break;
-	case DIRECTION_OUTBOUND:
-		folder = "telecom/msg/sent";
-		break;
-	default:
-		folder = "";
-		break;
-	}
+	data = g_new0(struct messages_event, 1);
+	data->type = type;
+	data->msg_type = g_strdup("SMS_GSM");
+	data->old_folder = g_strdup("");
+	data->handle = fill_handle(handle);
+
+	if (type == MET_NEW_MESSAGE)
+		data->folder = g_strdup("telecom/msg/inbox");
+	else
+		data->folder = g_strdup("");
 
 	data = messages_event_new(type, BMSG_T_SMS_GSM, handle, folder, "");
 
@@ -1017,10 +1015,14 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 
 	dbus_message_iter_get_basic(&struct_arg, &direction);
 
+	if (direction == DIRECTION_OUTBOUND)
+		goto done;
+
 	DBG("new message: %s", handle);
 
-	notify_new_sms(handle, MET_NEW_MESSAGE, direction);
+	notify_new_sms(handle, MET_NEW_MESSAGE);
 
+done:
 	g_free(handle);
 
 	return TRUE;
@@ -1047,7 +1049,7 @@ static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 
 	DBG("message deleted: %s", handle);
 
-	notify_new_sms(handle, MET_MESSAGE_DELETED, DIRECTION_UNKNOWN);
+	notify_new_sms(handle, MET_MESSAGE_DELETED);
 
 	g_free(handle);
 
