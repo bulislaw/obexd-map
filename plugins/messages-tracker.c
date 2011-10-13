@@ -1049,37 +1049,44 @@ static gboolean handle_new_sms(DBusConnection * connection, DBusMessage * msg,
 
 	dbus_message_iter_recurse(&arg, &inner_arg);
 
-	if (dbus_message_iter_get_arg_type(&inner_arg) != DBUS_TYPE_STRUCT)
-		return TRUE;
+	for ( ; dbus_message_iter_get_arg_type(&inner_arg) != DBUS_TYPE_INVALID;
+					dbus_message_iter_next(&inner_arg)) {
 
-	dbus_message_iter_recurse(&inner_arg, &struct_arg);
+		if (dbus_message_iter_get_arg_type(&inner_arg)
+							!= DBUS_TYPE_STRUCT)
+			continue;
 
-	if (dbus_message_iter_get_arg_type(&struct_arg) != DBUS_TYPE_INT32)
-		return TRUE;
+		dbus_message_iter_recurse(&inner_arg, &struct_arg);
 
-	dbus_message_iter_get_basic(&struct_arg, &ihandle);
+		if (dbus_message_iter_get_arg_type(&struct_arg) !=
+							DBUS_TYPE_INT32)
+			continue;
 
-	handle = g_strdup_printf("%d", ihandle);
+		dbus_message_iter_get_basic(&struct_arg, &ihandle);
 
-	dbus_message_iter_next(&struct_arg); /* Type */
-	dbus_message_iter_next(&struct_arg); /* StartTime */
-	dbus_message_iter_next(&struct_arg); /* EndTime */
-	dbus_message_iter_next(&struct_arg); /* Direction */
+		handle = g_strdup_printf("%d", ihandle);
 
-	if (dbus_message_iter_get_arg_type(&struct_arg) != DBUS_TYPE_INT32)
-		return TRUE;
+		dbus_message_iter_next(&struct_arg); /* Type */
+		dbus_message_iter_next(&struct_arg); /* StartTime */
+		dbus_message_iter_next(&struct_arg); /* EndTime */
+		dbus_message_iter_next(&struct_arg); /* Direction */
 
-	dbus_message_iter_get_basic(&struct_arg, &direction);
+		if (dbus_message_iter_get_arg_type(&struct_arg) !=
+								DBUS_TYPE_INT32)
+			continue;
 
-	if (direction == DIRECTION_OUTBOUND)
-		goto done;
+		dbus_message_iter_get_basic(&struct_arg, &direction);
 
-	DBG("new message: %s", handle);
+		if (direction == DIRECTION_OUTBOUND)
+			goto done;
 
-	notify_new_sms(handle, MET_NEW_MESSAGE);
+		DBG("new message: %s", handle);
+
+		notify_new_sms(handle, MET_NEW_MESSAGE);
 
 done:
-	g_free(handle);
+		g_free(handle);
+	}
 
 	return TRUE;
 }
