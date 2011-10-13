@@ -175,6 +175,7 @@ struct request {
 	unsigned long flags;
 	gboolean deleted;
 	void *set_status_call;
+	DBusPendingCall *pc;
 	union {
 		messages_folder_listing_cb folder_list;
 		messages_get_messages_listing_cb messages_list;
@@ -186,14 +187,12 @@ struct request {
 struct session {
 	char *cwd;
 	struct message_folder *folder;
-	gboolean aborted;
 	void *event_user_data;
 	messages_event_cb event_cb;
 	struct request *request;
 	GHashTable *msg_stat;
 	GDestroyNotify abort_request;
 	void *request_data;
-	gboolean destroy;
 	gboolean push_in_progress;
 	GSList *mns_event_cache;
 };
@@ -204,6 +203,18 @@ static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
 static gint newmsg_watch_id, delmsg_watch_id, delgrp_watch_id;
 static GArray *msg_grp;
+
+static void free_request(struct request *request)
+{
+	g_free(request->name);
+	g_free(request->filter->period_begin);
+	g_free(request->filter->period_end);
+	g_free(request->filter->originator);
+	g_free(request->filter->recipient);
+	g_free(request->filter);
+
+	g_free(request);
+}
 
 static void free_msg_data(struct messages_message *msg)
 {
@@ -765,11 +776,7 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	if (reply == NULL)
 		goto end;
 
-	if (session->aborted)
-		goto aborted;
-
 	msg_data = pull_message_data(reply);
-
 
 	ihandle = g_ascii_strtoll(msg_data->handle, NULL, 10);
 	igrp = g_ascii_strtoll(reply[MESSAGE_GROUP] + MESSAGE_GRP_PREFIX_LEN,
@@ -831,7 +838,7 @@ end:
 	request->cb.messages_list(session, 0, request->size - request->offset,
 						request->new_message, NULL,
 						request->user_data);
-aborted:
+
 	g_free(request->filter->period_begin);
 	g_free(request->filter->period_end);
 	g_free(request->filter->originator);
@@ -841,8 +848,6 @@ aborted:
 	g_free(request);
 
 	session->request = NULL;
-	if (session->destroy)
-		messages_disconnect(session);
 }
 
 static void get_message_resp(const char **reply, void *s)
@@ -859,9 +864,6 @@ static void get_message_resp(const char **reply, void *s)
 
 	if (reply == NULL)
 		goto done;
-
-	if (session->aborted)
-		goto aborted;
 
 	msg_data = pull_message_data(reply);
 
@@ -922,13 +924,10 @@ done:
 
 	request->cb.message(session, err, FALSE, NULL, request->user_data);
 
-aborted:
 	g_free(request->name);
 	g_free(request);
 
 	session->request = NULL;
-	if (session->destroy)
-		messages_disconnect(session);
 }
 
 static void session_dispatch_event(struct session *session,
@@ -1295,11 +1294,7 @@ void messages_disconnect(void *s)
 
 	messages_set_notification_registration(session, NULL, NULL);
 
-	if (session->request != NULL) {
-		session->destroy = TRUE;
-
-		return;
-	}
+	messages_abort(session);
 
 	g_hash_table_destroy(session->msg_stat);
 	g_free(session->cwd);
@@ -1411,22 +1406,22 @@ int messages_set_folder(void *s, const char *name, gboolean cdup)
 	return 0;
 }
 
-static gboolean async_get_folder_listing(void *s) {
+int messages_get_folder_listing(void *s, const char *name,
+					uint16_t max, uint16_t offset,
+					messages_folder_listing_cb callback,
+					void *user_data)
+{
 	struct session *session = s;
-	struct request *request = session->request;
 	gboolean count = FALSE;
 	int folder_count = 0;
 	char *path = NULL;
 	struct message_folder *folder;
 	GSList *dir;
 
-	if (session->aborted)
-		goto aborted;
-
-	if (request->name && strchr(request->name, '/') != NULL)
+	if (name && strchr(name, '/') != NULL)
 		goto done;
 
-	path = g_build_filename(session->cwd, request->name, NULL);
+	path = g_build_filename(session->cwd, name, NULL);
 
 	if (path == NULL || strlen(path) == 0)
 		goto done;
@@ -1436,59 +1431,26 @@ static gboolean async_get_folder_listing(void *s) {
 	if (folder == NULL)
 		goto done;
 
-	if (request->max == 0) {
-		request->max = 0xffff;
-		request->offset = 0;
+	if (max == 0) {
+		max = 0xffff;
+		offset = 0;
 		count = TRUE;
 	}
 
 	for (dir = folder->subfolders; dir &&
-				(folder_count - request->offset) < request->max;
+				(folder_count - offset) < max;
 				folder_count++, dir = g_slist_next(dir)) {
 		struct message_folder *dir_data = dir->data;
 
-		if (count == FALSE && request->offset <= folder_count)
-			request->cb.folder_list(session, -EAGAIN, 1,
-							dir_data->name,
-							request->user_data);
+		if (count == FALSE && offset <= folder_count)
+			callback(session, -EAGAIN, 1, dir_data->name,
+								user_data);
 	}
 
 done:
-	request->cb.folder_list(session, 0, folder_count, NULL,
-							request->user_data);
+	callback(session, 0, folder_count, NULL, user_data);
 
 	g_free(path);
-
-aborted:
-	g_free(request->name);
-	g_free(request);
-
-	session->request = NULL;
-	if (session->destroy)
-		messages_disconnect(session);
-
-	return FALSE;
-}
-
-int messages_get_folder_listing(void *s, const char *name,
-					uint16_t max, uint16_t offset,
-					messages_folder_listing_cb callback,
-					void *user_data)
-{
-	struct session *session = s;
-	struct request *request = g_new0(struct request, 1);
-
-	request->name = g_strdup(name);
-	request->max = max;
-	request->offset = offset;
-	request->cb.folder_list = callback;
-	request->user_data = user_data;
-
-	session->aborted = FALSE;
-	session->request = request;
-
-	g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, async_get_folder_listing,
-						session, NULL);
 
 	return 0;
 }
@@ -1503,7 +1465,6 @@ int messages_get_messages_listing(void *s, const char *name,
 	struct request *request;
 	char *path, *query;
 	struct message_folder *folder = NULL;
-	DBusPendingCall *call;
 	int err = 0;
 
 	if (name == NULL || strlen(name) == 0) {
@@ -1539,7 +1500,6 @@ int messages_get_messages_listing(void *s, const char *name,
 	request->user_data = user_data;
 	request->deleted = g_strcmp0(folder->name, "deleted") ? FALSE : TRUE;
 
-	session->aborted = FALSE;
 	session->request = request;
 
 	if (max == 0) {
@@ -1548,7 +1508,7 @@ int messages_get_messages_listing(void *s, const char *name,
 		request->count = TRUE;
 	}
 
-	call = query_tracker(query, session, &err);
+	request->pc = query_tracker(query, session, &err);
 
 	g_free(query);
 
@@ -1560,7 +1520,6 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 {
 	struct session *session = s;
 	struct request *request;
-	DBusPendingCall *call;
 	int err = 0;
 	char *handle, *query_handle, *query;
 
@@ -1591,10 +1550,9 @@ int messages_get_message(void *s, const char *h, unsigned long flags,
 	request->generate_response = get_message_resp;
 	request->user_data = user_data;
 
-	session->aborted = FALSE;
 	session->request = request;
 
-	call = query_tracker(query, session, &err);
+	request->pc = query_tracker(query, session, &err);
 
 failed:
 	g_free(query_handle);
@@ -1609,7 +1567,7 @@ static void messages_qt_callback(int err, void *user_data)
 	struct session *session = user_data;
 	struct request *request = session->request;
 
-	if (!session->aborted && request->cb.status)
+	if (request->cb.status)
 		request->cb.status(session, err, request->user_data);
 
 	g_free(request);
@@ -1929,7 +1887,6 @@ static void send_sms_messaging_pc(DBusPendingCall *pc, void *user_data)
 		goto failed;
 	}
 
-
 	DBG("Message UUID: %s", uuid);
 	request->uuid = g_strdup(uuid);
 
@@ -2157,7 +2114,11 @@ void messages_abort(void *s)
 	if (session->abort_request != NULL)
 		session->abort_request(session);
 
-	session->aborted = TRUE;
+	if (session->request != NULL && session->request->pc != NULL) {
+		dbus_pending_call_cancel(session->request->pc);
+		free_request(session->request);
+	}
+
 	session->abort_request = NULL;
 	session->request_data = NULL;
 }
