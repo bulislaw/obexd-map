@@ -234,6 +234,7 @@ struct mas_session {
 	obex_object_t *obex_obj;
 	void *request;
 	GDestroyNotify request_free;
+	GQueue *events_queue;
 };
 
 struct any_object {
@@ -607,6 +608,62 @@ static void append_entry(DBusMessageIter *dict,
 	dbus_message_iter_close_container(dict, &entry);
 }
 
+static void event_free(struct messages_event *event)
+{
+	g_free(event->handle);
+	g_free(event->folder);
+	g_free(event->old_folder);
+	g_free(event);
+}
+
+static void clear_events_queue(struct mas_session *mas)
+{
+	GList *cur;
+
+	for (cur = mas->events_queue->head; cur != NULL; cur = cur->next)
+		event_free(cur->data);
+
+	g_queue_clear(mas->events_queue);
+}
+
+static void messages_event_pcn(DBusPendingCall *pc, void *user_data);
+
+static void send_next_event(struct mas_session *mas)
+{
+	struct messages_event *event;
+	DBusMessage *outgoing;
+	unsigned char evt;
+	unsigned char msgtype = 2;
+
+	event = g_queue_pop_head(mas->events_queue);
+	if (event == NULL)
+		return;
+
+	evt = (unsigned char)event->type + 1;
+
+	outgoing = dbus_message_new_method_call("org.openobex.client",
+			mas->mns_path, "org.openobex.MNS", "SendEvent");
+
+	dbus_message_append_args(outgoing,
+			DBUS_TYPE_BYTE, &event->instance_id,
+			DBUS_TYPE_BYTE, &evt,
+			DBUS_TYPE_STRING, &event->handle,
+			DBUS_TYPE_STRING, &event->folder,
+			DBUS_TYPE_STRING, &event->old_folder,
+			DBUS_TYPE_BYTE, &msgtype,
+			DBUS_TYPE_INVALID);
+
+	dbus_connection_send_with_reply(mas->dbus, outgoing,
+			&mas->pending_event, -1);
+
+	dbus_message_unref(outgoing);
+
+	dbus_pending_call_set_notify(mas->pending_event,
+			messages_event_pcn, mas, NULL);
+
+	event_free(event);
+}
+
 static int mns_stop_session(struct mas_session *mas);
 
 static void mns_start_session_pcn(DBusPendingCall *pc, void *user_data)
@@ -647,6 +704,8 @@ cleanup:
 
 	if (mas->mns_enabled == FALSE)
 		mns_stop_session(mas);
+	else
+		send_next_event(mas);
 }
 
 /* XXX: How to act when connection is unexpectedly closed.
@@ -730,6 +789,7 @@ static int mns_stop_session(struct mas_session *mas)
 
 	DBG("");
 
+	clear_events_queue(mas);
 	mas->mns_enabled = FALSE;
 
 	if (mas->pending_session)
@@ -786,42 +846,30 @@ static void messages_event_pcn(DBusPendingCall *pc, void *user_data)
 	 */
 	if (!mas->mns_enabled)
 		mns_stop_session(mas);
+	else
+		send_next_event(mas);
 }
 
 static void my_messages_event_cb(void *session, const struct messages_event *data, void *user_data)
 {
 	struct mas_session *mas = user_data;
-	DBusMessage *outgoing;
-	unsigned char evt = (unsigned char)data->type + 1;
-	unsigned char msgtype = 2;
 
-/*	if (mas->pending_session || mas->pending_event)
-		return -EAGAIN;*/
+	DBG("");
 
-	if (!mas->mns_path)
-		return; /* -EACCES;*/
+	if (!mas->mns_path) {
+		DBG("Backend tried to pushed event, but MNS is not connected!");
+		return;
+	}
 
-	outgoing = dbus_message_new_method_call("org.openobex.client",
-			mas->mns_path, "org.openobex.MNS", "SendEvent");
+	g_queue_push_tail(mas->events_queue, (gpointer)data);	/* FIXME */
 
-	dbus_message_append_args(outgoing,
-			DBUS_TYPE_BYTE, &data->instance_id,
-			DBUS_TYPE_BYTE, &evt,
-			DBUS_TYPE_STRING, &data->handle,
-			DBUS_TYPE_STRING, &data->folder,
-			DBUS_TYPE_STRING, &data->old_folder,
-			DBUS_TYPE_BYTE, &msgtype,
-			DBUS_TYPE_INVALID);
+	if (mas->pending_session || mas->pending_event) {
+		DBG("MNS session connection or event sending in progress.");
+		return;
+	}
 
-	dbus_connection_send_with_reply(mas->dbus, outgoing,
-			&mas->pending_event, -1);
+	send_next_event(mas);
 
-	dbus_message_unref(outgoing);
-
-	dbus_pending_call_set_notify(mas->pending_event,
-			messages_event_pcn, mas, NULL);
-
-	/*return 0;*/
 }
 
 static int set_notification_registration(struct mas_session *mas, int state)
@@ -888,6 +936,7 @@ static void mas_reset(struct obex_session *os, void *user_data)
 
 static void mas_clean(struct mas_session *mas)
 {
+	g_queue_free(mas->events_queue);
 	g_free(mas->remote_addr);
 	g_free(mas);
 }
@@ -913,6 +962,7 @@ static void *mas_connect(struct obex_session *os, int *err)
 		*sep = 0;
 
 	mas->obex_os = os;
+	mas->events_queue = g_queue_new();
 
 	manager_register_session(os);
 
@@ -934,6 +984,7 @@ static void mas_disconnect(struct obex_session *os, void *user_data)
 	messages_disconnect(mas->backend_data);
 
 	mas->disconnected = TRUE;
+	clear_events_queue(mas);
 
 	if (mas->mns_enabled || mas->pending_event || mas->pending_session)
 		set_notification_registration(mas, 0);

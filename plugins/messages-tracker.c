@@ -963,8 +963,6 @@ static void notify_new_sms(const char *handle, enum messages_event_type type,
 
 		session_dispatch_event(session, data);
 	}
-
-	free_event_data(data);
 }
 
 static void notify_cached_events(struct session *session, const char *h)
@@ -987,8 +985,6 @@ static void notify_cached_events(struct session *session, const char *h)
 		if (g_slist_find(mns_srv, session) != NULL)
 			session->event_cb(session, data,
 						session->event_user_data);
-
-		free_event_data(data);
 	}
 
 	g_slist_free(session->mns_event_cache);
