@@ -111,6 +111,7 @@ struct bmsg_parser {
 	char *eol;
 	ssize_t nleft;
 	struct bmsg_bmsg_vcard *vcard;
+	GRegex *vcard_re;
 };
 
 static int match_full_line(struct bmsg_parser *pd, const char *pattern)
@@ -127,6 +128,35 @@ static int match_full_line(struct bmsg_parser *pd, const char *pattern)
 	pd->nleft -= len;
 
 	return 0;
+}
+
+static gboolean match_vcard_item(struct bmsg_parser *pd, const char **name,
+				size_t *nlen, const char **value, size_t *vlen)
+{
+	GMatchInfo *minfo = NULL;
+	size_t len;
+	gint spos, epos;
+
+	len = pd->eol - pd->input;
+	if (!g_regex_match_full(pd->vcard_re, pd->input, len, 0, 0, &minfo,
+									NULL))
+		return FALSE;
+
+	g_match_info_fetch_pos(minfo, 1, &spos, &epos);
+	*name = pd->input + spos;
+	*nlen = epos - spos;
+
+	g_match_info_fetch_pos(minfo, 3, &spos, &epos);
+	*value = pd->input + spos;
+	*vlen = epos - spos;
+
+	g_match_info_free(minfo);
+
+	len += 2;
+	pd->input += len;
+	pd->nleft -= len;
+
+	return TRUE;
 }
 
 static ssize_t match_with_param(struct bmsg_parser *pd, const char *pattern,
@@ -254,36 +284,51 @@ static int bmsg_parser_originator(struct bmsg_parser *pd)
 	return 0;
 }
 
+/* TODO:
+ * support for encoded values
+ * better support for vCard 3.0 (e.g. quoting)
+ * unfolding
+ */
 static int bmsg_parser_vcard(struct bmsg_parser *pd)
 {
-	/* FIXME: This could be more sophisticated, e.g. support folding or
-	 * preprocess N field */
 	ssize_t len;
-	char *val;
+	const char *name, *val;
+	size_t nlen, vlen;
 
-	if ((len = match_with_param(pd, "VERSION:", &val)) >= 0) {
-		if (strncmp(val, "2.1", len) == 0)
-			pd->vcard->version = BMSG_VCARD_21;
-		else if (strncmp(val, "3.0", len) == 0)
-			pd->vcard->version = BMSG_VCARD_30;
-		else
-			return -1;
-	} else if ((len = match_with_param(pd, "FN:", &val)) >= 0) {
-		if (pd->vcard->fn == NULL)
-			pd->vcard->fn = g_strndup(val, len);
-	} else if ((len = match_with_param(pd, "N:", &val)) >= 0) {
-		if (pd->vcard->n == NULL)
-			pd->vcard->n = g_strndup(val, len);
-	} else if ((len = match_with_param(pd, "TEL:", &val)) >= 0) {
-		if (pd->vcard->tel == NULL)
-			pd->vcard->tel = g_strndup(val, len);
-	} else if ((len = match_with_param(pd, "EMAIL:", &val)) >= 0) {
-		if (pd->vcard->email == NULL)
-			pd->vcard->email = g_strndup(val, len);
-	} else if (match_full_line(pd, "END:VCARD") == 0) {
+	if (match_full_line(pd, "END:VCARD") == 0) {
 		pd->state = pd->unwind_state;
-	} else {
-		return -1;
+		return 0;
+	}
+
+	if (!match_vcard_item(pd, &name, &nlen, &val, &vlen)) {
+		len = pd->eol - pd->input + 2;
+		pd->input += len;
+		pd->nleft -= len;
+
+		return 0;
+	}
+
+	if (g_ascii_strncasecmp(name, "VERSION", nlen) == 0) {
+		if (g_ascii_strncasecmp(val, "2.1", vlen) == 0)
+			pd->vcard->version = BMSG_VCARD_21;
+		else if (g_ascii_strncasecmp(val, "3.0", vlen) == 0)
+			pd->vcard->version = BMSG_VCARD_30;
+		else {
+			DBG("Incorrect vCard version!");
+			return -1;
+		}
+	} else if (g_ascii_strncasecmp(name, "FN", nlen) == 0) {
+		if (pd->vcard->fn == NULL)
+			pd->vcard->fn = g_strndup(val, vlen);
+	} else if (g_ascii_strncasecmp(name, "N", nlen) == 0) {
+		if (pd->vcard->n == NULL)
+			pd->vcard->n = g_strndup(val, vlen);
+	} else if (g_ascii_strncasecmp(name, "TEL", nlen) == 0) {
+		if (pd->vcard->tel == NULL)
+			pd->vcard->tel = g_strndup(val, vlen);
+	} else if (g_ascii_strncasecmp(name, "EMAIL", nlen) == 0) {
+		if (pd->vcard->email == NULL)
+			pd->vcard->email = g_strndup(val, vlen);
 	}
 
 	return 0;
@@ -503,9 +548,23 @@ void bmsg_free(struct bmsg_bmsg *bmsg)
 struct bmsg_parser *bmsg_parser_new(void)
 {
 	struct bmsg_parser *pd;
+	GError *gerror = NULL;
+	GRegex *re;
+
+	re = g_regex_new("^(?:[[:alnum:].]+\\.)?([[:alpha:]]+)"
+						"(?:;([^:]*?))?:(.*)",
+						G_REGEX_CASELESS | G_REGEX_RAW,
+						0, &gerror);
+	if (gerror != NULL) {
+		DBG("g_regex_new error: %s", gerror->message);
+		g_error_free(gerror);
+
+		return NULL;
+	}
 
 	pd = g_new0(struct bmsg_parser, 1);
 	pd->bmsg = bmsg_new();
+	pd->vcard_re = re;
 
 	return pd;
 }
@@ -590,6 +649,8 @@ void bmsg_parser_free(struct bmsg_parser *pd)
 		return;
 
 	bmsg_free(pd->bmsg);
+	g_regex_unref(pd->vcard_re);
+
 	g_free(pd);
 }
 
