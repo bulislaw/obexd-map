@@ -275,6 +275,43 @@ static const uint8_t MAS_TARGET[TARGET_SIZE] = {
 			0xbb, 0x58, 0x2b, 0x40, 0x42, 0x0c, 0x11, 0xdb,
 			0xb0, 0xde, 0x08, 0x00, 0x20, 0x0c, 0x9a, 0x66  };
 
+struct messages_event *messages_event_new(enum messages_event_type event_type,
+							enum bmsg_type msg_type,
+							const char *handle,
+							const char *folder,
+							const char *old_folder)
+{
+	struct messages_event *event;
+
+	event = g_new0(struct messages_event, 1);
+	event->refcount = 1;
+
+	event->type = event_type;
+	event->msg_type = msg_type;
+	event->handle = g_strdup(handle);
+	event->folder = g_strdup(folder);
+	event->old_folder = g_strdup(old_folder);
+
+	return event;
+}
+
+void messages_event_ref(struct messages_event *event)
+{
+	++event->refcount;
+}
+
+void messages_event_unref(struct messages_event *event)
+{
+	--event->refcount;
+
+	if (event->refcount == 0) {
+		g_free(event->handle);
+		g_free(event->folder);
+		g_free(event->old_folder);
+		g_free(event);
+	}
+}
+
 static int find_aparam_tag(uint8_t tag)
 {
 	int i;
@@ -608,20 +645,12 @@ static void append_entry(DBusMessageIter *dict,
 	dbus_message_iter_close_container(dict, &entry);
 }
 
-static void event_free(struct messages_event *event)
-{
-	g_free(event->handle);
-	g_free(event->folder);
-	g_free(event->old_folder);
-	g_free(event);
-}
-
 static void clear_events_queue(struct mas_session *mas)
 {
 	GList *cur;
 
 	for (cur = mas->events_queue->head; cur != NULL; cur = cur->next)
-		event_free(cur->data);
+		messages_event_unref(cur->data);
 
 	g_queue_clear(mas->events_queue);
 }
@@ -634,6 +663,7 @@ static void send_next_event(struct mas_session *mas)
 	DBusMessage *outgoing;
 	unsigned char evt;
 	unsigned char msgtype = 2;
+	unsigned char instance_id = 0;
 
 	event = g_queue_pop_head(mas->events_queue);
 	if (event == NULL)
@@ -645,7 +675,7 @@ static void send_next_event(struct mas_session *mas)
 			mas->mns_path, "org.openobex.MNS", "SendEvent");
 
 	dbus_message_append_args(outgoing,
-			DBUS_TYPE_BYTE, &event->instance_id,
+			DBUS_TYPE_BYTE, &instance_id,
 			DBUS_TYPE_BYTE, &evt,
 			DBUS_TYPE_STRING, &event->handle,
 			DBUS_TYPE_STRING, &event->folder,
@@ -661,7 +691,7 @@ static void send_next_event(struct mas_session *mas)
 	dbus_pending_call_set_notify(mas->pending_event,
 			messages_event_pcn, mas, NULL);
 
-	event_free(event);
+	messages_event_unref(event);
 }
 
 static int mns_stop_session(struct mas_session *mas);
@@ -850,7 +880,7 @@ static void messages_event_pcn(DBusPendingCall *pc, void *user_data)
 		send_next_event(mas);
 }
 
-static void my_messages_event_cb(void *session, const struct messages_event *data, void *user_data)
+static void my_messages_event_cb(void *session, struct messages_event *data, void *user_data)
 {
 	struct mas_session *mas = user_data;
 
@@ -861,7 +891,8 @@ static void my_messages_event_cb(void *session, const struct messages_event *dat
 		return;
 	}
 
-	g_queue_push_tail(mas->events_queue, (gpointer)data);	/* FIXME */
+	messages_event_ref(data);
+	g_queue_push_tail(mas->events_queue, data);
 
 	if (mas->pending_session || mas->pending_event) {
 		DBG("MNS session connection or event sending in progress.");

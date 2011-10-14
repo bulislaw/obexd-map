@@ -219,16 +219,6 @@ static void free_msg_data(struct messages_message *msg)
 	g_free(msg);
 }
 
-static void free_event_data(struct messages_event *event)
-{
-	g_free(event->handle);
-	g_free(event->folder);
-	g_free(event->old_folder);
-	g_free(event->msg_type);
-
-	g_free(event);
-}
-
 static struct messages_filter *copy_messages_filter(
 					const struct messages_filter *orig)
 {
@@ -913,13 +903,7 @@ static void session_dispatch_event(struct session *session,
 	if (session->push_in_progress) {
 		struct messages_event *data;
 
-		data = g_new0(struct messages_event, 1);
-		data->type = event->type;
-		data->msg_type = g_strdup(event->msg_type);
-		data->old_folder = g_strdup(event->old_folder);
-		data->handle = g_strdup(event->handle);
-		data->folder = g_strdup(event->folder);
-
+		messages_event_ref(data);
 		session->mns_event_cache = g_slist_append(
 						session->mns_event_cache,
 						data);
@@ -937,32 +921,31 @@ static void notify_new_sms(const char *handle, enum messages_event_type type,
 {
 	struct messages_event *data;
 	GSList *next;
+	char *folder;
 
 	DBG("");
 
-	data = g_new0(struct messages_event, 1);
-	data->type = type;
-	data->msg_type = g_strdup("SMS_GSM");
-	data->old_folder = g_strdup("");
-	data->handle = fill_handle(handle);
-
 	switch (direction) {
 	case DIRECTION_INBOUND:
-		data->folder = g_strdup("telecom/msg/inbox");
+		folder = "telecom/msg/inbox";
 		break;
 	case DIRECTION_OUTBOUND:
-		data->folder = g_strdup("telecom/msg/sent");
+		folder = "telecom/msg/sent";
 		break;
 	default:
-		data->folder = g_strdup("");
+		folder = "";
 		break;
 	}
+
+	data = messages_event_new(type, BMSG_T_SMS_GSM, handle, folder, "");
 
 	for (next = mns_srv; next != NULL; next = g_slist_next(next)) {
 		struct session *session = next->data;
 
 		session_dispatch_event(session, data);
 	}
+
+	messages_event_unref(data);
 }
 
 static void notify_cached_events(struct session *session, const char *h)
@@ -977,7 +960,7 @@ static void notify_cached_events(struct session *session, const char *h)
 		struct messages_event *data = event->data;
 
 		if (handle != NULL && g_strcmp0(handle, data->handle) == 0) {
-			free_event_data(data);
+			messages_event_unref(data);
 
 			continue;
 		}
@@ -985,6 +968,8 @@ static void notify_cached_events(struct session *session, const char *h)
 		if (g_slist_find(mns_srv, session) != NULL)
 			session->event_cb(session, data,
 						session->event_user_data);
+
+		messages_event_unref(data);
 	}
 
 	g_slist_free(session->mns_event_cache);

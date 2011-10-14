@@ -95,17 +95,23 @@ enum messages_event_type {
 	MET_MESSAGE_SHIFT
 };
 
-/* Data for sending MNS notification. Handle shall be formatted as described in
- * messages_message.
- */
 struct messages_event {
 	enum messages_event_type type;
-	uint8_t instance_id;
 	char *handle;
 	char *folder;
 	char *old_folder;
-	char *msg_type;
+	enum bmsg_type msg_type;
+	unsigned int refcount;
 };
+
+struct messages_event *messages_event_new(enum messages_event_type event_type,
+							enum bmsg_type msg_type,
+							const char *handle,
+							const char *folder,
+							const char *old_folder);
+void messages_event_ref(struct messages_event *event);
+void messages_event_unref(struct messages_event *event);
+
 
 /* parameter_mask: |-ed PMASK_* values
  * See MAP specification for the rest.
@@ -180,7 +186,7 @@ void messages_disconnect(void *session);
  * set to NULL.
  */
 typedef void (*messages_event_cb)(void *session,
-		const struct messages_event *event,
+		struct messages_event *event,
 		void *user_data);
 
 int messages_set_notification_registration(void *session,
