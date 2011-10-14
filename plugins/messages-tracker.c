@@ -50,9 +50,10 @@
 
 #define TRACKER_MESSAGE_TSTAMP_FORMAT "%Y-%m-%dT%TZ"
 
-#define QUERY_RESPONSE_SIZE 21
+#define QUERY_RESPONSE_SIZE 15
 #define MESSAGE_HANDLE_SIZE 16
 #define MESSAGE_HANDLE_PREFIX_LEN 8
+#define MESSAGE_GRP_PREFIX_LEN 13
 
 #define SMS_DEFAULT_CHARSET "UTF-8"
 
@@ -79,6 +80,7 @@
 #define MESSAGE_READ 11
 #define MESSAGE_SENT 12
 #define MESSAGE_CONTENT 13
+#define MESSAGE_GROUP 14
 
 #define LIST_MESSAGES_QUERY						\
 "SELECT "								\
@@ -96,6 +98,7 @@
 "nmo:isRead(?msg) "							\
 "nmo:isSent(?msg) "							\
 "nie:plainTextContent(?msg) "						\
+"nmo:communicationChannel(?msg) "					\
 "WHERE { "								\
 	"?msg a nmo:SMSMessage . "					\
 	"%s "								\
@@ -199,7 +202,8 @@ static struct message_folder *folder_tree = NULL;
 static DBusConnection *session_connection = NULL;
 static unsigned long message_id_tracker_id;
 static GSList *mns_srv;
-static gint newmsg_watch_id, delmsg_watch_id;
+static gint newmsg_watch_id, delmsg_watch_id, delgrp_watch_id;
+static GArray *msg_grp;
 
 static void free_msg_data(struct messages_message *msg)
 {
@@ -753,7 +757,8 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	struct session *session = user_data;
 	struct request *request = session->request;
 	struct messages_message *msg_data;
-	int stat, ihandle;
+	int stat, ihandle, igrp, *group;
+	unsigned i;
 
 	DBG("reply %p", reply);
 
@@ -765,7 +770,22 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 
 	msg_data = pull_message_data(reply);
 
+
 	ihandle = g_ascii_strtoll(msg_data->handle, NULL, 10);
+	igrp = g_ascii_strtoll(reply[MESSAGE_GROUP] + MESSAGE_GRP_PREFIX_LEN,
+								NULL, 10);
+
+	for (i = 0; i < msg_grp->len; i++) {
+		if (ihandle == g_array_index(msg_grp, int *, i)[1])
+			goto already_exists;
+	}
+
+	group = g_new0(int, 2);
+	group[0] = igrp;
+	group[1] = ihandle;
+	g_array_append_val(msg_grp, group);
+
+already_exists:
 	stat = GPOINTER_TO_INT(g_hash_table_lookup(session->msg_stat,
 						GINT_TO_POINTER(ihandle)));
 	if (stat == 0) {
@@ -1069,6 +1089,7 @@ static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 {
 	DBusMessageIter arg;
 	int ihandle;
+	unsigned i;
 	char *handle;
 
 	DBG("");
@@ -1087,7 +1108,68 @@ static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 
 	notify_new_sms(handle, MET_MESSAGE_DELETED);
 
+	for (i = 0; i < msg_grp->len; i++) {
+		int *data = g_array_index(msg_grp, int *, i);
+
+		if (ihandle == data[1]) {
+			g_free(data);
+			msg_grp = g_array_remove_index_fast(msg_grp, i);
+
+			break;
+		}
+	}
+
 	g_free(handle);
+
+	return TRUE;
+}
+
+static gboolean handle_del_grp(DBusConnection * connection, DBusMessage * msg,
+							void *user_data)
+{
+	DBusMessageIter arg, array;
+
+	DBG("");
+
+	if (!dbus_message_iter_init(msg, &arg))
+		return TRUE;
+
+	if (dbus_message_iter_get_arg_type(&arg) != DBUS_TYPE_ARRAY)
+		return TRUE;
+
+	dbus_message_iter_recurse(&arg, &array);
+
+	for ( ; dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_INVALID;
+					dbus_message_iter_next(&array)) {
+		int32_t grp;
+		unsigned i;
+
+		if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_INT32)
+			return TRUE;
+
+		dbus_message_iter_get_basic(&array, &grp);
+
+		DBG("Group deleted: %d, searching for messages", grp);
+
+		for (i = 0; i < msg_grp->len; i++) {
+			int *data = g_array_index(msg_grp, int *, i);
+
+			if (grp == data[0]) {
+				char *handle = g_strdup_printf("%d", data[1]);
+
+				DBG("message deleted: %s", handle);
+
+				notify_new_sms(handle, MET_MESSAGE_DELETED);
+
+				g_free(data);
+				msg_grp = g_array_remove_index_fast(msg_grp, i);
+				/* last element becomes i-th */
+				i--;
+
+				g_free(handle);
+			}
+		}
+	}
 
 	return TRUE;
 }
@@ -1161,6 +1243,8 @@ int messages_init(void)
 	if (retrieve_message_id_tracker_id() < 0)
 		return -1;
 
+	msg_grp = g_array_new(FALSE, FALSE, sizeof(int *));
+
 	messages_qt_init();
 
 	create_folder_tree();
@@ -1170,9 +1254,16 @@ int messages_init(void)
 
 void messages_exit(void)
 {
+	unsigned i;
+
 	destroy_folder_tree(folder_tree);
 
 	dbus_connection_unref(session_connection);
+
+	for (i = 0; i < msg_grp->len; i++)
+		g_free(g_array_index(msg_grp, int *, i));
+
+	g_array_free(msg_grp, TRUE);
 
 	messages_qt_exit();
 }
@@ -1232,8 +1323,16 @@ int messages_set_notification_registration(void *s, messages_event_cb cb,
 							"eventDeleted",
 							handle_del_sms,
 							NULL, NULL);
+			delgrp_watch_id = g_dbus_add_signal_watch(
+							session_connection,
+							NULL, NULL,
+							"com.nokia.commhistory",
+							"groupsDeleted",
+							handle_del_grp,
+							NULL, NULL);
 		}
-		if (newmsg_watch_id == 0 || delmsg_watch_id == 0)
+		if (newmsg_watch_id == 0 || delmsg_watch_id == 0 ||
+							delgrp_watch_id == 0)
 			return -EIO;
 
 		session->event_user_data = user_data;
@@ -1248,6 +1347,8 @@ int messages_set_notification_registration(void *s, messages_event_cb cb,
 							newmsg_watch_id);
 			g_dbus_remove_watch(session_connection,
 							delmsg_watch_id);
+			g_dbus_remove_watch(session_connection,
+							delgrp_watch_id);
 		}
 	}
 
