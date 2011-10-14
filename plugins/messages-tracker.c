@@ -193,7 +193,7 @@ struct session {
 	GHashTable *msg_stat;
 	GDestroyNotify abort_request;
 	void *request_data;
-	gboolean push_in_progress;
+	gboolean op_in_progress;
 	GSList *mns_event_cache;
 };
 
@@ -959,7 +959,7 @@ static void session_dispatch_event(struct session *session,
 		}
 	}
 
-	if (session->push_in_progress) {
+	if (session->op_in_progress) {
 		struct messages_event *data;
 
 		messages_event_ref(data);
@@ -1090,12 +1090,30 @@ done:
 	return TRUE;
 }
 
+static void notify_del_sms(const char *handle)
+{
+	unsigned i;
+	int ihandle = g_ascii_strtoll(handle, NULL, 10);
+
+	notify_new_sms(handle, MET_MESSAGE_DELETED);
+
+	for (i = 0; i < msg_grp->len; i++) {
+		int *data = g_array_index(msg_grp, int *, i);
+
+		if (ihandle == data[1]) {
+			g_free(data);
+			msg_grp = g_array_remove_index_fast(msg_grp, i);
+
+			break;
+		}
+	}
+}
+
 static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 							void *user_data)
 {
 	DBusMessageIter arg;
 	int ihandle;
-	unsigned i;
 	char *handle;
 
 	DBG("");
@@ -1112,18 +1130,7 @@ static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 
 	DBG("message deleted: %s", handle);
 
-	notify_new_sms(handle, MET_MESSAGE_DELETED);
-
-	for (i = 0; i < msg_grp->len; i++) {
-		int *data = g_array_index(msg_grp, int *, i);
-
-		if (ihandle == data[1]) {
-			g_free(data);
-			msg_grp = g_array_remove_index_fast(msg_grp, i);
-
-			break;
-		}
-	}
+	notify_del_sms(handle);
 
 	g_free(handle);
 
@@ -1611,11 +1618,18 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 
 		break;
 	case 0x1:
+		session->op_in_progress = TRUE;
+
 		ret = messages_qt_set_deleted(&request->set_status_call,
 						handle, value & 0x01,
 						messages_qt_callback, session);
 		if (ret < 0)
 			return ret;
+
+		notify_del_sms(handle);
+
+		session->op_in_progress = FALSE;
+		notify_cached_events(session, handle);
 
 		if(value == 1)
 			stat |= MESSAGE_STAT_DELETED;
@@ -1670,7 +1684,7 @@ static void push_message_abort(gpointer s)
 	g_free(request->uuid);
 	g_free(request);
 
-	session->push_in_progress = FALSE;
+	session->op_in_progress = FALSE;
 	notify_cached_events(session, NULL);
 }
 
@@ -1997,7 +2011,7 @@ int messages_push_message(void *s, struct bmsg_bmsg *bmsg, const char *name,
 	struct session *session = s;
 	struct push_message_request *request;
 
-	session->push_in_progress = TRUE;
+	session->op_in_progress = TRUE;
 
 	if ((flags & MESSAGES_UTF8) != MESSAGES_UTF8) {
 		DBG("Tried to push non-utf message");
