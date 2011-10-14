@@ -110,15 +110,26 @@ int obex_server_init(uint16_t service, const char *folder,
 void obex_server_exit(void)
 {
 	GSList *l;
+	GSList *driver_lists = NULL;
 
 	for (l = servers; l; l = l->next) {
 		struct obex_server *server = l->data;
 
 		server->transport->stop(server->transport_data);
+
+		if (g_slist_find(driver_lists, server->drivers) == NULL)
+			driver_lists = g_slist_prepend(driver_lists,
+							server->drivers);
+
 		obex_server_free(server);
 	}
 
 	g_slist_free(servers);
+
+	for (l = driver_lists; l != NULL; l = l->next)
+		g_slist_free(l->data);
+
+	g_slist_free(driver_lists);
 
 	return;
 }
