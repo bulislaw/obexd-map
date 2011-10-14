@@ -76,12 +76,19 @@ static void mns_send_event_callback(struct obc_session *session,
 	struct obc_transfer *transfer = obc_session_get_transfer(session);
 	DBusMessage *reply;
 
-	DBG("");
-	/*DBG("%d", gw_obex_xfer_object_done(transfer->xfer));*/
+	DBG("session = %p, mns = %p, transfer = %p", session, mns, transfer);
+
 	if (mns->msg == NULL)
 		goto done;
 
-	reply = dbus_message_new_method_return(mns->msg);
+	if (err != NULL) {
+		DBG("err: %s", err->message);
+		reply = g_dbus_create_error(mns->msg,
+						ERROR_INF ".Failed",
+						"%s", err->message);
+	} else {
+		reply = dbus_message_new_method_return(mns->msg);
+	}
 
 	g_dbus_send_message(conn, reply);
 	dbus_message_unref(mns->msg);
@@ -103,11 +110,8 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 	const char *handle, *folder, *old_folder;
 	struct event_apparam eapp;
 	char *cbuf;
-#if 0
-	struct session_data *session = user_data;
-#endif
 
-	DBG("");
+	DBG("mns = %p", mns);
 
 	if (mns->msg) {
 		DBG("Another transfer in progress!");
@@ -208,11 +212,6 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 
 	g_string_free(buf, FALSE);
 
-/*	if (session->msg)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InProgress",
-				"Transfer in progress");*/
-
 	/* XXX: currently it also sends obex length header. can we ignore this?
 	 * This makes test device respond with code 500.
 	 * (also see MAP specification, page 64)
@@ -235,8 +234,6 @@ static DBusMessage *mns_send_event(DBusConnection *connection,
 
 	mns->msg = dbus_message_ref(message);
 
-	//dbus_message_new_method_return(message);
-
 	return NULL;
 }
 
@@ -254,24 +251,19 @@ static void mns_free(void *data)
 	obc_session_unref(mns->session);
 	g_free(mns);
 }
-/*gboolean mns_register_interface(DBusConnection *connection, const char *path,*/
-				/*void *user_data, GDBusDestroyFunction destroy)*/
+
 static int mns_probe(struct obc_session *session)
 {
 	const char *path = obc_session_get_path(session);
 	struct mns *mns;
 
 	DBG("%s", path);
-	/*struct session_data *session = user_data;
-	void *priv;*/
 
 	mns = g_try_malloc0(sizeof(*mns));
 	if (!mns)
 		return -ENOMEM;
 
 	mns->session = obc_session_ref(session);
-
-	/*session_set_data(session, priv);*/
 
 	if (!g_dbus_register_interface(conn, path, MNS_INTERFACE,
 				mns_methods, NULL, NULL, mns, mns_free)) {
@@ -282,18 +274,13 @@ static int mns_probe(struct obc_session *session)
 	return 0;
 }
 
-/*void mns_unregister_interface(DBusConnection *connection, const char *path,
-				void *user_data)*/
 static void mns_remove(struct obc_session *session)
 {
 	const char *path = obc_session_get_path(session);
-	/*struct session_data *session = user_data;*/
-	/*void *priv = session_get_data(session);*/
+
+	DBG("%s", path);
 
 	g_dbus_unregister_interface(conn, path, MNS_INTERFACE);
-#if 0
-	g_free(priv);
-#endif
 }
 
 
