@@ -60,6 +60,11 @@
 
 #define MESSAGES_FILTER_BY_HANDLE "FILTER (xsd:string(?msg) = \"message:%s\" ) ."
 
+#define MESSAGE_STAT_EMPTY	0x01
+#define MESSAGE_STAT_READ	0x02
+#define MESSAGE_STAT_DELETED	0x04
+#define MESSAGE_STAT_SENT	0x08
+
 #define MESSAGE_HANDLE 0
 #define MESSAGE_SUBJECT 1
 #define MESSAGE_SDATE 2
@@ -173,11 +178,6 @@ struct request {
 		messages_get_message_cb message;
 		messages_set_message_status_cb status;
 	} cb;
-};
-
-struct message_status {
-	uint8_t read;
-	uint8_t deleted;
 };
 
 struct session {
@@ -753,7 +753,7 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 	struct session *session = user_data;
 	struct request *request = session->request;
 	struct messages_message *msg_data;
-	struct message_status *stat;
+	int stat, ihandle;
 
 	DBG("reply %p", reply);
 
@@ -765,20 +765,27 @@ static void get_messages_listing_resp(const char **reply, void *user_data)
 
 	msg_data = pull_message_data(reply);
 
-	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
-	if (stat == NULL) {
-		stat = g_new0(struct message_status, 1);
-		stat->read = msg_data->read;
+	ihandle = g_ascii_strtoll(msg_data->handle, NULL, 10);
+	stat = GPOINTER_TO_INT(g_hash_table_lookup(session->msg_stat,
+						GINT_TO_POINTER(ihandle)));
+	if (stat == 0) {
+		stat = MESSAGE_STAT_EMPTY;
+		if(msg_data->read)
+			stat |= MESSAGE_STAT_READ;
 
-		g_hash_table_insert(session->msg_stat,
-					g_strdup(msg_data->handle), stat);
-	} else if (stat != NULL && stat->read != STATUS_NOT_SET)
-		msg_data->read = stat->read;
+		if(msg_data->sent)
+			stat |= MESSAGE_STAT_SENT;
 
-	if (request->deleted && (stat == NULL || !stat->deleted))
+		g_hash_table_insert(session->msg_stat, GINT_TO_POINTER(ihandle),
+							GINT_TO_POINTER(stat));
+	} else {
+		msg_data->read = stat & MESSAGE_STAT_READ ? TRUE : FALSE;
+	}
+
+	if (request->deleted && !(stat & MESSAGE_STAT_DELETED))
 		goto done;
 
-	if (!request->deleted && (stat != NULL && stat->deleted))
+	if (!request->deleted && stat & MESSAGE_STAT_DELETED)
 		goto done;
 
 	request->size++;
@@ -826,8 +833,7 @@ static void get_message_resp(const char **reply, void *s)
 	struct bmsg *bmsg;
 	char *final_bmsg, *status, *folder, *handle;
 	struct phonebook_contact *contact;
-	struct message_status *stat;
-	int err;
+	int err, stat, ihandle;
 
 	DBG("reply %p", reply);
 
@@ -841,13 +847,17 @@ static void get_message_resp(const char **reply, void *s)
 
 	contact = pull_message_contact(reply, msg_data->sent);
 
-	stat = g_hash_table_lookup(session->msg_stat, msg_data->handle);
-	if (stat != NULL && stat->read != STATUS_NOT_SET)
-		msg_data->read = stat->read;
+	ihandle = g_ascii_strtoll(msg_data->handle, NULL, 10);
+	stat = GPOINTER_TO_INT(g_hash_table_lookup(session->msg_stat,
+						GINT_TO_POINTER(ihandle)));
+	if (stat & MESSAGE_STAT_READ)
+		msg_data->read = TRUE;
+	else if (stat != 0)
+		msg_data->read = FALSE;
 
 	status = msg_data->read ? "READ" : "UNREAD";
 
-	if (stat != NULL && stat->deleted == 1)
+	if (stat & MESSAGE_STAT_DELETED)
 		folder = g_strdup("telecom/msg/deleted");
 	else
 		folder = message2folder(msg_data);
@@ -904,6 +914,32 @@ aborted:
 static void session_dispatch_event(struct session *session,
 						struct messages_event *event)
 {
+	int ihandle, stat, direction;
+
+	if (event->type == MET_MESSAGE_DELETED) {
+		ihandle = g_ascii_strtoll(event->handle, NULL, 10);
+		if (!g_hash_table_lookup_extended(session->msg_stat,
+						GINT_TO_POINTER(ihandle),
+						NULL, (gpointer) &stat))
+			return;
+
+		direction = DIRECTION_INBOUND;
+		if (stat & MESSAGE_STAT_SENT)
+			direction = DIRECTION_OUTBOUND;
+
+		switch (direction) {
+		case DIRECTION_INBOUND:
+			event->folder = g_strdup("telecom/msg/inbox");
+			break;
+		case DIRECTION_OUTBOUND:
+			event->folder = g_strdup("telecom/msg/sent");
+			break;
+		default:
+			event->folder = g_strdup("");
+			break;
+		}
+	}
+
 	if (session->push_in_progress) {
 		struct messages_event *data;
 
@@ -928,16 +964,12 @@ static void notify_new_sms(const char *handle, enum messages_event_type type)
 
 	DBG("");
 
-	data = g_new0(struct messages_event, 1);
-	data->type = type;
-	data->msg_type = g_strdup("SMS_GSM");
-	data->old_folder = g_strdup("");
-	data->handle = fill_handle(handle);
-
 	if (type == MET_NEW_MESSAGE)
-		data->folder = g_strdup("telecom/msg/inbox");
+		folder = "telecom/msg/inbox";
+	else if (type == MET_MESSAGE_DELETED)
+		folder = NULL;
 	else
-		data->folder = g_strdup("");
+		folder = "";
 
 	data = messages_event_new(type, BMSG_T_SMS_GSM, handle, folder, "");
 
@@ -1036,7 +1068,7 @@ static gboolean handle_del_sms(DBusConnection * connection, DBusMessage * msg,
 							void *user_data)
 {
 	DBusMessageIter arg;
-	unsigned ihandle = 0;
+	int ihandle;
 	char *handle;
 
 	DBG("");
@@ -1152,8 +1184,7 @@ int messages_connect(void **s)
 	session->cwd = g_strdup("/");
 	session->folder = folder_tree;
 
-	session->msg_stat = g_hash_table_new_full(g_str_hash, g_str_equal,
-							g_free, g_free);
+	session->msg_stat = g_hash_table_new(NULL, NULL);
 
 	*s = session;
 
@@ -1482,16 +1513,16 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 			void *user_data)
 {
 	struct session *session = s;
-	struct message_status *stat = NULL;
-	int ret;
 	struct request *request;
+	int ret, ihandle, stat;
 
-	stat = g_hash_table_lookup(session->msg_stat, handle);
-	if (stat == NULL) {
-		stat = g_new0(struct message_status, 1);
-		stat->read = STATUS_NOT_SET;
-
-		g_hash_table_insert(session->msg_stat, g_strdup(handle), stat);
+	ihandle = g_ascii_strtoll(handle, NULL, 10);
+	stat = GPOINTER_TO_INT(g_hash_table_lookup(session->msg_stat,
+						GINT_TO_POINTER(ihandle)));
+	if (stat == 0) {
+		stat = MESSAGE_STAT_EMPTY;
+		g_hash_table_insert(session->msg_stat, GINT_TO_POINTER(ihandle),
+							GINT_TO_POINTER(stat));
 	}
 
 	request = g_new0(struct request, 1);
@@ -1500,29 +1531,40 @@ int messages_set_message_status(void *s, const char *handle, uint8_t indicator,
 	session->request = request;
 
 	switch (indicator) {
-		case 0x0:
-			ret = messages_qt_set_read(&request->set_status_call,
+	case 0x0:
+		ret = messages_qt_set_read(&request->set_status_call,
 						handle, value & 0x01,
 						messages_qt_callback, session);
-			if (ret < 0)
-				return ret;
+		if (ret < 0)
+			return ret;
 
-			stat->read = value;
-			break;
-		case 0x1:
-			ret = messages_qt_set_deleted(&request->set_status_call,
+		if(value == 1)
+			stat |= MESSAGE_STAT_READ;
+		else if(value == 0)
+			stat &= ~MESSAGE_STAT_READ;
+
+		break;
+	case 0x1:
+		ret = messages_qt_set_deleted(&request->set_status_call,
 						handle, value & 0x01,
 						messages_qt_callback, session);
-			if (ret < 0)
-				return ret;
+		if (ret < 0)
+			return ret;
 
-			stat->deleted = value;
-			break;
-		default:
-			g_free(request);
-			session->request = NULL;
-			return -EBADR;
+		if(value == 1)
+			stat |= MESSAGE_STAT_DELETED;
+		else if(value == 0)
+			stat &= ~MESSAGE_STAT_DELETED;
+
+		break;
+	default:
+		g_free(request);
+		session->request = NULL;
+		return -EBADR;
 	}
+
+	g_hash_table_insert(session->msg_stat, GINT_TO_POINTER(ihandle),
+							GINT_TO_POINTER(stat));
 
 	return 0;
 }
