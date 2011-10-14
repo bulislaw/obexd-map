@@ -936,6 +936,9 @@ static void mas_reset(struct obex_session *os, void *user_data)
 
 static void mas_clean(struct mas_session *mas)
 {
+	if (mas->dbus)
+		dbus_connection_unref(mas->dbus);
+
 	g_queue_free(mas->events_queue);
 	g_free(mas->remote_addr);
 	g_free(mas);
